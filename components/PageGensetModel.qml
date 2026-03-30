@@ -271,12 +271,36 @@ VisibleItemModel {
 	}
 
 	ListButton {
+		readonly property bool hasDigitalInputNotAvailableError: controlError.valid
+				&& Number(controlError.value) === 5
+		readonly property bool hasRemoteStartControlDisabledError: controlError.valid
+				&& Number(controlError.value) === 1
+		readonly property bool canClearDigitalInputInhibit: hasDigitalInputNotAvailableError
+				&& digitalInputInhibitSet.valid
+		readonly property bool digitalInputBlocks: hasDigitalInputNotAvailableError
+				&& digitalInputInhibitSet.valid
+				&& digitalInputInhibitSet.value > 0
 		readonly property bool showReenableRemoteStartButton: remoteStartModeEnabled.valid
 				&& (remoteStartModeEnabled.value === 0 || remoteStartModeEnabled.value === false)
 				&& enableRemoteStartMode.valid
+				&& !digitalInputBlocks
 		readonly property bool canReenableRemoteStart: showReenableRemoteStartButton
 				&& remoteStartStatusCode.valid
 				&& remoteStartStatusCode.value === VenusOS.Genset_StatusCode_Standby
+		readonly property string remoteStartSecondaryText: {
+			if (canClearDigitalInputInhibit) {
+				//% "Clear Digital Input Control"
+				return qsTrId("Clear_Digital_Input_Control")
+			}
+			if (canReenableRemoteStart) {
+				//% "Re-enable remote start mode"
+				return qsTrId("Re-enable_remote_start_mode")
+			}
+			if (showReenableRemoteStartButton) {
+				return CommonWords.disabled
+			}
+			return CommonWords.enabledOrDisabled(remoteStartModeEnabled.value)
+		}
 
 		readonly property string remoteStartSecondaryText: {
 			if (canReenableRemoteStart) {
@@ -293,7 +317,23 @@ VisibleItemModel {
 		secondaryText: remoteStartSecondaryText
 		interactive: canReenableRemoteStart
 		writeAccessLevel: VenusOS.User_AccessType_User
-		onClicked: enableRemoteStartMode.setValue(1)
+		onClicked: {
+			if (canClearDigitalInputInhibit) {
+				digitalInputInhibitSet.setValue(0)
+			} else {
+				enableRemoteStartMode.setValue(1)
+			}
+		}
+
+		VeQuickItem {
+			id: controlError
+			uid: root.startStopBindPrefix ? root.startStopBindPrefix + "/Error" : ""
+		}
+
+		VeQuickItem {
+			id: digitalInputInhibitSet
+			uid: root.startStopBindPrefix ? root.startStopBindPrefix + "/DigitalInput/InhibitSet" : ""
+		}
 
 		VeQuickItem {
 			id: remoteStartModeEnabled
@@ -313,6 +353,7 @@ VisibleItemModel {
 			id: controlError
 			uid: root.startStopBindPrefix ? root.startStopBindPrefix + "/Error" : ""
 		}
+
 	}
 
 	ListDcOutputQuantityGroup {
