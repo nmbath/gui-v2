@@ -53,13 +53,14 @@ DevicePage {
 								//% "Inverted"
 								text: qsTrId("digitalinput_inverted")
 								dataItem.uid: root.bindPrefix + "/Settings/InvertTranslation"
+								preferredVisible: inputType.value !== VenusOS.DigitalInput_Type_GeneratorInhibitRun
 							}
 
 							ListSwitch {
 								//% "Invert alarm logic"
 								text: qsTrId("digitalinput_invert_alarm_logic")
 								dataItem.uid: root.bindPrefix + "/Settings/InvertAlarm"
-								preferredVisible: alarmSwitch.checked
+								preferredVisible: alarmSwitch.checked && inputType.value !== VenusOS.DigitalInput_Type_GeneratorInhibitRun
 							}
 						}
 					}
