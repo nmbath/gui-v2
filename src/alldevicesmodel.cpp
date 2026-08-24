@@ -22,6 +22,7 @@ bool includeServiceItem(VeQItem *serviceItem)
 	static const QSet<QString> knownSystemServices = {
 		QStringLiteral("adc"),
 		QStringLiteral("ble"),
+		QStringLiteral("containers"),
 		QStringLiteral("digitalinputs"),
 		QStringLiteral("hub4"),
 		QStringLiteral("fronius"),
