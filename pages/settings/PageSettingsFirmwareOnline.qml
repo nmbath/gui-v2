@@ -55,6 +55,7 @@ Page {
 				optionModel: [
 					{ display: CommonWords.firmware_type_normal, value: FirmwareUpdater.ImageTypeNormal },
 					{ display: CommonWords.firmware_type_large, value: FirmwareUpdater.ImageTypeLarge },
+					{ display: CommonWords.firmware_type_containers, value: FirmwareUpdater.ImageTypeContainers },
 				]
 
 				VeQuickItem {
