@@ -88,7 +88,10 @@ Page {
 			ListText {
 				//% "D-Bus proxy"
 				text: qsTrId("pagesettingscontainerservice_dbus_proxy")
-				secondaryText: Containers.serviceStateToText(dbusProxyState.value)
+				// DbusProxyState (0=Unknown/1=Ready/2=Unavailable) - a
+				// distinct enum from ServiceState above, not the same
+				// 0/1/2 meanings even though the numbers overlap.
+				secondaryText: Containers.dbusProxyStateToText(dbusProxyState.value)
 			}
 
 			SettingsListHeader {
