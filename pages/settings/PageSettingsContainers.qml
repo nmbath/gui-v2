@@ -122,14 +122,23 @@ Page {
 						text: item.value || ""
 						caption: image.value || ""
 						// While running, live resource usage is more useful
-						// at a glance than a static "Running" label - the
-						// state text still applies for every other state
-						// (Stopped/Starting/Error/etc).
-						secondaryText: state.value === 4 // ContainerState.Running, see Containers.qml
+						// at a glance than a static "Running" label; while
+						// blocked on a dependency, naming what it's waiting
+						// for and when it'll retry is more useful than the
+						// bare "Waiting to start" state text - everything
+						// else (Stopped/Starting/Error/etc) still falls back
+						// to the plain state text.
+						secondaryText: {
+							if (state.value === 4) { // ContainerState.Running
 								//% "%1% CPU, %2 MB"
-								? qsTrId("pagesettingscontainers_running_stats")
+								return qsTrId("pagesettingscontainers_running_stats")
 										.arg(Math.round(cpuUsage.value)).arg(Containers.bytesToMebibytes(memoryUsage.value))
-								: Containers.stateToText(state.value)
+							}
+							if (state.value === 8) { // ContainerState.WaitingForDependency
+								return Containers.waitingForDependencyText(dependency.value, retryIn.value)
+							}
+							return Containers.stateToText(state.value)
+						}
 						onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainer.qml",
 								{"title": text, "containerPrefix": containerPrefix})
 
@@ -212,7 +221,7 @@ Page {
 										width: 16
 										height: 16
 										radius: 8
-										color: Containers.severityColor(state.value, errorCode.value)
+										color: Containers.severityColor(state.value, errorCode.value, dbusState.value)
 										visible: color != "transparent"
 									}
 								}
@@ -230,6 +239,18 @@ Page {
 						VeQuickItem {
 							id: errorCode
 							uid: containerPrefix + "/ErrorCode"
+						}
+						VeQuickItem {
+							id: dbusState
+							uid: containerPrefix + "/Dbus/State"
+						}
+						VeQuickItem {
+							id: dependency
+							uid: containerPrefix + "/Dependency"
+						}
+						VeQuickItem {
+							id: retryIn
+							uid: containerPrefix + "/RetryIn"
 						}
 						VeQuickItem {
 							id: cpuUsage
