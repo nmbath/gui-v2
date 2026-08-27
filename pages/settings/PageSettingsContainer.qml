@@ -18,8 +18,10 @@ import Victron.VenusOS
 	since a plain re-write of DesiredState=Running when it is already 1 is
 	a no-op (SetValue only calls back on an actual value change) - this
 	also doubles as the recovery action for a container stuck in Error
-	after exceeding its restart-loop limit (mock-up 7), where desired
-	state is already Running but nothing is retrying it.
+	after exceeding its restart-loop limit (mock-up 7), or WaitingForDependency
+	(state 8, Group F proxy-readiness work) - a manual "try now" that
+	bypasses the pending backoff - where desired state is already Running
+	but nothing is retrying it (or retrying on its own schedule).
 */
 Page {
 	id: root
@@ -47,6 +49,10 @@ Page {
 	VeQuickItem { id: restartCount; uid: root.containerPrefix + "/RestartCount" }
 	VeQuickItem { id: errorCode; uid: root.containerPrefix + "/ErrorCode" }
 	VeQuickItem { id: errorText; uid: root.containerPrefix + "/Error" }
+	VeQuickItem { id: dbusState; uid: root.containerPrefix + "/Dbus/State" }
+	VeQuickItem { id: dbusErrorText; uid: root.containerPrefix + "/Dbus/Error" }
+	VeQuickItem { id: dependency; uid: root.containerPrefix + "/Dependency" }
+	VeQuickItem { id: retryIn; uid: root.containerPrefix + "/RetryIn" }
 	VeQuickItem { id: memoryLimit; uid: root.containerPrefix + "/Resources/MemoryLimit" }
 	VeQuickItem { id: cpuLimit; uid: root.containerPrefix + "/Resources/CpuLimit" }
 	VeQuickItem { id: startOnBoot; uid: root.containerPrefix + "/Lifecycle/StartOnBoot" }
@@ -92,6 +98,34 @@ Page {
 				//% "Error: %1"
 				text: qsTrId("pagesettingscontainer_error").arg(errorText.value)
 				preferredVisible: errorCode.value !== 0 && !!errorText.value
+			}
+
+			// Waiting to start (state 8): not an error - self-recovers as
+			// soon as the dependency is Ready - but the bare state text
+			// alone gives no reason and no sense of progress. Names what
+			// it's waiting for and counts down to the next retry (spec
+			// v14's suggested GUI wording), and offers Restart below as an
+			// explicit "try now" action for anyone who doesn't want to wait
+			// out the backoff.
+			ListText {
+				//% "Waiting to start"
+				text: qsTrId("pagesettingscontainer_waiting_for_dependency")
+				caption: Containers.waitingForDependencyText(dependency.value, retryIn.value)
+				preferredVisible: state.value === 8 // ContainerState.WaitingForDependency
+			}
+
+			// Degraded while Running (Dbus/State Unavailable): the workload
+			// itself is fine and was deliberately left running - only its
+			// D-Bus link is down. Restarting the container would not fix
+			// an external proxy outage, so no action is offered here; it
+			// clears itself automatically once the proxy is Ready again.
+			ListText {
+				//% "D-Bus unavailable"
+				text: qsTrId("pagesettingscontainer_dbus_unavailable")
+				secondaryText: dbusErrorText.value
+				//% "Will reconnect automatically once the D-Bus proxy is available again"
+				caption: qsTrId("pagesettingscontainer_dbus_unavailable_caption")
+				preferredVisible: root.isRunning && dbusState.value === 3 // DbusState.Unavailable
 			}
 
 			SettingsListHeader {
@@ -141,9 +175,15 @@ Page {
 					if (checked) {
 						desiredState.setValue(0)
 					} else if (desiredState.value === 1) {
-						// Already Running (stuck after exceeding
-						// restart-loop limit, mock-up 7): a re-write to 1
-						// would be a no-op, so force a restart instead.
+						// Already desired Running but not actually Running
+						// (stuck after exceeding the restart-loop limit,
+						// mock-up 7 - or WaitingForDependency, state 8): a
+						// re-write to 1 would be a no-op, so force a
+						// restart instead. For WaitingForDependency this
+						// also bypasses the pending backoff (Stop clears
+						// the wait, then Start re-checks the dependency
+						// immediately - see reconciler.py's
+						// _reconcile_stopped/_clear_dependency_wait).
 						root.restart()
 					} else {
 						desiredState.setValue(1)
@@ -154,12 +194,16 @@ Page {
 			ListButton {
 				// text/secondaryText split matches PageDebug.qml's Quit
 				// button and the Delete button below ("Restart container"
-				// label, "Restart" on the button).
+				// label, "Restart" on the button). Also offered while
+				// WaitingForDependency (state 8) as the explicit "try now"
+				// action from the caption above, since root.restart()
+				// already bypasses the pending backoff for that state too
+				// (see the Running switch's onClicked comment above).
 				//% "Restart container"
 				text: qsTrId("pagesettingscontainer_restart_container")
 				//% "Restart"
 				secondaryText: qsTrId("pagesettingscontainer_restart")
-				preferredVisible: root.isRunning
+				preferredVisible: root.isRunning || state.value === 8
 				onClicked: root.restart()
 			}
 
