@@ -143,6 +143,24 @@ QtObject {
 		return value
 	}
 
+	// Sub-container runtime children only expose a Running bool
+	// (docs/dbus-api.md ContainerRuntime/Child/<runtime-id>/Running) - no full
+	// ContainerState enum, so this is deliberately not stateToText().
+	function childStateToText(running) {
+		//% "Running"
+		return running ? qsTrId("containers_child_state_running")
+				//% "Stopped"
+				: qsTrId("containers_child_state_stopped")
+	}
+
+	// "3 of 4 running" summary for a sub-container runtime's Children/{Count,
+	// Running} (docs/dbus-api.md) - used both on the parent container's
+	// Sub-containers nav row and the sub-container list page's own header.
+	function childRunningSummaryText(running, total) {
+		//% "%1 of %2 running"
+		return qsTrId("containers_child_running_summary").arg(running).arg(total)
+	}
+
 	function bytesToMebibytes(bytes) {
 		return Math.round(bytes / (1024 * 1024))
 	}
