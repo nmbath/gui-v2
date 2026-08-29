@@ -238,6 +238,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/listitems/ListPvInverterPositionRadioButtonGroup.qml
     components/listitems/ListRebootButton.qml
     components/listitems/ListRelayState.qml
+    components/listitems/ListResourceGauge.qml
     components/listitems/ListSpinBoxRange.qml
     components/listitems/ListGeneratorAutoStartSwitch.qml
     components/listitems/ListTemperatureRelay.qml
@@ -438,6 +439,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsContainer.qml
     pages/settings/PageSettingsContainerResources.qml
     pages/settings/PageSettingsContainerService.qml
+    pages/settings/PageSettingsContainerStartup.qml
+    pages/settings/PageSettingsContainerSubcontainers.qml
     pages/settings/PageSettingsContainers.qml
     pages/settings/PageSettingsDisplayAndAppearance.qml
     pages/settings/PageSettingsDisplayBrief.qml

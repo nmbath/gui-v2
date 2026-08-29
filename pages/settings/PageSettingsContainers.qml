@@ -23,6 +23,86 @@ Page {
 
 	readonly property string containersServiceUid: BackendConnection.serviceUidForType("containers")
 
+	// docs/dbus-api.md: MaxMemoryLimitBytes/MaxCpuLimit are the host ceiling
+	// (RAM minus a fixed OS/Venus reserve; host core count) - the same bound
+	// PageSettingsContainerResources.qml's Memory/CPU-maximum sliders use.
+	// AllocatedMemoryLimitBytes/AllocatedCpuLimit are already the backend's
+	// own authoritative sum of every container's own Resources/MemoryLimit,
+	// CpuLimit PLUS its ContainerRuntime/Resources aggregate when enabled -
+	// the two are separate, additive cgroups (RUNTIME_API_CGROUP_ROOT vs
+	// DEDICATED_CGROUP_ROOT in backend/podman.py, not one shared leaf), so
+	// both genuinely consume host memory and both are counted - see
+	// [[containers_system_resources]] in memory. All four leaves are added
+	// together in the same backend commit, so every row below simply stays
+	// hidden (via .valid) as one unit until it lands.
+	VeQuickItem { id: systemMaxMemory; uid: root.containersServiceUid + "/System/MaxMemoryLimitBytes" }
+	VeQuickItem { id: systemMaxCpu; uid: root.containersServiceUid + "/System/MaxCpuLimit" }
+	VeQuickItem { id: allocatedMemory; uid: root.containersServiceUid + "/System/AllocatedMemoryLimitBytes" }
+	VeQuickItem { id: allocatedCpu; uid: root.containersServiceUid + "/System/AllocatedCpuLimit" }
+
+	// The backend's own Allocated total already excludes each Unlimited (0)
+	// contributor from the sum (same "0 = no cap" convention as everywhere
+	// else), which makes it an undercount rather than a hard ceiling - so
+	// this page still needs to know how many contributors are Unlimited, to
+	// flag that undercount rather than let the total silently read smaller
+	// than reality. A container's own limit and its ContainerRuntime
+	// aggregate (when enabled) are two separate, independently-Unlimited
+	// contributors (see [[containers_system_resources]]), so both are
+	// counted here. That count (unlike the sum itself) has no backend leaf
+	// of its own, so it's the one thing still computed client-side, from
+	// the list's own live per-row model.
+	property int unlimitedMemoryCount: 0
+	property int unlimitedCpuCount: 0
+
+	function recomputeUnlimitedCounts() {
+		let unlimitedMemory = 0
+		let unlimitedCpu = 0
+		for (let i = 0; i < containerRepeater.count; ++i) {
+			const row = containerRepeater.itemAt(i)
+			if (!row) {
+				continue
+			}
+			if (row.memoryLimitBytes <= 0) {
+				unlimitedMemory++
+			}
+			if (row.cpuLimitCores <= 0) {
+				unlimitedCpu++
+			}
+			if (row.runtimeEnabled) {
+				if (row.runtimeMemoryLimitBytes <= 0) {
+					unlimitedMemory++
+				}
+				if (row.runtimeCpuLimitCores <= 0) {
+					unlimitedCpu++
+				}
+			}
+		}
+		root.unlimitedMemoryCount = unlimitedMemory
+		root.unlimitedCpuCount = unlimitedCpu
+	}
+
+	function assignedMemoryText() {
+		const assignedMib = Containers.bytesToMebibytes(allocatedMemory.value)
+		const totalMib = Containers.bytesToMebibytes(systemMaxMemory.value)
+		if (root.unlimitedMemoryCount > 0) {
+			//% "%1 MB assigned / %2 MB total (%3 unlimited)"
+			return qsTrId("pagesettingscontainers_system_memory_assigned_unlimited")
+					.arg(assignedMib).arg(totalMib).arg(root.unlimitedMemoryCount)
+		}
+		//% "%1 MB assigned / %2 MB total"
+		return qsTrId("pagesettingscontainers_system_memory_assigned").arg(assignedMib).arg(totalMib)
+	}
+
+	function assignedCpuText() {
+		if (root.unlimitedCpuCount > 0) {
+			//% "%1 of %2 cores assigned (%3 unlimited)"
+			return qsTrId("pagesettingscontainers_system_cpu_assigned_unlimited")
+					.arg(allocatedCpu.value).arg(systemMaxCpu.value).arg(root.unlimitedCpuCount)
+		}
+		//% "%1 of %2 cores assigned"
+		return qsTrId("pagesettingscontainers_system_cpu_assigned").arg(allocatedCpu.value).arg(systemMaxCpu.value)
+	}
+
 	VeQItemSortTableModel {
 		id: containers
 
@@ -56,6 +136,36 @@ Page {
 				// pattern as Settings > Integrations > Signal K, not a direct
 				// write to the container service itself.
 				dataItem.uid: Global.venusPlatform.serviceUid + "/Services/Containers/Enabled"
+			}
+
+			SettingsColumn {
+				width: parent ? parent.width : 0
+				// Both leaves are published together (same backend change),
+				// so checking one is enough to know whether either is safe
+				// to read - but check both anyway, in case they land as two
+				// separate writes.
+				preferredVisible: enabledSwitch.checked && systemMaxMemory.valid && systemMaxCpu.valid
+
+				SettingsListHeader {
+					//% "System resources"
+					text: qsTrId("pagesettingscontainers_system_resources")
+				}
+
+				ListResourceGauge {
+					//% "Memory"
+					text: qsTrId("pagesettingscontainerresources_memory")
+					valueText: root.assignedMemoryText()
+					value: allocatedMemory.value
+					to: systemMaxMemory.value
+				}
+
+				ListResourceGauge {
+					//% "CPU"
+					text: qsTrId("pagesettingscontainerresources_cpu")
+					valueText: root.assignedCpuText()
+					value: allocatedCpu.value
+					to: systemMaxCpu.value
+				}
 			}
 
 			SettingsListHeader {
@@ -118,6 +228,25 @@ Page {
 						required property VeQItem item
 
 						readonly property string containerPrefix: item.itemParent().uid
+
+						// Exposed so root.recomputeUnlimitedCounts() can count how
+						// many contributors (a container's own limit, and
+						// separately its ContainerRuntime aggregate when
+						// enabled) are Unlimited (0) - see that function's own
+						// comment for why. The assigned sum itself comes
+						// straight from the backend's own System/Allocated*
+						// leaves, not from these.
+						readonly property real memoryLimitBytes: memoryLimit.value
+						readonly property real cpuLimitCores: cpuLimit.value
+						readonly property bool runtimeEnabled: !!containerRuntimeEnabled.value
+						readonly property real runtimeMemoryLimitBytes: runtimeMemoryLimit.value
+						readonly property real runtimeCpuLimitCores: runtimeCpuLimit.value
+
+						onMemoryLimitBytesChanged: root.recomputeUnlimitedCounts()
+						onCpuLimitCoresChanged: root.recomputeUnlimitedCounts()
+						onRuntimeEnabledChanged: root.recomputeUnlimitedCounts()
+						onRuntimeMemoryLimitBytesChanged: root.recomputeUnlimitedCounts()
+						onRuntimeCpuLimitCoresChanged: root.recomputeUnlimitedCounts()
 
 						text: item.value || ""
 						caption: image.value || ""
@@ -260,7 +389,32 @@ Page {
 							id: memoryUsage
 							uid: containerPrefix + "/Resources/MemoryUsage"
 						}
+						VeQuickItem {
+							id: memoryLimit
+							uid: containerPrefix + "/Resources/MemoryLimit"
+						}
+						VeQuickItem {
+							id: cpuLimit
+							uid: containerPrefix + "/Resources/CpuLimit"
+						}
+						VeQuickItem {
+							id: containerRuntimeEnabled
+							uid: containerPrefix + "/ContainerRuntime/Enabled"
+						}
+						VeQuickItem {
+							id: runtimeMemoryLimit
+							uid: containerPrefix + "/ContainerRuntime/Resources/MemoryLimitBytes"
+						}
+						VeQuickItem {
+							id: runtimeCpuLimit
+							uid: containerPrefix + "/ContainerRuntime/Resources/CpuLimit"
+						}
 					}
+
+					// Covers rows appearing/disappearing - each row's own
+					// onMemoryLimitBytesChanged etc (above) covers live value
+					// changes on an already-existing row.
+					onCountChanged: root.recomputeUnlimitedCounts()
 				}
 			}
 		}

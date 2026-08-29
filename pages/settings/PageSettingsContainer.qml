@@ -28,8 +28,9 @@ Page {
 
 	required property string containerPrefix
 
-	// DesiredState/StartupDelay live on com.victronenergy.settings, a
-	// *different* D-Bus service than com.victronenergy.containers -
+	// DesiredState (and, on the Startup Options page, StartupDelay) live on
+	// com.victronenergy.settings, a *different* D-Bus service than
+	// com.victronenergy.containers -
 	// containerPrefix.replace("/Containers/", "/Settings/Containers/") only
 	// ever rewrote the path, never the service name, so it produced a
 	// nonsense uid still addressed to com.victronenergy.containers
@@ -55,9 +56,14 @@ Page {
 	VeQuickItem { id: retryIn; uid: root.containerPrefix + "/RetryIn" }
 	VeQuickItem { id: memoryLimit; uid: root.containerPrefix + "/Resources/MemoryLimit" }
 	VeQuickItem { id: cpuLimit; uid: root.containerPrefix + "/Resources/CpuLimit" }
-	VeQuickItem { id: startOnBoot; uid: root.containerPrefix + "/Lifecycle/StartOnBoot" }
-	VeQuickItem { id: startupDelay; uid: root.settingsPrefix + "/StartupDelay" }
 	VeQuickItem { id: desiredState; uid: root.settingsPrefix + "/DesiredState" }
+	VeQuickItem { id: containerRuntimeEnabled; uid: root.containerPrefix + "/ContainerRuntime/Enabled" }
+	VeQuickItem { id: childrenCount; uid: root.containerPrefix + "/ContainerRuntime/Children/Count" }
+	VeQuickItem { id: childrenRunning; uid: root.containerPrefix + "/ContainerRuntime/Children/Running" }
+	// HostIdentity/* still publishes empty-string sentinels until the
+	// extensionidentities integration lands (docs/dbus-api.md note 1) - the
+	// caption below is simply blank on real hardware until then, not broken.
+	VeQuickItem { id: hostIdentityName; uid: root.containerPrefix + "/HostIdentity/Name" }
 
 	// Forces a real value change (0 then 1) rather than a same-value
 	// no-op write - see module docstring.
@@ -129,32 +135,47 @@ Page {
 			}
 
 			SettingsListHeader {
-				//% "Startup"
-				text: qsTrId("pagesettingscontainer_startup")
+				//% "Configuration"
+				text: qsTrId("pagesettingscontainer_configuration")
 			}
 
-			ListSwitch {
-				//% "Start automatically"
-				text: qsTrId("pagesettingscontainer_start_automatically")
-				//% "Start after dbus-containers starts"
-				caption: qsTrId("pagesettingscontainerstartup_start_automatically_caption")
-				dataItem.uid: startOnBoot.uid
+			ListNavigation {
+				//% "Resources"
+				text: qsTrId("pagesettingscontainer_resources")
+				//% "Memory %1, %2"
+				secondaryText: qsTrId("pagesettingscontainer_resource_limits_summary")
+						.arg(Containers.memoryLimitToText(memoryLimit.value))
+						.arg(Containers.cpuLimitToText(cpuLimit.value))
+				// title: text (this row's own label, not root.title) -
+				// passing the container page's own title here duplicated it
+				// in the breadcrumb instead of showing the sub-page's own
+				// name (Containers > node-red > node-red instead of
+				// Containers > node-red > Resources).
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerResources.qml",
+						{"title": text, "containerPrefix": root.containerPrefix})
 			}
 
-			ListSlider {
-				// ListSlider has no separate value-readout property (see
-				// components/listitems/core/ListSlider.qml) - shown as
-				// part of the label itself instead, e.g. "Delay: 15 s".
-				//% "Delay: %1 s"
-				text: qsTrId("pagesettingscontainerstartup_delay").arg(Math.round(value))
-				//% "Staggering prevents several heavy applications from starting together after a GX reboot or service restart."
-				caption: qsTrId("pagesettingscontainerstartup_delay_caption")
-				dataItem.uid: startupDelay.uid
-				from: 0
-				to: 120
-				stepSize: 1
-				// Wire type for StartOnBoot is Int32, not a genuine boolean.
-				preferredVisible: !!startOnBoot.value
+			ListNavigation {
+				//% "Startup Options"
+				text: qsTrId("pagesettingscontainer_startup_options")
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerStartup.qml",
+						{"title": text, "containerPrefix": root.containerPrefix})
+			}
+
+			ListNavigation {
+				//% "Sub-containers"
+				text: qsTrId("pagesettingscontainer_subcontainers")
+				secondaryText: Containers.childRunningSummaryText(childrenRunning.value, childrenCount.value)
+				//% "Dedicated runtime identity: %1"
+				caption: hostIdentityName.value ? qsTrId("pagesettingscontainer_subcontainers_identity_caption").arg(hostIdentityName.value) : ""
+				// Wire type for ContainerRuntime/Enabled is Int32, not a
+				// genuine boolean (docs/dbus-api.md note 3) - published for
+				// every container, 0/Unavailable for the overwhelming
+				// majority that never request the capability, so this row
+				// is absent for almost every container.
+				preferredVisible: !!containerRuntimeEnabled.value
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerSubcontainers.qml",
+						{"title": text, "containerPrefix": root.containerPrefix})
 			}
 
 			SettingsListHeader {
@@ -162,19 +183,26 @@ Page {
 				text: qsTrId("pagesettingscontainer_control")
 			}
 
-			ListSwitch {
-				//% "Running"
-				text: qsTrId("pagesettingscontainer_running")
-				// checked is derived from observed state (not desiredState)
-				// so it reflects reality even when they briefly disagree
-				// during a transition - same manual checked/onClicked
-				// pattern as the Unlimited-memory switch on the Resources
-				// page (ListSwitch.qml's own docstring, option 2).
-				checked: root.isRunning
+			ListButton {
+				// text/secondaryText split matches the Restart/Delete
+				// buttons below ("Stop container" label, "Stop" on the
+				// button).
+				//% "Stop container"
+				text: qsTrId("pagesettingscontainer_stop_container")
+				//% "Stop"
+				secondaryText: qsTrId("pagesettingscontainer_stop")
+				preferredVisible: root.isRunning
+				onClicked: desiredState.setValue(0)
+			}
+
+			ListButton {
+				//% "Start container"
+				text: qsTrId("pagesettingscontainer_start_container")
+				//% "Start"
+				secondaryText: qsTrId("pagesettingscontainer_start")
+				preferredVisible: !root.isRunning
 				onClicked: {
-					if (checked) {
-						desiredState.setValue(0)
-					} else if (desiredState.value === 1) {
+					if (desiredState.value === 1) {
 						// Already desired Running but not actually Running
 						// (stuck after exceeding the restart-loop limit,
 						// mock-up 7 - or WaitingForDependency, state 8): a
@@ -192,35 +220,17 @@ Page {
 			}
 
 			ListButton {
-				// text/secondaryText split matches PageDebug.qml's Quit
-				// button and the Delete button below ("Restart container"
-				// label, "Restart" on the button). Also offered while
-				// WaitingForDependency (state 8) as the explicit "try now"
-				// action from the caption above, since root.restart()
-				// already bypasses the pending backoff for that state too
-				// (see the Running switch's onClicked comment above).
+				// Also offered while WaitingForDependency (state 8) as the
+				// explicit "try now" action from the Waiting caption above,
+				// since root.restart() already bypasses the pending backoff
+				// for that state too (see the Start button's onClicked
+				// comment above).
 				//% "Restart container"
 				text: qsTrId("pagesettingscontainer_restart_container")
 				//% "Restart"
 				secondaryText: qsTrId("pagesettingscontainer_restart")
 				preferredVisible: root.isRunning || state.value === 8
 				onClicked: root.restart()
-			}
-
-			ListNavigation {
-				//% "Resource limits"
-				text: qsTrId("pagesettingscontainer_resource_limits")
-				//% "Memory %1, %2"
-				secondaryText: qsTrId("pagesettingscontainer_resource_limits_summary")
-						.arg(Containers.memoryLimitToText(memoryLimit.value))
-						.arg(Containers.cpuLimitToText(cpuLimit.value))
-				// title: text (this row's own "Resource limits" label, not
-				// root.title) - passing the container page's own title here
-				// duplicated it in the breadcrumb instead of showing the
-				// sub-page's own name (Containers > node-red > node-red
-				// instead of Containers > node-red > Resource limits).
-				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerResources.qml",
-						{"title": text, "containerPrefix": root.containerPrefix})
 			}
 
 			ListButton {
@@ -235,8 +245,8 @@ Page {
 				writeAccessLevel: VenusOS.User_AccessType_Installer
 				// ListButton.click() (components/listitems/core/ListButton.qml)
 				// already gates on checkWriteAccessLevel() before this signal
-				// fires - no need to call it again here, same as the running
-				// switch above.
+				// fires - no need to call it again here, same as the Stop/
+				// Start/Restart buttons above.
 				onClicked: Global.dialogLayer.open(deleteConfirmationDialogComponent)
 
 				Component {
