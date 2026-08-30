@@ -58,8 +58,15 @@ Page {
 	VeQuickItem { id: cpuLimit; uid: root.containerPrefix + "/Resources/CpuLimit" }
 	VeQuickItem { id: desiredState; uid: root.settingsPrefix + "/DesiredState" }
 	VeQuickItem { id: containerRuntimeEnabled; uid: root.containerPrefix + "/ContainerRuntime/Enabled" }
-	VeQuickItem { id: childrenCount; uid: root.containerPrefix + "/ContainerRuntime/Children/Count" }
-	VeQuickItem { id: childrenRunning; uid: root.containerPrefix + "/ContainerRuntime/Children/Running" }
+	// Unified across both child ownership modes (docs/dbus-api.md note 5) -
+	// Mode is "", "managed" or "runtime"; Count/Running cover either shape
+	// through the one path, replacing the older ContainerRuntime/Children/*
+	// equivalent this row used to read (still published, just runtime-mode
+	// only, so no longer sufficient on its own to decide this row's
+	// visibility).
+	VeQuickItem { id: childrenMode; uid: root.containerPrefix + "/Children/Mode" }
+	VeQuickItem { id: childrenCount; uid: root.containerPrefix + "/Children/TotalCount" }
+	VeQuickItem { id: childrenRunning; uid: root.containerPrefix + "/Children/RunningCount" }
 	// HostIdentity/* still publishes empty-string sentinels until the
 	// extensionidentities integration lands (docs/dbus-api.md note 1) - the
 	// caption below is simply blank on real hardware until then, not broken.
@@ -166,14 +173,23 @@ Page {
 				//% "Sub-containers"
 				text: qsTrId("pagesettingscontainer_subcontainers")
 				secondaryText: Containers.childRunningSummaryText(childrenRunning.value, childrenCount.value)
+				// Only the runtime-mode case has its own dedicated identity
+				// worth calling out - a managed-mode container's children
+				// run under whatever identity the parent itself already
+				// has (shared or dedicated), not a separate one of their
+				// own, so there is nothing extra to surface here for it.
 				//% "Dedicated runtime identity: %1"
-				caption: hostIdentityName.value ? qsTrId("pagesettingscontainer_subcontainers_identity_caption").arg(hostIdentityName.value) : ""
+				caption: containerRuntimeEnabled.value && hostIdentityName.value
+						? qsTrId("pagesettingscontainer_subcontainers_identity_caption").arg(hostIdentityName.value) : ""
 				// Wire type for ContainerRuntime/Enabled is Int32, not a
 				// genuine boolean (docs/dbus-api.md note 3) - published for
 				// every container, 0/Unavailable for the overwhelming
-				// majority that never request the capability, so this row
-				// is absent for almost every container.
-				preferredVisible: !!containerRuntimeEnabled.value
+				// majority that never request the capability. Children/Mode
+				// (docs/dbus-api.md note 5) covers the managed-mode case the
+				// same way - "" for the overwhelming majority with no
+				// children of either kind - so this row is absent for
+				// almost every container either way.
+				preferredVisible: !!containerRuntimeEnabled.value || childrenMode.value === "managed"
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerSubcontainers.qml",
 						{"title": text, "containerPrefix": root.containerPrefix})
 			}
