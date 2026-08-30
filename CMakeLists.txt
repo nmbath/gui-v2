@@ -30,6 +30,9 @@ endif()
 project(venus-gui-v2 LANGUAGES CXX VERSION 1.3.18)
 add_definitions(-DPROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} -DPROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR} -DPROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH} )
 
+set(CONTAINERS_VERSION 1)
+add_definitions(-DCONTAINERS_VERSION=${CONTAINERS_VERSION})
+
 option(NO_CACHEGEN "Enable bytecode compilation and lint processing for all qml files via cmake -NO_CACHEGEN=OFF" ON) # Enabled by default
 option(RUN_UNIT_TESTS "only affects desktop builds. Enable via cmake -DRUN_UNIT_TESTS=ON" OFF) # Disabled by default
 option(GUI_V2_BUILD "Disable via cmake -DGUI_V2_BUILD=OFF for unit test only build (for CI/CD)" ON) # Enabled by default
