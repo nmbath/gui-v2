@@ -23,12 +23,16 @@ import Victron.VenusOS
 	Own container: /Containers/<UUID>/Resources/{MemoryUsage,MemoryLimit,
 	CpuUsage,CpuLimit,CpuWeight,Pids,PidsLimit} (docs/dbus-api.md).
 
-	Aggregate (isAggregate=true): /Containers/<UUID>/ContainerRuntime/Resources/
-	{MemoryUsedBytes,MemoryLimitBytes,CpuUsage,CpuLimit,PidsUsed,PidsLimit} - the
-	envelope applied across all of that container's sub-containers collectively,
-	entirely separate from the parent's own Resources above (docs/dbus-api.md
-	note 3). No CpuWeight equivalent exists for the aggregate case. Writing one
-	of these three R/W leaves calls update_runtime_resources (reconciler.py),
+	Aggregate (isAggregate=true): /Containers/<UUID>/Children/Resources/
+	{MemoryUsedBytes,MemoryLimitBytes,CpuUsage,CpuLimit,PidsUsed,PidsLimit}
+	(docs/dbus-api.md note 5) - the envelope applied across all of that
+	container's children collectively, for either ownership mode (runtime or
+	managed) through the one unified path, entirely separate from the
+	parent's own Resources above. No CpuWeight equivalent exists for the
+	aggregate case. Writing one of these three R/W leaves calls
+	update_runtime_resources or update_children_resources (reconciler.py,
+	whichever the container's actual mode is - both raise for the other
+	mode, so a write here always reaches the one that actually applies),
 	which persists and applies live but never recreates the parent.
 
 	Memory/CPU maximum are sliders from 0 (which already means "unlimited" per
@@ -36,14 +40,14 @@ import Victron.VenusOS
 	service's top-level /System/MaxMemoryLimitBytes and /System/MaxCpuLimit -
 	so there is no separate "Unlimited" switch here: sliding all the way to 0
 	already produces the same wire value backend/podman.py already treats as
-	unlimited. Same bound for both own-container and aggregate: a
-	sub-container runtime's aggregate envelope lives in its own separate
-	cgroup (RUNTIME_API_CGROUP_ROOT in backend/podman.py), not carved out of
-	the parent's own (DEDICATED_CGROUP_ROOT) - it's an additional allocation
-	of host memory, not a subdivision of the parent's limit, confirmed live -
-	see [[containers_system_resources]] in memory. Both rows stay hidden
-	until the backend publishes those two leaves (preferredVisible on each
-	system-max item's .valid).
+	unlimited. Same bound for both own-container and aggregate: a child's
+	aggregate envelope lives in its own separate cgroup (RUNTIME_API_CGROUP_
+	ROOT or CHILD_SCOPE_CGROUP_ROOT in backend/podman.py, depending on mode),
+	not carved out of the parent's own (DEDICATED_CGROUP_ROOT) - it's an
+	additional allocation of host memory, not a subdivision of the parent's
+	limit, confirmed live - see [[containers_system_resources]] in memory.
+	Both rows stay hidden until the backend publishes those two leaves
+	(preferredVisible on each system-max item's .valid).
 */
 Page {
 	id: root
@@ -53,7 +57,7 @@ Page {
 
 	readonly property int memoryStepMib: 64
 
-	readonly property string resourcePrefix: root.containerPrefix + (root.isAggregate ? "/ContainerRuntime/Resources" : "/Resources")
+	readonly property string resourcePrefix: root.containerPrefix + (root.isAggregate ? "/Children/Resources" : "/Resources")
 	readonly property string memoryUsageLeaf: root.isAggregate ? "MemoryUsedBytes" : "MemoryUsage"
 	readonly property string memoryLimitLeaf: root.isAggregate ? "MemoryLimitBytes" : "MemoryLimit"
 	readonly property string pidsUsageLeaf: root.isAggregate ? "PidsUsed" : "Pids"
