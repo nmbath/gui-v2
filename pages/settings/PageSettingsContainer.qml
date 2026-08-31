@@ -45,6 +45,7 @@ Page {
 	VeQuickItem { id: state; uid: root.containerPrefix + "/State" }
 	VeQuickItem { id: statusText; uid: root.containerPrefix + "/Status" }
 	VeQuickItem { id: image; uid: root.containerPrefix + "/Image" }
+	VeQuickItem { id: pullPolicy; uid: root.containerPrefix + "/Image/PullPolicy" }
 	VeQuickItem { id: runtimeId; uid: root.containerPrefix + "/RuntimeId" }
 	VeQuickItem { id: uptime; uid: root.containerPrefix + "/Uptime" }
 	VeQuickItem { id: restartCount; uid: root.containerPrefix + "/RestartCount" }
@@ -291,6 +292,13 @@ Page {
 				//% "Image"
 				text: qsTrId("pagesettingscontainer_image")
 				secondaryText: image.value || ""
+			}
+
+			ListRadioButtonGroup {
+				//% "Pull policy"
+				text: qsTrId("pagesettingscontainer_pull_policy")
+				dataItem.uid: pullPolicy.uid
+				optionModel: Containers.pullPolicyOptions()
 			}
 
 			ListText {
