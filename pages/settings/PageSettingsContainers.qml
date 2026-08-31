@@ -136,6 +136,39 @@ Page {
 				// pattern as Settings > Integrations > Signal K, not a direct
 				// write to the container service itself.
 				dataItem.uid: Global.venusPlatform.serviceUid + "/Services/Containers/Enabled"
+
+				// Disabling this stops dbus-containers, which in turn stops
+				// every running container (reconciler.py's
+				// stop_all_for_service_disable, found missing live - a
+				// disabled container service used to leave every Podman
+				// container running unsupervised) - too destructive to fire
+				// on a bare click without confirmation. Enabling has no such
+				// one-way risk, so it writes immediately; the toast after is
+				// only a heads-up, not a gate.
+				updateDataOnClick: false
+				onClicked: {
+					if (checked) {
+						Global.dialogLayer.open(disableConfirmationDialogComponent)
+					} else {
+						dataItem.setValue(1)
+						//% "Enabling containers may temporarily slow the system down while they start"
+						Global.showToastNotification(VenusOS.Notification_Info,
+								qsTrId("pagesettingscontainers_enable_slowdown_toast"), 10000)
+					}
+				}
+
+				Component {
+					id: disableConfirmationDialogComponent
+
+					ModalWarningDialog {
+						//% "Disable containers?"
+						title: qsTrId("pagesettingscontainers_disable_confirm_title")
+						//% "Every running container will be stopped. Definitions are kept, so containers can be started again from here once re-enabled."
+						description: qsTrId("pagesettingscontainers_disable_confirm_description")
+						dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_OkAndCancel
+						onAccepted: enabledSwitch.dataItem.setValue(0)
+					}
+				}
 			}
 
 			SettingsColumn {
