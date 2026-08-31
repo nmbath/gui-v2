@@ -143,6 +143,24 @@ QtObject {
 		return value
 	}
 
+	// image.pullPolicy (schema.py) - governs a future pull only, never
+	// anything already running (reconciler.py's update_pull_policy/
+	// update_child_pull_policy docstrings). Managed containers/children
+	// only - a runtime-mode child has no definition of its own for this
+	// to edit (docs/dbus-api.md note 7).
+	readonly property var _pullPolicyOptions: [
+		//% "If missing"
+		{ display: qsTrId("containers_pull_policy_if_missing"), value: "if-missing" },
+		//% "Always"
+		{ display: qsTrId("containers_pull_policy_always"), value: "always" },
+		//% "Never"
+		{ display: qsTrId("containers_pull_policy_never"), value: "never" },
+	]
+
+	function pullPolicyOptions() {
+		return root._pullPolicyOptions
+	}
+
 	// Sub-container runtime children only expose a Running bool
 	// (docs/dbus-api.md ContainerRuntime/Child/<runtime-id>/Running) - no full
 	// ContainerState enum, so this is deliberately not stateToText().

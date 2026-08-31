@@ -44,11 +44,13 @@ import Victron.VenusOS
 	managed mode too, not an oversight in either case) - runtime-mode
 	children show only Running/Stopped, managed-mode ones the fuller
 	State/ErrorCode/Error Venus itself tracks for them, unlike the parent
-	container list's richer live-stats secondaryText. Nothing here is
-	writable: Venus does not start, stop, delete or recreate a child of
-	either kind through this page, and there is intentionally no D-Bus path
-	through which a client could ask it to (docs/dbus-api.md notes 3/6) -
-	hence the footer note.
+	container list's richer live-stats secondaryText. Nothing here starts,
+	stops, deletes or recreates a child of either kind, and there is
+	intentionally no D-Bus path through which a client could ask it to
+	(docs/dbus-api.md notes 3/6) - hence the footer note. The one exception
+	is Image/PullPolicy (docs/dbus-api.md note 7), managed mode only: it
+	governs a future pull, never anything already running, so it carries
+	none of the lifecycle-control risk the footer note is about.
 */
 Page {
 	id: root
@@ -182,12 +184,22 @@ Page {
 						filterFlags: VeQItemSortTableModel.FilterInvalid
 					}
 
-					delegate: ListText {
-						id: childDelegate
+					delegate: ColumnLayout {
+						id: childColumn
 
 						required property VeQItem item
 
 						readonly property string childPrefix: item.itemParent().uid
+
+						Layout.fillWidth: true
+						spacing: 0
+
+					ListText {
+						id: childDelegate
+
+						Layout.fillWidth: true
+
+						readonly property string childPrefix: childColumn.childPrefix
 
 						// Runtime-mode children publish Image/Running/Status
 						// only; managed-mode ones publish State/ErrorCode/
@@ -290,6 +302,24 @@ Page {
 							id: error
 							uid: childPrefix + "/Error"
 						}
+					}
+
+					ListRadioButtonGroup {
+						// Managed mode only - a runtime-mode child has no
+						// definition of its own to edit (docs/dbus-api.md
+						// note 7); update_child_pull_policy (reconciler.py)
+						// only ever applies to a future pull, never anything
+						// already running, so this needs no confirmation the
+						// way Restart/Delete on the parent's own page do.
+						visible: root.isManaged
+
+						Layout.fillWidth: true
+
+						//% "Pull policy"
+						text: qsTrId("pagesettingscontainersubcontainers_pull_policy")
+						dataItem.uid: childColumn.childPrefix + "/Image/PullPolicy"
+						optionModel: Containers.pullPolicyOptions()
+					}
 					}
 				}
 			}
