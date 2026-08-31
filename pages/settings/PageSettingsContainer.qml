@@ -55,8 +55,12 @@ Page {
 	VeQuickItem { id: dbusErrorText; uid: root.containerPrefix + "/Dbus/Error" }
 	VeQuickItem { id: dependency; uid: root.containerPrefix + "/Dependency" }
 	VeQuickItem { id: retryIn; uid: root.containerPrefix + "/RetryIn" }
+	VeQuickItem { id: memoryUsage; uid: root.containerPrefix + "/Resources/MemoryUsage" }
 	VeQuickItem { id: memoryLimit; uid: root.containerPrefix + "/Resources/MemoryLimit" }
+	VeQuickItem { id: cpuUsage; uid: root.containerPrefix + "/Resources/CpuUsage" }
 	VeQuickItem { id: cpuLimit; uid: root.containerPrefix + "/Resources/CpuLimit" }
+	VeQuickItem { id: pids; uid: root.containerPrefix + "/Resources/Pids" }
+	VeQuickItem { id: pidsLimit; uid: root.containerPrefix + "/Resources/PidsLimit" }
 	VeQuickItem { id: desiredState; uid: root.settingsPrefix + "/DesiredState" }
 	VeQuickItem { id: containerRuntimeEnabled; uid: root.containerPrefix + "/ContainerRuntime/Enabled" }
 	// Unified across both child ownership modes (docs/dbus-api.md note 5) -
@@ -86,8 +90,50 @@ Page {
 		restartTimer.start()
 	}
 
+	// CpuUsage is a percentage (100% = one full logical CPU busy for the
+	// sample period, backend/podman.py in venus-containers) while CpuLimit
+	// is in cores - same conversion PageSettingsContainerSubcontainers.qml
+	// already applies for its own aggregate gauges, needed here for the
+	// same reason: comparing a percentage against a core count directly
+	// would be meaningless.
+	readonly property real cpuUsageCores: cpuUsage.value / 100
+
 	GradientListView {
 		model: VisibleItemModel {
+			SettingsListHeader {
+				//% "Current usage"
+				text: qsTrId("pagesettingscontainer_current_usage")
+			}
+
+			ListResourceGauge {
+				//% "Memory"
+				text: qsTrId("pagesettingscontainerresources_memory")
+				//% "%1 MB / %2 MB"
+				valueText: qsTrId("pagesettingscontainerresources_memory_usage_value")
+						.arg(Containers.bytesToMebibytes(memoryUsage.value)).arg(Containers.bytesToMebibytes(memoryLimit.value))
+				value: memoryUsage.value
+				to: memoryLimit.value
+			}
+
+			ListResourceGauge {
+				//% "CPU"
+				text: qsTrId("pagesettingscontainerresources_cpu")
+				//% "%1 / %2"
+				valueText: qsTrId("pagesettingscontainerresources_cpu_usage_value")
+						.arg(root.cpuUsageCores.toFixed(2)).arg(cpuLimit.value)
+				value: root.cpuUsageCores
+				to: cpuLimit.value
+			}
+
+			ListResourceGauge {
+				//% "Processes"
+				text: qsTrId("pagesettingscontainerresources_processes")
+				//% "%1 / %2"
+				valueText: qsTrId("pagesettingscontainerresources_pids_usage_value").arg(pids.value).arg(pidsLimit.value)
+				value: pids.value
+				to: pidsLimit.value
+			}
+
 			SettingsListHeader {
 				//% "Status"
 				text: qsTrId("pagesettingscontainer_status")
