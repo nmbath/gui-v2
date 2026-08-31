@@ -249,7 +249,25 @@ Page {
 						onRuntimeCpuLimitCoresChanged: root.recomputeUnlimitedCounts()
 
 						text: item.value || ""
-						caption: image.value || ""
+						// The image reference alone gave no hint that a
+						// container has sub-containers of its own at all -
+						// found live: Venus Grafana's own managed influxdb/
+						// loader pair was completely invisible from this
+						// list, only discoverable by opening the container
+						// and finding its "Sub-containers" row. Appending
+						// the same running-summary text that row itself
+						// shows surfaces it here too, for either ownership
+						// mode, without needing a whole extra row per
+						// container.
+						caption: {
+							const base = image.value || ""
+							if (childrenTotal.value <= 0) {
+								return base
+							}
+							const summary = Containers.childRunningSummaryText(childrenRunning.value, childrenTotal.value)
+							//% "%1 · %2"
+							return base ? qsTrId("pagesettingscontainers_caption_with_children").arg(base).arg(summary) : summary
+						}
 						// While running, live resource usage is more useful
 						// at a glance than a static "Running" label; while
 						// blocked on a dependency, naming what it's waiting
@@ -360,6 +378,19 @@ Page {
 						VeQuickItem {
 							id: image
 							uid: containerPrefix + "/Image"
+						}
+						// Unified across both child ownership modes (docs/
+						// dbus-api.md note 5) - "" for the overwhelming
+						// majority with no children of either kind, so the
+						// caption addition below is likewise absent for
+						// almost every container.
+						VeQuickItem {
+							id: childrenTotal
+							uid: containerPrefix + "/Children/TotalCount"
+						}
+						VeQuickItem {
+							id: childrenRunning
+							uid: containerPrefix + "/Children/RunningCount"
 						}
 						VeQuickItem {
 							id: state
