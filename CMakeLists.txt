@@ -30,7 +30,7 @@ endif()
 project(venus-gui-v2 LANGUAGES CXX VERSION 1.3.17)
 add_definitions(-DPROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} -DPROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR} -DPROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH} )
 
-set(CONTAINERS_VERSION 2)
+set(CONTAINERS_VERSION 3)
 add_definitions(-DCONTAINERS_VERSION=${CONTAINERS_VERSION})
 
 option(NO_CACHEGEN "Enable bytecode compilation and lint processing for all qml files via cmake -NO_CACHEGEN=OFF" ON) # Enabled by default
