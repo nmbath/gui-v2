@@ -26,6 +26,7 @@ ListItem {
 	// cores vs a bare process count).
 	property string text
 	property string valueText
+	property string caption
 
 	// Raw value/maximum driving the bar fill - NOT already-normalised to 0..1,
 	// so callers can pass D-Bus values directly (e.g. MemoryUsedBytes/MemoryLimitBytes).
@@ -60,6 +61,13 @@ ListItem {
 			// there is nothing meaningful to show a fraction of - leave the bar
 			// empty rather than dividing by zero.
 			value: root.to > 0 ? Math.min(root.value / root.to, 1) : 0
+
+			Layout.fillWidth: true
+		}
+
+		CaptionLabel {
+			text: root.caption
+			visible: text.length > 0
 
 			Layout.fillWidth: true
 		}

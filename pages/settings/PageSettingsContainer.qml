@@ -61,6 +61,12 @@ Page {
 	VeQuickItem { id: cpuLimit; uid: root.containerPrefix + "/Resources/CpuLimit" }
 	VeQuickItem { id: pids; uid: root.containerPrefix + "/Resources/Pids" }
 	VeQuickItem { id: pidsLimit; uid: root.containerPrefix + "/Resources/PidsLimit" }
+	VeQuickItem { id: diskTotal; uid: root.containerPrefix + "/DiskUsage/TotalBytes" }
+	VeQuickItem { id: diskImage; uid: root.containerPrefix + "/DiskUsage/ImageBytes" }
+	VeQuickItem { id: diskLocal; uid: root.containerPrefix + "/DiskUsage/ExclusiveBytes" }
+	VeQuickItem { id: diskHostTotal; uid: root.containerPrefix + "/DiskUsage/HostTotalBytes" }
+	VeQuickItem { id: diskHostUsed; uid: root.containerPrefix + "/DiskUsage/HostUsedBytes" }
+	VeQuickItem { id: diskUpdatedAt; uid: root.containerPrefix + "/DiskUsage/UpdatedAt" }
 	VeQuickItem { id: desiredState; uid: root.settingsPrefix + "/DesiredState" }
 	VeQuickItem { id: containerRuntimeEnabled; uid: root.containerPrefix + "/ContainerRuntime/Enabled" }
 	// Unified across both child ownership modes (docs/dbus-api.md note 5) -
@@ -132,6 +138,55 @@ Page {
 				valueText: qsTrId("pagesettingscontainerresources_pids_usage_value").arg(pids.value).arg(pidsLimit.value)
 				value: pids.value
 				to: pidsLimit.value
+			}
+
+			SettingsListHeader {
+				//% "Disk usage"
+				text: qsTrId("pagesettingscontainer_disk_usage")
+				// DiskUsage/UpdatedAt is 0 until the first periodic sample -
+				// same "pending" convention vcm show/list already use,
+				// see cli.py's _format_disk_usage.
+				preferredVisible: !!diskUpdatedAt.value
+			}
+
+			ListText {
+				//% "Total"
+				text: qsTrId("pagesettingscontainer_disk_total")
+				secondaryText: Containers.formatBytes(diskTotal.value)
+				preferredVisible: !!diskUpdatedAt.value
+			}
+
+			ListText {
+				//% "Image"
+				text: qsTrId("pagesettingscontainer_disk_image")
+				secondaryText: Containers.formatBytes(diskImage.value)
+				preferredVisible: !!diskUpdatedAt.value
+			}
+
+			ListText {
+				//% "Local"
+				text: qsTrId("pagesettingscontainer_disk_local")
+				secondaryText: Containers.formatBytes(diskLocal.value)
+				//% "Writable layer + managed storage - the part unique to this container"
+				caption: qsTrId("pagesettingscontainer_disk_local_caption")
+				preferredVisible: !!diskUpdatedAt.value
+			}
+
+			ListResourceGauge {
+				//% "Disk (host)"
+				text: qsTrId("pagesettingscontainer_disk_host")
+				//% "%1 used of %2 (%3)"
+				valueText: qsTrId("pagesettingscontainer_disk_host_value")
+						.arg(Containers.formatBytes(diskHostUsed.value))
+						.arg(Containers.formatBytes(diskHostTotal.value))
+						.arg(diskHostTotal.value > 0
+							? Math.round(diskHostUsed.value / diskHostTotal.value * 100) + "%"
+							: "-")
+				//% "How full the disk this container's own storage lives on actually is - usually the same for every container, since most share one disk."
+				caption: qsTrId("pagesettingscontainer_disk_host_caption")
+				value: diskHostUsed.value
+				to: diskHostTotal.value
+				preferredVisible: !!diskUpdatedAt.value && diskHostTotal.value > 0
 			}
 
 			SettingsListHeader {
