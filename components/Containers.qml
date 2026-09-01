@@ -183,6 +183,25 @@ QtObject {
 		return Math.round(bytes / (1024 * 1024))
 	}
 
+	// DiskUsage/* values span a much wider range than a container's own
+	// resource limits (a few KB of managed storage up to tens of GB of
+	// host disk) - a single fixed unit reads badly at either end, so this
+	// auto-scales the same way PageSettingsSupportStatus.qml's own
+	// scaleBytes does for the SD-card-equivalent storage figures
+	// elsewhere in the app.
+	function formatBytes(bytes) {
+		bytes = Number(bytes) || 0
+		if (bytes < 1024) {
+			return bytes + " B"
+		} else if (bytes < 1024 * 1024) {
+			return (bytes / 1024).toFixed(1) + " KB"
+		} else if (bytes < 1024 * 1024 * 1024) {
+			return (bytes / 1024 / 1024).toFixed(1) + " MB"
+		} else {
+			return (bytes / 1024 / 1024 / 1024).toFixed(1) + " GB"
+		}
+	}
+
 	function mebibytesToBytes(mib) {
 		return Math.round(mib * 1024 * 1024)
 	}
