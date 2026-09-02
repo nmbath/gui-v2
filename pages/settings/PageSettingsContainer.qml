@@ -205,13 +205,24 @@ Page {
 				// representation in this page at all. Empty (and so
 				// invisible - captionText only reflows the layout when
 				// non-empty, see ListText.qml) whenever there's nothing to
-				// add beyond the state text above.
-				caption: statusText.value
+				// add beyond the state text above, or while an error is
+				// active - the PrimaryListLabel below already covers that
+				// case with a properly labelled, retry-aware summary, and
+				// /Status carries the same raw text /Error does once
+				// there's an active error (confirmed live on a
+				// raspberrypi5 test device, 2026-09-02: a pull failure's
+				// full multi-line "Copying blob sha256:..." capture showed
+				// up in both places at once). firstMeaningfulLine collapses
+				// that raw text to its one meaningful line either way, in
+				// case a future backend change ever populates /Status with
+				// multi-line detail while /ErrorCode is still 0.
+				caption: errorCode.value !== 0 ? "" : Containers.firstMeaningfulLine(statusText.value)
 			}
 
 			PrimaryListLabel {
 				//% "Error: %1"
-				text: qsTrId("pagesettingscontainer_error").arg(errorText.value)
+				text: qsTrId("pagesettingscontainer_error")
+						.arg(Containers.errorSummaryText(errorCode.value, errorText.value, retryIn.value))
 				preferredVisible: errorCode.value !== 0 && !!errorText.value
 			}
 

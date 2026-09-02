@@ -102,6 +102,108 @@ QtObject {
 		}
 	}
 
+	// ErrorCode (docs/dbus-api.md's "Error codes" table, venus-containers
+	// repo enums.py) - a short, specific label for what actually went
+	// wrong (timeout vs. image unavailable vs. identity provisioning vs.
+	// ...), not just "there's an error". Every ErrorCode/Children/Child/
+	// <id>/ErrorCode leaf in this app should go through this rather than
+	// showing the raw integer or falling back to whatever free-text
+	// happened to be in Error/Status - those are backend detail (see
+	// firstMeaningfulLine below), not the category.
+	function errorCodeToText(value) {
+		switch (value) {
+		case 0: return ""
+		//% "Invalid definition"
+		case 10: return qsTrId("containers_error_definition_invalid")
+		//% "Image unavailable"
+		case 11: return qsTrId("containers_error_image_unavailable")
+		//% "Create failed"
+		case 12: return qsTrId("containers_error_create_failed")
+		//% "Start failed"
+		case 13: return qsTrId("containers_error_start_failed")
+		//% "Stop failed"
+		case 14: return qsTrId("containers_error_stop_failed")
+		//% "Runtime missing"
+		case 15: return qsTrId("containers_error_runtime_missing")
+		//% "Could not apply resource limits"
+		case 16: return qsTrId("containers_error_resource_apply_failed")
+		//% "Out of memory"
+		case 17: return qsTrId("containers_error_oom_killed")
+		//% "Restart loop"
+		case 18: return qsTrId("containers_error_restart_loop")
+		//% "Device unavailable"
+		case 19: return qsTrId("containers_error_device_unavailable")
+		//% "D-Bus unavailable"
+		case 20: return qsTrId("containers_error_dbus_unavailable")
+		//% "Persistent data unavailable"
+		case 21: return qsTrId("containers_error_persistent_data_unavailable")
+		//% "Remove failed"
+		case 22: return qsTrId("containers_error_remove_failed")
+		//% "Timed out"
+		case 23: return qsTrId("containers_error_backend_timeout")
+		//% "Definition changed outside Venus"
+		case 24: return qsTrId("containers_error_definition_drift")
+		//% "Identity provisioning failed"
+		case 25: return qsTrId("containers_error_identity_provisioning_failed")
+		//% "User resolution failed"
+		case 26: return qsTrId("containers_error_process_user_resolution_failed")
+		//% "Sub-container runtime API unavailable"
+		case 27: return qsTrId("containers_error_runtime_api_unavailable")
+		default: return ""
+		}
+	}
+
+	// The one line of a raw backend error capture that actually carries
+	// the reason, not the multi-line output skopeo/podman produces along
+	// the way to it - a pull failure's raw text is a "Trying to pull ..."
+	// preamble followed by one "Copying blob sha256:..." line per image
+	// layer, with the real reason only on its own final "Error: ..." line
+	// (mirrors venus-containers repo cli.py's _first_meaningful_line,
+	// which the CLI's own `vcm list`/`vcm show` use for the same reason -
+	// dumping the whole raw capture into one Status line made a failing
+	// container's cause unreadable and buried the one line that
+	// mattered). Falls back to the last non-empty line for anything that
+	// doesn't follow that shape, so a short single-line status (e.g.
+	// "restart attempt 2 of 5") passes through unchanged.
+	function firstMeaningfulLine(text) {
+		if (!text) {
+			return ""
+		}
+		const lines = String(text).split("\n").map(line => line.trim()).filter(line => !!line)
+		if (lines.length === 0) {
+			return ""
+		}
+		for (let i = lines.length - 1; i >= 0; --i) {
+			if (lines[i].toLowerCase().startsWith("error:")) {
+				return lines[i]
+			}
+		}
+		return lines[lines.length - 1]
+	}
+
+	// Combines the three published fields that together describe a
+	// container's trouble - ErrorCode (the category), Error/Status (the
+	// detail), RetryIn (authoritative retry timing, see
+	// waitingForDependencyText's own note on that) - into one line, the
+	// same shape as the CLI's _summarize_status. retryInSeconds is
+	// optional (defaults to 0/no countdown) since not every call site
+	// tracks it - e.g. a managed child has no RetryIn leaf of its own yet.
+	function errorSummaryText(errorCodeValue, text, retryInSeconds) {
+		const label = root.errorCodeToText(errorCodeValue)
+		const detail = root.firstMeaningfulLine(text)
+		let summary
+		if (label && detail) {
+			summary = label + ": " + detail
+		} else {
+			summary = label || detail
+		}
+		if (retryInSeconds > 0) {
+			//% "%1 (retry in %2s)"
+			return qsTrId("containers_error_summary_retry").arg(summary).arg(retryInSeconds)
+		}
+		return summary
+	}
+
 	// Richer than stateToText(8) alone: names what it's waiting on and,
 	// once RetryIn is known, when it'll try again - spec v14's suggested
 	// GUI wording ("Waiting to start - D-Bus proxy unavailable - retry in

@@ -305,9 +305,19 @@ Page {
 						// at a glance than a static "Running" label; while
 						// blocked on a dependency, naming what it's waiting
 						// for and when it'll retry is more useful than the
-						// bare "Waiting to start" state text - everything
-						// else (Stopped/Starting/Error/etc) still falls back
-						// to the plain state text.
+						// bare "Waiting to start" state text; while erroring,
+						// what actually went wrong (and whether/when Venus
+						// will retry it automatically) is more useful than
+						// the bare "Failed" state text - a fleet of several
+						// containers used to show identical "Failed" rows
+						// for genuinely different problems (timeout vs.
+						// image unavailable vs. identity provisioning),
+						// indistinguishable without opening each one's own
+						// page (confirmed live on a raspberrypi5 test
+						// device, 2026-09-02, mass-creating several
+						// dedicated containers at once). Everything else
+						// (Stopped/Starting/etc) still falls back to the
+						// plain state text.
 						secondaryText: {
 							if (state.value === 4) { // ContainerState.Running
 								//% "%1% CPU, %2 MB"
@@ -316,6 +326,9 @@ Page {
 							}
 							if (state.value === 8) { // ContainerState.WaitingForDependency
 								return Containers.waitingForDependencyText(dependency.value, retryIn.value)
+							}
+							if (errorCode.value !== 0) {
+								return Containers.errorSummaryText(errorCode.value, errorText.value, retryIn.value)
 							}
 							return Containers.stateToText(state.value)
 						}
@@ -432,6 +445,10 @@ Page {
 						VeQuickItem {
 							id: errorCode
 							uid: containerPrefix + "/ErrorCode"
+						}
+						VeQuickItem {
+							id: errorText
+							uid: containerPrefix + "/Error"
 						}
 						VeQuickItem {
 							id: dbusState
