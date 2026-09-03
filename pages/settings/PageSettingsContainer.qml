@@ -107,15 +107,38 @@ Page {
 
 			ListItem {
 				id: usageSummary
+				readonly property real cellWidth: availableWidth / 6
 
 				preferredVisible: !root.isDeleted
 				contentItem: RowLayout {
-					spacing: usageSummary.spacing
+					spacing: 0
 
 					ColumnLayout {
 						spacing: 0
-						Layout.fillWidth: true
-						Layout.preferredWidth: 1
+						Layout.minimumWidth: usageSummary.cellWidth
+						Layout.preferredWidth: usageSummary.cellWidth
+						Layout.maximumWidth: usageSummary.cellWidth
+
+						Label {
+							//% "Status"
+							text: qsTrId("pagesettingscontainer_status")
+							font: usageSummary.font
+							horizontalAlignment: Text.AlignHCenter
+							Layout.fillWidth: true
+						}
+
+						SecondaryListLabel {
+							text: Containers.stateToText(state.value)
+							horizontalAlignment: Text.AlignHCenter
+							Layout.fillWidth: true
+						}
+					}
+
+					ColumnLayout {
+						spacing: 0
+						Layout.minimumWidth: usageSummary.cellWidth
+						Layout.preferredWidth: usageSummary.cellWidth
+						Layout.maximumWidth: usageSummary.cellWidth
 
 						Label {
 							//% "Memory (MB)"
@@ -135,8 +158,9 @@ Page {
 
 					ColumnLayout {
 						spacing: 0
-						Layout.fillWidth: true
-						Layout.preferredWidth: 1
+						Layout.minimumWidth: usageSummary.cellWidth
+						Layout.preferredWidth: usageSummary.cellWidth
+						Layout.maximumWidth: usageSummary.cellWidth
 
 						Label {
 							//% "CPU"
@@ -155,8 +179,9 @@ Page {
 
 					ColumnLayout {
 						spacing: 0
-						Layout.fillWidth: true
-						Layout.preferredWidth: 1
+						Layout.minimumWidth: usageSummary.cellWidth
+						Layout.preferredWidth: usageSummary.cellWidth
+						Layout.maximumWidth: usageSummary.cellWidth
 
 						Label {
 							//% "Processes"
@@ -175,8 +200,9 @@ Page {
 
 					ColumnLayout {
 						spacing: 0
-						Layout.fillWidth: true
-						Layout.preferredWidth: 1
+						Layout.minimumWidth: usageSummary.cellWidth
+						Layout.preferredWidth: usageSummary.cellWidth
+						Layout.maximumWidth: usageSummary.cellWidth
 
 						Label {
 							//% "Image"
@@ -193,8 +219,9 @@ Page {
 
 					ColumnLayout {
 						spacing: 0
-						Layout.fillWidth: true
-						Layout.preferredWidth: 1
+						Layout.minimumWidth: usageSummary.cellWidth
+						Layout.preferredWidth: usageSummary.cellWidth
+						Layout.maximumWidth: usageSummary.cellWidth
 
 						Label {
 							//% "Local"
@@ -214,12 +241,14 @@ Page {
 			SettingsListHeader {
 				//% "Status"
 				text: qsTrId("pagesettingscontainer_status")
+				preferredVisible: root.isDeleted
 			}
 
 			ListText {
 				//% "Status"
 				text: qsTrId("pagesettingscontainer_status")
 				secondaryText: Containers.stateToText(state.value)
+				preferredVisible: root.isDeleted
 				// /Status (docs/dbus-api.md) only ever carries detail the
 				// bare /State enum can't - the container's own restart-loop
 				// progress ("restart attempt 2 of 5") while it's still
