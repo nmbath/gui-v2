@@ -57,13 +57,30 @@ Page {
 	property int unlimitedMemoryCount: 0
 	property int unlimitedCpuCount: 0
 	property int activeContainerCount: 0
+	property int runningContainerCount: 0
 	property int deletedContainerCount: 0
 	property string hostDiskSourcePrefix
+
+	// Local clock for ticking a Creating/Recreating row's elapsed-pull time
+	// client-side, the same pattern PageSettingsContainerImport.qml already
+	// uses for its own Expires countdown - CreatingSince (docs/dbus-api.md
+	// in the venus-containers repo) is a fixed timestamp, not a value the
+	// backend re-publishes every second, so ticking is this page's job.
+	// Only runs while there's an active container to show it for.
+	property real nowSeconds: Date.now() / 1000
+
+	Timer {
+		interval: 1000
+		repeat: true
+		running: enabledSwitch.checked && root.activeContainerCount > 0
+		onTriggered: root.nowSeconds = Date.now() / 1000
+	}
 
 	function recomputeUnlimitedCounts() {
 		let unlimitedMemory = 0
 		let unlimitedCpu = 0
 		let activeContainers = 0
+		let runningContainers = 0
 		let deletedContainers = 0
 		let diskSourcePrefix = ""
 		for (let i = 0; i < containerRepeater.count; ++i) {
@@ -76,6 +93,9 @@ Page {
 				continue
 			}
 			activeContainers++
+			if (row.isRunning) {
+				runningContainers++
+			}
 			if (!diskSourcePrefix) {
 				diskSourcePrefix = row.containerPrefix
 			}
@@ -97,30 +117,28 @@ Page {
 		root.unlimitedMemoryCount = unlimitedMemory
 		root.unlimitedCpuCount = unlimitedCpu
 		root.activeContainerCount = activeContainers
+		root.runningContainerCount = runningContainers
 		root.deletedContainerCount = deletedContainers
 		root.hostDiskSourcePrefix = diskSourcePrefix
 	}
 
 	function assignedMemoryText() {
-		const assignedMib = Containers.bytesToMebibytes(allocatedMemory.value)
-		const totalMib = Containers.bytesToMebibytes(systemMaxMemory.value)
 		if (root.unlimitedMemoryCount > 0) {
-			//% "%1 MB assigned / %2 MB total (%3 unlimited)"
-			return qsTrId("pagesettingscontainers_system_memory_assigned_unlimited")
-					.arg(assignedMib).arg(totalMib).arg(root.unlimitedMemoryCount)
+			return Containers.memoryLimitToText(0)
 		}
-		//% "%1 MB assigned / %2 MB total"
-		return qsTrId("pagesettingscontainers_system_memory_assigned").arg(assignedMib).arg(totalMib)
+		//% "%1 / %2"
+		return qsTrId("pagesettingscontainers_system_memory_compact")
+				.arg(Containers.bytesToMebibytes(allocatedMemory.value))
+				.arg(Containers.bytesToMebibytes(systemMaxMemory.value))
 	}
 
 	function assignedCpuText() {
 		if (root.unlimitedCpuCount > 0) {
-			//% "%1 of %2 cores assigned (%3 unlimited)"
-			return qsTrId("pagesettingscontainers_system_cpu_assigned_unlimited")
-					.arg(allocatedCpu.value).arg(systemMaxCpu.value).arg(root.unlimitedCpuCount)
+			return Containers.cpuLimitToText(0)
 		}
-		//% "%1 of %2 cores assigned"
-		return qsTrId("pagesettingscontainers_system_cpu_assigned").arg(allocatedCpu.value).arg(systemMaxCpu.value)
+		//% "%1 / %2"
+		return qsTrId("pagesettingscontainers_system_cpu_compact")
+				.arg(allocatedCpu.value).arg(systemMaxCpu.value)
 	}
 
 	VeQItemSortTableModel {
@@ -221,35 +239,96 @@ Page {
 					text: qsTrId("pagesettingscontainers_system_resources")
 				}
 
-				ListResourceGauge {
-					//% "Memory"
-					text: qsTrId("pagesettingscontainerresources_memory")
-					valueText: root.assignedMemoryText()
-					value: allocatedMemory.value
-					to: systemMaxMemory.value
-				}
+				ListItem {
+					id: systemSummary
+					readonly property real cellWidth: availableWidth / 4
 
-				ListResourceGauge {
-					//% "CPU"
-					text: qsTrId("pagesettingscontainerresources_cpu")
-					valueText: root.assignedCpuText()
-					value: allocatedCpu.value
-					to: systemMaxCpu.value
-				}
+					contentItem: RowLayout {
+						spacing: 0
 
-				ListResourceGauge {
-					//% "Disk (host)"
-					text: qsTrId("pagesettingscontainer_disk_host")
-					//% "%1 used of %2 (%3)"
-					valueText: qsTrId("pagesettingscontainer_disk_host_value")
-							.arg(Containers.formatBytes(diskHostUsed.value))
-							.arg(Containers.formatBytes(diskHostTotal.value))
-							.arg(diskHostTotal.value > 0
-								? Math.round(diskHostUsed.value / diskHostTotal.value * 100) + "%"
-								: "-")
-					value: diskHostUsed.value
-					to: diskHostTotal.value
-					preferredVisible: !!diskUpdatedAt.value && diskHostTotal.value > 0
+						ColumnLayout {
+							spacing: 0
+							Layout.minimumWidth: systemSummary.cellWidth
+							Layout.preferredWidth: systemSummary.cellWidth
+							Layout.maximumWidth: systemSummary.cellWidth
+
+							Label {
+								//% "CPU"
+								text: qsTrId("pagesettingscontainerresources_cpu")
+								font: systemSummary.font
+								Layout.alignment: Qt.AlignHCenter
+							}
+
+							SecondaryListLabel {
+								text: root.assignedCpuText()
+								Layout.alignment: Qt.AlignHCenter
+							}
+						}
+
+						ColumnLayout {
+							spacing: 0
+							Layout.minimumWidth: systemSummary.cellWidth
+							Layout.preferredWidth: systemSummary.cellWidth
+							Layout.maximumWidth: systemSummary.cellWidth
+
+							Label {
+								//% "Memory (MB)"
+								text: qsTrId("pagesettingscontainer_memory_mb")
+								font: systemSummary.font
+								Layout.alignment: Qt.AlignHCenter
+							}
+
+							SecondaryListLabel {
+								text: root.assignedMemoryText()
+								Layout.alignment: Qt.AlignHCenter
+							}
+						}
+
+						ColumnLayout {
+							spacing: 0
+							Layout.minimumWidth: systemSummary.cellWidth
+							Layout.preferredWidth: systemSummary.cellWidth
+							Layout.maximumWidth: systemSummary.cellWidth
+
+							Label {
+								//% "Disk"
+								text: qsTrId("pagesettingscontainers_system_disk")
+								font: systemSummary.font
+								Layout.alignment: Qt.AlignHCenter
+							}
+
+							SecondaryListLabel {
+								//% "%1 / %2"
+								text: diskUpdatedAt.value
+										? qsTrId("pagesettingscontainers_system_disk_compact")
+												.arg(Containers.formatBytes(diskHostUsed.value))
+												.arg(Containers.formatBytes(diskHostTotal.value))
+										: "--"
+								Layout.alignment: Qt.AlignHCenter
+							}
+						}
+
+						ColumnLayout {
+							spacing: 0
+							Layout.minimumWidth: systemSummary.cellWidth
+							Layout.preferredWidth: systemSummary.cellWidth
+							Layout.maximumWidth: systemSummary.cellWidth
+
+							Label {
+								//% "Containers"
+								text: qsTrId("pagesettingscontainers_containers")
+								font: systemSummary.font
+								Layout.alignment: Qt.AlignHCenter
+							}
+
+							SecondaryListLabel {
+								//% "%1 running / %2 defined"
+								text: qsTrId("pagesettingscontainers_running_defined")
+										.arg(root.runningContainerCount).arg(root.activeContainerCount)
+								Layout.alignment: Qt.AlignHCenter
+							}
+						}
+					}
 				}
 			}
 
@@ -342,6 +421,8 @@ Page {
 
 						readonly property string containerPrefix: item.itemParent().uid
 						readonly property bool isDeleted: state.value === 7 // ContainerState.Deleted
+						readonly property bool isRunning: state.value === 4 // ContainerState.Running
+						readonly property bool isCreating: state.value === 1 || state.value === 6 // Creating/Recreating
 						preferredVisible: !isDeleted
 
 						// Exposed so root.recomputeUnlimitedCounts() can count how
@@ -363,6 +444,7 @@ Page {
 						onRuntimeMemoryLimitBytesChanged: root.recomputeUnlimitedCounts()
 						onRuntimeCpuLimitCoresChanged: root.recomputeUnlimitedCounts()
 						onIsDeletedChanged: root.recomputeUnlimitedCounts()
+						onIsRunningChanged: root.recomputeUnlimitedCounts()
 
 						text: item.value || ""
 						// The image reference alone gave no hint that a
@@ -406,6 +488,22 @@ Page {
 								//% "%1% CPU, %2 MB"
 								return qsTrId("pagesettingscontainers_running_stats")
 										.arg(Math.round(cpuUsage.value)).arg(Containers.bytesToMebibytes(memoryUsage.value))
+							}
+							if (containerDelegate.isCreating) {
+								// %CPU/MB means nothing yet - there's no running
+								// process to measure. What's actually useful here
+								// is the same detail /Status gives the CLI (found
+								// live on venus.local, 2026-09-02, mass-creating
+								// several dedicated containers at once: identical
+								// "Creating" rows for a fleet were indistinguishable
+								// without opening each one) - how many layers have
+								// actually started, and how long this attempt has
+								// been running, since a plateaued layer count alone
+								// can look identical to a hung service.
+								const elapsed = creatingSince.value > 0
+										? Math.max(0, Math.floor(root.nowSeconds - creatingSince.value)) : 0
+								return Containers.creatingProgressText(pullLayersDone.value, pullLayersTotal.value, elapsed)
+										|| Containers.stateToText(state.value)
 							}
 							if (state.value === 8) { // ContainerState.WaitingForDependency
 								return Containers.waitingForDependencyText(dependency.value, retryIn.value)
@@ -544,6 +642,18 @@ Page {
 						VeQuickItem {
 							id: retryIn
 							uid: containerPrefix + "/RetryIn"
+						}
+						VeQuickItem {
+							id: pullLayersDone
+							uid: containerPrefix + "/Image/PullLayersDone"
+						}
+						VeQuickItem {
+							id: pullLayersTotal
+							uid: containerPrefix + "/Image/PullLayersTotal"
+						}
+						VeQuickItem {
+							id: creatingSince
+							uid: containerPrefix + "/CreatingSince"
 						}
 						VeQuickItem {
 							id: cpuUsage
