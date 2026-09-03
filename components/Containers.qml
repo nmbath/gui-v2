@@ -223,6 +223,43 @@ QtObject {
 		return qsTrId("containers_waiting_for_dependency_caption").arg(root.dependencyToText(dependency))
 	}
 
+	// Creating/Recreating row detail for the container list, in place of
+	// the %CPU/MB a Running row shows (there's nothing to measure yet).
+	// docs/dbus-api.md note 10 in the venus-containers repo: layersTotal
+	// is -1 until the manifest resolves (falls through to the plain
+	// layers-started count below), and a percentage would be actively
+	// misleading - podman front-loads blob copies so it races to ~99% in
+	// the first few seconds and then plateaus for the real, much longer,
+	// transfer + unpack time - hence a layer count and elapsed time here,
+	// never a percentage. elapsedSeconds is 0 before it's worth mentioning
+	// (matches the backend's own /Status text, which omits it below 5s);
+	// callers should fall back to stateToText() when this returns "" (no
+	// layers seen yet and elapsed hasn't crossed that threshold).
+	function creatingProgressText(layersDone, layersTotal, elapsedSeconds) {
+		if (layersTotal > 0) {
+			if (elapsedSeconds >= 5) {
+				//% "Pulling: layer %1 of %2 (%3s)"
+				return qsTrId("containers_creating_layer_of_elapsed")
+						.arg(layersDone).arg(layersTotal).arg(elapsedSeconds)
+			}
+			//% "Pulling: layer %1 of %2"
+			return qsTrId("containers_creating_layer_of").arg(layersDone).arg(layersTotal)
+		}
+		if (layersDone > 0) {
+			if (elapsedSeconds >= 5) {
+				//% "Pulling: %1 layer(s) started (%2s)"
+				return qsTrId("containers_creating_layers_started_elapsed").arg(layersDone).arg(elapsedSeconds)
+			}
+			//% "Pulling: %1 layer(s) started"
+			return qsTrId("containers_creating_layers_started").arg(layersDone)
+		}
+		if (elapsedSeconds >= 5) {
+			//% "Creating (%1s)"
+			return qsTrId("containers_creating_elapsed").arg(elapsedSeconds)
+		}
+		return ""
+	}
+
 	readonly property var _restartPolicyOptions: [
 		//% "Never"
 		{ display: qsTrId("containers_restart_policy_none"), value: "none" },
