@@ -160,6 +160,8 @@ public:
 	Q_INVOKABLE void securityProtocolChanged();
 	Q_INVOKABLE void reloadPage();
 	Q_INVOKABLE void openUrl(const QString &url);
+	Q_INVOKABLE void chooseContainerImportFile();
+	Q_INVOKABLE bool uploadSelectedContainerImportFile(const QString &relativeUrl);
 
 #if defined(VENUS_WEBASSEMBLY_BUILD)
 	Q_INVOKABLE void hitWatchdog();

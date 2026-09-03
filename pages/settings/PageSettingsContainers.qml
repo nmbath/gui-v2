@@ -23,6 +23,9 @@ Page {
 
 	readonly property string containersServiceUid: BackendConnection.serviceUidForType("containers")
 	readonly property string importServiceUid: BackendConnection.serviceUidForType("import")
+	readonly property bool wasmClient: Qt.platform.os === "wasm"
+	property bool wasmUploadRequested
+	property bool wasmUploadStarted
 
 	// docs/dbus-api.md: MaxMemoryLimitBytes/MaxCpuLimit are the host ceiling
 	// (RAM minus a fixed OS/Venus reserve; host core count) - the same bound
@@ -41,7 +44,62 @@ Page {
 	VeQuickItem { id: allocatedMemory; uid: root.containersServiceUid + "/System/AllocatedMemoryLimitBytes" }
 	VeQuickItem { id: allocatedCpu; uid: root.containersServiceUid + "/System/AllocatedCpuLimit" }
 	VeQuickItem { id: importServiceConnected; uid: root.importServiceUid + "/Connected" }
-	VeQuickItem { id: importState; uid: root.importServiceUid + "/State" }
+	VeQuickItem {
+		id: importState
+		uid: root.importServiceUid + "/State"
+		onValidChanged: root.ensureWasmImportSession()
+		onValueChanged: {
+			root.ensureWasmImportSession()
+			if (!root.wasmUploadRequested) {
+				return
+			}
+			if (value === 3) { // Review
+				root.wasmUploadRequested = false
+				root.wasmUploadStarted = false
+				Qt.callLater(Global.pageManager.pushPage,
+						"/pages/settings/PageSettingsContainerImport.qml",
+						{"title": qsTrId("pagesettingscontainers_add_from_file")})
+			} else if (value === 6 || value === 7) { // Failed or Cancelled
+				root.wasmUploadRequested = false
+				root.wasmUploadStarted = false
+				//% "Container definition upload failed"
+				Global.showToastNotification(VenusOS.Notification_Warning,
+						qsTrId("pagesettingscontainers_upload_failed"), 5000)
+			}
+		}
+	}
+	VeQuickItem { id: importRelativePath; uid: root.importServiceUid + "/Path" }
+	VeQuickItem {
+		id: importStartAction
+		uid: root.importServiceUid + "/Start"
+		onValidChanged: root.ensureWasmImportSession()
+	}
+
+	Timer {
+		interval: 100
+		repeat: true
+		running: root.wasmUploadRequested && !root.wasmUploadStarted
+		onTriggered: {
+			root.ensureWasmImportSession()
+			if (importState.value === 1 && importRelativePath.valid
+					&& BackendConnection.uploadSelectedContainerImportFile(importRelativePath.value)) {
+				root.wasmUploadStarted = true
+				//% "Uploading container definition…"
+				Global.showToastNotification(VenusOS.Notification_Info,
+						qsTrId("pagesettingscontainers_uploading"), 3000)
+			}
+		}
+	}
+
+	function ensureWasmImportSession() {
+		if (!root.wasmUploadRequested || !importState.valid || !importStartAction.valid) {
+			return
+		}
+		if (importState.value === 0 || importState.value === 5
+				|| importState.value === 6 || importState.value === 7) {
+			importStartAction.setValue("container")
+		}
+	}
 
 	// The backend's own Allocated total already excludes each Unlimited (0)
 	// contributor from the sum (same "0 = no cap" convention as everywhere
@@ -360,7 +418,23 @@ Page {
 						&& importServiceConnected.value === 1
 				writeAccessLevel: VenusOS.User_AccessType_User
 				onClicked: {
-					if (importState.value === 3) {
+					if (root.wasmClient) {
+						if (BackendConnection.vrm) {
+							//% "Container file upload is not available through VRM Remote Console yet"
+							Global.showToastNotification(VenusOS.Notification_Warning,
+									qsTrId("pagesettingscontainers_vrm_upload_unavailable"), 5000)
+							return
+						}
+						if (importState.value === 3) {
+							Global.pageManager.pushPage("/pages/settings/PageSettingsContainerImport.qml",
+									{"title": text})
+							return
+						}
+						root.wasmUploadRequested = true
+						root.wasmUploadStarted = false
+						BackendConnection.chooseContainerImportFile()
+						root.ensureWasmImportSession()
+					} else if (importState.value === 3) {
 						Global.pageManager.pushPage("/pages/settings/PageSettingsContainerImport.qml",
 								{"title": text})
 					} else {

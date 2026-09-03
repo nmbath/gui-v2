@@ -270,6 +270,49 @@ void BackendConnection::openUrl(const QString &url)
 	emscripten_run_script(ba.constData());
 }
 
+void BackendConnection::chooseContainerImportFile()
+{
+	EM_ASM({
+		const input = document.createElement("input");
+		input.type = "file";
+		input.accept = ".json,application/json";
+		const upload = {};
+		upload.input = input;
+		upload.file = null;
+		upload.started = false;
+		window.venusContainerImportUpload = upload;
+		input.addEventListener("change", () => {
+			if (input.files && input.files.length > 0) {
+				upload.file = input.files[0];
+			}
+		}, { once: true });
+		input.click();
+	});
+}
+
+bool BackendConnection::uploadSelectedContainerImportFile(const QString &relativeUrl)
+{
+	if (!relativeUrl.startsWith(QStringLiteral("/import/"))) {
+		return false;
+	}
+
+	const QByteArray encodedUrl = relativeUrl.toUtf8();
+	return EM_ASM_INT({
+		const upload = window.venusContainerImportUpload;
+		if (!upload || !upload.file || upload.started) {
+			return 0;
+		}
+
+		upload.started = true;
+		const request = new XMLHttpRequest();
+		request.open("PUT", UTF8ToString($0));
+		request.setRequestHeader("Content-Type", "application/octet-stream");
+		request.setRequestHeader("X-Venus-Filename", upload.file.name);
+		request.send(upload.file);
+		return 1;
+	}, encodedUrl.constData()) != 0;
+}
+
 void BackendConnection::hitWatchdog()
 {
 	// 'watchdogHit' and 'guiv2initialized' are defined in index.html.
@@ -288,6 +331,8 @@ void BackendConnection::onReloadPageTimerExpired() {}
 void BackendConnection::securityProtocolChanged() {}
 void BackendConnection::reloadPage() {}
 void BackendConnection::openUrl(const QString &) {}
+void BackendConnection::chooseContainerImportFile() {}
+bool BackendConnection::uploadSelectedContainerImportFile(const QString &) { return false; }
 
 #endif
 
