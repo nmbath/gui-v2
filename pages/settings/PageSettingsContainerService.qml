@@ -10,7 +10,7 @@ import Victron.VenusOS
 	com.victronenergy.containers service-level status (venus-containers Drop
 	3 spec Section 14 point 6 / Section 7.1 - service-level paths, not the
 	per-container ones). Read-only except PruneImages, a trigger-path
-	matching /Containers/<UUID>/Purge's own convention (docs/dbus-api.md,
+	matching /Containers/<UUID>/Admin/Purge's own convention (docs/dbus-api.md,
 	Decisions).
 */
 Page {

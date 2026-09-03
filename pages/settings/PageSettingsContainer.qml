@@ -41,6 +41,7 @@ Page {
 	readonly property string containerUuidSegment: containerPrefix.substring(containerPrefix.lastIndexOf("/") + 1)
 	readonly property string settingsPrefix: BackendConnection.serviceUidForType("settings") + "/Settings/Containers/" + root.containerUuidSegment
 	readonly property bool isRunning: state.value === 4 // ContainerState.Running, see Containers.qml
+	readonly property bool isDeleted: state.value === 7 // ContainerState.Deleted
 
 	VeQuickItem { id: state; uid: root.containerPrefix + "/State" }
 	VeQuickItem { id: statusText; uid: root.containerPrefix + "/Status" }
@@ -68,6 +69,8 @@ Page {
 	VeQuickItem { id: diskHostUsed; uid: root.containerPrefix + "/DiskUsage/HostUsedBytes" }
 	VeQuickItem { id: diskUpdatedAt; uid: root.containerPrefix + "/DiskUsage/UpdatedAt" }
 	VeQuickItem { id: desiredState; uid: root.settingsPrefix + "/DesiredState" }
+	VeQuickItem { id: startOnBoot; uid: root.containerPrefix + "/Lifecycle/StartOnBoot" }
+	VeQuickItem { id: purge; uid: root.containerPrefix + "/Admin/Purge" }
 	VeQuickItem { id: containerRuntimeEnabled; uid: root.containerPrefix + "/ContainerRuntime/Enabled" }
 	// Unified across both child ownership modes (docs/dbus-api.md note 5) -
 	// Mode is "", "managed" or "runtime"; Count/Running cover either shape
@@ -109,6 +112,7 @@ Page {
 			SettingsListHeader {
 				//% "Current usage"
 				text: qsTrId("pagesettingscontainer_current_usage")
+				preferredVisible: !root.isDeleted
 			}
 
 			ListResourceGauge {
@@ -119,6 +123,7 @@ Page {
 						.arg(Containers.bytesToMebibytes(memoryUsage.value)).arg(Containers.bytesToMebibytes(memoryLimit.value))
 				value: memoryUsage.value
 				to: memoryLimit.value
+				preferredVisible: !root.isDeleted
 			}
 
 			ListResourceGauge {
@@ -129,6 +134,7 @@ Page {
 						.arg(root.cpuUsageCores.toFixed(2)).arg(cpuLimit.value)
 				value: root.cpuUsageCores
 				to: cpuLimit.value
+				preferredVisible: !root.isDeleted
 			}
 
 			ListResourceGauge {
@@ -138,6 +144,7 @@ Page {
 				valueText: qsTrId("pagesettingscontainerresources_pids_usage_value").arg(pids.value).arg(pidsLimit.value)
 				value: pids.value
 				to: pidsLimit.value
+				preferredVisible: !root.isDeleted
 			}
 
 			SettingsListHeader {
@@ -146,21 +153,21 @@ Page {
 				// DiskUsage/UpdatedAt is 0 until the first periodic sample -
 				// same "pending" convention vcm show/list already use,
 				// see cli.py's _format_disk_usage.
-				preferredVisible: !!diskUpdatedAt.value
+				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
 			}
 
 			ListText {
 				//% "Total"
 				text: qsTrId("pagesettingscontainer_disk_total")
 				secondaryText: Containers.formatBytes(diskTotal.value)
-				preferredVisible: !!diskUpdatedAt.value
+				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
 			}
 
 			ListText {
 				//% "Image"
 				text: qsTrId("pagesettingscontainer_disk_image")
 				secondaryText: Containers.formatBytes(diskImage.value)
-				preferredVisible: !!diskUpdatedAt.value
+				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
 			}
 
 			ListText {
@@ -169,7 +176,7 @@ Page {
 				secondaryText: Containers.formatBytes(diskLocal.value)
 				//% "Writable layer + managed storage - the part unique to this container"
 				caption: qsTrId("pagesettingscontainer_disk_local_caption")
-				preferredVisible: !!diskUpdatedAt.value
+				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
 			}
 
 			ListResourceGauge {
@@ -186,7 +193,7 @@ Page {
 				caption: qsTrId("pagesettingscontainer_disk_host_caption")
 				value: diskHostUsed.value
 				to: diskHostTotal.value
-				preferredVisible: !!diskUpdatedAt.value && diskHostTotal.value > 0
+				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value && diskHostTotal.value > 0
 			}
 
 			SettingsListHeader {
@@ -257,6 +264,7 @@ Page {
 			SettingsListHeader {
 				//% "Configuration"
 				text: qsTrId("pagesettingscontainer_configuration")
+				preferredVisible: !root.isDeleted
 			}
 
 			ListNavigation {
@@ -266,6 +274,7 @@ Page {
 				secondaryText: qsTrId("pagesettingscontainer_resource_limits_summary")
 						.arg(Containers.memoryLimitToText(memoryLimit.value))
 						.arg(Containers.cpuLimitToText(cpuLimit.value))
+				preferredVisible: !root.isDeleted
 				// title: text (this row's own label, not root.title) -
 				// passing the container page's own title here duplicated it
 				// in the breadcrumb instead of showing the sub-page's own
@@ -278,6 +287,7 @@ Page {
 			ListNavigation {
 				//% "Startup Options"
 				text: qsTrId("pagesettingscontainer_startup_options")
+				preferredVisible: !root.isDeleted
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerStartup.qml",
 						{"title": text, "containerPrefix": root.containerPrefix})
 			}
@@ -302,7 +312,7 @@ Page {
 				// same way - "" for the overwhelming majority with no
 				// children of either kind - so this row is absent for
 				// almost every container either way.
-				preferredVisible: !!containerRuntimeEnabled.value || childrenMode.value === "managed"
+				preferredVisible: !root.isDeleted && (!!containerRuntimeEnabled.value || childrenMode.value === "managed")
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerSubcontainers.qml",
 						{"title": text, "containerPrefix": root.containerPrefix})
 			}
@@ -310,6 +320,7 @@ Page {
 			SettingsListHeader {
 				//% "Control"
 				text: qsTrId("pagesettingscontainer_control")
+				preferredVisible: !root.isDeleted
 			}
 
 			ListButton {
@@ -320,7 +331,7 @@ Page {
 				text: qsTrId("pagesettingscontainer_stop_container")
 				//% "Stop"
 				secondaryText: qsTrId("pagesettingscontainer_stop")
-				preferredVisible: root.isRunning
+				preferredVisible: !root.isDeleted && root.isRunning
 				onClicked: desiredState.setValue(0)
 			}
 
@@ -329,7 +340,7 @@ Page {
 				text: qsTrId("pagesettingscontainer_start_container")
 				//% "Start"
 				secondaryText: qsTrId("pagesettingscontainer_start")
-				preferredVisible: !root.isRunning
+				preferredVisible: !root.isDeleted && !root.isRunning
 				onClicked: {
 					if (desiredState.value === 1) {
 						// Already desired Running but not actually Running
@@ -358,7 +369,7 @@ Page {
 				text: qsTrId("pagesettingscontainer_restart_container")
 				//% "Restart"
 				secondaryText: qsTrId("pagesettingscontainer_restart")
-				preferredVisible: root.isRunning || state.value === 8
+				preferredVisible: !root.isDeleted && (root.isRunning || state.value === 8)
 				onClicked: root.restart()
 			}
 
@@ -372,6 +383,7 @@ Page {
 				//% "Definition is retained for restore"
 				caption: qsTrId("pagesettingscontainer_delete_caption")
 				writeAccessLevel: VenusOS.User_AccessType_Installer
+				preferredVisible: !root.isDeleted
 				// ListButton.click() (components/listitems/core/ListButton.qml)
 				// already gates on checkWriteAccessLevel() before this signal
 				// fires - no need to call it again here, same as the Stop/
@@ -396,14 +408,65 @@ Page {
 			}
 
 			SettingsListHeader {
+				//% "Recovery"
+				text: qsTrId("pagesettingscontainer_recovery")
+				preferredVisible: root.isDeleted
+			}
+
+			ListButton {
+				//% "Restore container"
+				text: qsTrId("pagesettingscontainer_restore_container")
+				//% "Restore"
+				secondaryText: qsTrId("pagesettingscontainer_restore")
+				//% "Recreates the container from its retained definition"
+				caption: qsTrId("pagesettingscontainer_restore_caption")
+				preferredVisible: root.isDeleted
+				writeAccessLevel: VenusOS.User_AccessType_Installer
+				onClicked: {
+					desiredState.setValue(startOnBoot.value ? 1 : 0)
+					Global.pageManager.popPage()
+				}
+			}
+
+			ListButton {
+				//% "Permanently remove container"
+				text: qsTrId("pagesettingscontainer_purge_container")
+				//% "Purge"
+				secondaryText: qsTrId("pagesettingscontainer_purge")
+				//% "Removes the definition, identity and all managed storage"
+				caption: qsTrId("pagesettingscontainer_purge_caption")
+				preferredVisible: root.isDeleted
+				writeAccessLevel: VenusOS.User_AccessType_Installer
+				onClicked: Global.dialogLayer.open(purgeConfirmationDialogComponent)
+
+				Component {
+					id: purgeConfirmationDialogComponent
+
+					ModalWarningDialog {
+						//% "Permanently remove container?"
+						title: qsTrId("pagesettingscontainer_purge_confirm_title")
+						//% "The retained definition, identity and all managed storage will be permanently removed. This cannot be undone."
+						description: qsTrId("pagesettingscontainer_purge_confirm_description")
+						dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_OkAndCancel
+						onAccepted: {
+							purge.setValue(1)
+							Global.pageManager.popPage()
+						}
+					}
+				}
+			}
+
+			SettingsListHeader {
 				//% "Information"
 				text: qsTrId("pagesettingscontainer_information")
+				preferredVisible: !root.isDeleted
 			}
 
 			ListText {
 				//% "Image"
 				text: qsTrId("pagesettingscontainer_image")
 				secondaryText: image.value || ""
+				preferredVisible: !root.isDeleted
 			}
 
 			ListRadioButtonGroup {
@@ -411,6 +474,7 @@ Page {
 				text: qsTrId("pagesettingscontainer_pull_policy")
 				dataItem.uid: pullPolicy.uid
 				optionModel: Containers.pullPolicyOptions()
+				preferredVisible: !root.isDeleted
 			}
 
 			ListText {
@@ -418,20 +482,21 @@ Page {
 				text: qsTrId("pagesettingscontainer_runtime_id")
 				secondaryText: runtimeId.value || ""
 				showAccessLevel: VenusOS.User_AccessType_SuperUser
-				preferredVisible: !!runtimeId.value
+				preferredVisible: !root.isDeleted && !!runtimeId.value
 			}
 
 			ListText {
 				//% "Uptime"
 				text: qsTrId("pagesettingscontainer_uptime")
 				secondaryText: Utils.secondsToString(uptime.value, false)
-				preferredVisible: root.isRunning
+				preferredVisible: !root.isDeleted && root.isRunning
 			}
 
 			ListText {
 				//% "Restart count"
 				text: qsTrId("pagesettingscontainer_restart_count")
 				secondaryText: restartCount.value
+				preferredVisible: !root.isDeleted
 			}
 		}
 	}

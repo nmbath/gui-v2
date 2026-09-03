@@ -53,15 +53,24 @@ Page {
 	// the list's own live per-row model.
 	property int unlimitedMemoryCount: 0
 	property int unlimitedCpuCount: 0
+	property int activeContainerCount: 0
+	property int deletedContainerCount: 0
 
 	function recomputeUnlimitedCounts() {
 		let unlimitedMemory = 0
 		let unlimitedCpu = 0
+		let activeContainers = 0
+		let deletedContainers = 0
 		for (let i = 0; i < containerRepeater.count; ++i) {
 			const row = containerRepeater.itemAt(i)
 			if (!row) {
 				continue
 			}
+			if (row.isDeleted) {
+				deletedContainers++
+				continue
+			}
+			activeContainers++
 			if (row.memoryLimitBytes <= 0) {
 				unlimitedMemory++
 			}
@@ -79,6 +88,8 @@ Page {
 		}
 		root.unlimitedMemoryCount = unlimitedMemory
 		root.unlimitedCpuCount = unlimitedCpu
+		root.activeContainerCount = activeContainers
+		root.deletedContainerCount = deletedContainers
 	}
 
 	function assignedMemoryText() {
@@ -236,7 +247,7 @@ Page {
 			// does).
 			SettingsColumn {
 				width: parent ? parent.width : 0
-				preferredVisible: enabledSwitch.checked && containerRepeater.count > 0
+				preferredVisible: enabledSwitch.checked && root.activeContainerCount > 0
 
 				SettingsListHeader {
 					//% "Containers"
@@ -261,6 +272,8 @@ Page {
 						required property VeQItem item
 
 						readonly property string containerPrefix: item.itemParent().uid
+						readonly property bool isDeleted: state.value === 7 // ContainerState.Deleted
+						preferredVisible: !isDeleted
 
 						// Exposed so root.recomputeUnlimitedCounts() can count how
 						// many contributors (a container's own limit, and
@@ -280,6 +293,7 @@ Page {
 						onRuntimeEnabledChanged: root.recomputeUnlimitedCounts()
 						onRuntimeMemoryLimitBytesChanged: root.recomputeUnlimitedCounts()
 						onRuntimeCpuLimitCoresChanged: root.recomputeUnlimitedCounts()
+						onIsDeletedChanged: root.recomputeUnlimitedCounts()
 
 						text: item.value || ""
 						// The image reference alone gave no hint that a
@@ -496,6 +510,43 @@ Page {
 					// onMemoryLimitBytesChanged etc (above) covers live value
 					// changes on an already-existing row.
 					onCountChanged: root.recomputeUnlimitedCounts()
+				}
+			}
+
+			SettingsColumn {
+				width: parent ? parent.width : 0
+				preferredVisible: enabledSwitch.checked && root.deletedContainerCount > 0
+
+				SettingsListHeader {
+					//% "Deleted containers"
+					text: qsTrId("pagesettingscontainers_deleted_containers")
+				}
+
+				Repeater {
+					model: VeQItemSortTableModel {
+						model: VeQItemChildModel {
+							model: containers
+							childId: "Name"
+						}
+						dynamicSortFilter: true
+						filterFlags: VeQItemSortTableModel.FilterInvalid
+					}
+
+					delegate: ListNavigation {
+						required property VeQItem item
+						readonly property string containerPrefix: item.itemParent().uid
+
+						text: item.value || ""
+						caption: image.value || ""
+						//% "Deleted - restore or permanently remove"
+						secondaryText: qsTrId("pagesettingscontainers_deleted_action")
+						preferredVisible: state.value === 7 // ContainerState.Deleted
+						onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainer.qml",
+								{"title": text, "containerPrefix": containerPrefix})
+
+						VeQuickItem { id: image; uid: containerPrefix + "/Image" }
+						VeQuickItem { id: state; uid: containerPrefix + "/State" }
+					}
 				}
 			}
 		}
