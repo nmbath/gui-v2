@@ -43,6 +43,7 @@ Page {
 	readonly property string settingsPrefix: BackendConnection.serviceUidForType("settings") + "/Settings/Containers/" + root.containerUuidSegment
 	readonly property bool isRunning: state.value === 4 // ContainerState.Running, see Containers.qml
 	readonly property bool isDeleted: state.value === 7 // ContainerState.Deleted
+	readonly property bool liveUsageValid: root.isRunning && memoryUsage.valid && cpuUsage.valid && pids.valid
 
 	VeQuickItem { id: state; uid: root.containerPrefix + "/State" }
 	VeQuickItem { id: statusText; uid: root.containerPrefix + "/Status" }
@@ -149,9 +150,11 @@ Page {
 
 						SecondaryListLabel {
 							//% "%1 / %2"
-							text: qsTrId("pagesettingscontainer_memory_usage_compact")
+							text: root.liveUsageValid
+									? qsTrId("pagesettingscontainer_memory_usage_compact")
 									.arg(Containers.bytesToMebibytes(memoryUsage.value))
 									.arg(Containers.bytesToMebibytes(memoryLimit.value))
+									: "-"
 							Layout.alignment: Qt.AlignHCenter
 						}
 					}
@@ -171,8 +174,10 @@ Page {
 
 						SecondaryListLabel {
 							//% "%1% / %2"
-							text: qsTrId("pagesettingscontainer_cpu_usage_compact")
+							text: root.liveUsageValid
+									? qsTrId("pagesettingscontainer_cpu_usage_compact")
 									.arg(Math.round(cpuUsage.value)).arg(cpuLimit.value)
+									: "-"
 							Layout.alignment: Qt.AlignHCenter
 						}
 					}
@@ -192,8 +197,10 @@ Page {
 
 						SecondaryListLabel {
 							//% "%1 / %2"
-							text: qsTrId("pagesettingscontainerresources_pids_usage_value")
+							text: root.liveUsageValid
+									? qsTrId("pagesettingscontainerresources_pids_usage_value")
 									.arg(pids.value).arg(pidsLimit.value)
+									: "-"
 							Layout.alignment: Qt.AlignHCenter
 						}
 					}

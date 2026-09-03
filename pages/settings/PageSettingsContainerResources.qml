@@ -54,6 +54,7 @@ Page {
 
 	required property string containerPrefix
 	property bool isAggregate: false
+	readonly property bool liveUsageValid: state.value === 4
 
 	readonly property int memoryStepMib: 1
 	readonly property var memoryPresetMib: [256, 512, 768, 1024, 1536, 2048]
@@ -89,6 +90,7 @@ Page {
 	VeQuickItem { id: cpuWeight; uid: root.resourcePrefix + "/CpuWeight" }
 	VeQuickItem { id: pids; uid: root.resourcePrefix + "/" + root.pidsUsageLeaf }
 	VeQuickItem { id: pidsLimit; uid: root.resourcePrefix + "/PidsLimit" }
+	VeQuickItem { id: state; uid: root.containerPrefix + "/State" }
 
 	// Top-level, not per-container - the same host ceiling bounds every
 	// Memory/CPU-maximum control in the app, own-container or aggregate alike.
@@ -112,14 +114,17 @@ Page {
 				//% "Memory"
 				text: qsTrId("pagesettingscontainerresources_memory")
 				//% "%1 MB"
-				secondaryText: qsTrId("pagesettingscontainerresources_memory_value")
+				secondaryText: root.liveUsageValid && memoryUsage.valid
+						? qsTrId("pagesettingscontainerresources_memory_value")
 						.arg(Containers.bytesToMebibytes(memoryUsage.value))
+						: "-"
 			}
 
-			ListQuantity {
+			ListText {
 				//% "CPU"
 				text: qsTrId("pagesettingscontainerresources_cpu")
-				value: cpuUsage.value
+				secondaryText: root.liveUsageValid && cpuUsage.valid
+						? Math.round(cpuUsage.value) + "%" : "-"
 				// Both own-container and aggregate CpuUsage are the same
 				// percentage convention (100% = one full logical CPU busy for
 				// the sample period, can exceed 100% with several cores
@@ -130,13 +135,12 @@ Page {
 				// the own-container figure from podman stats' native CPU%
 				// field - both genuinely percentages, unlike CpuLimit (both
 				// variants), which is in cores.
-				unit: VenusOS.Units_Percentage
 			}
 
 			ListText {
 				//% "Processes"
 				text: qsTrId("pagesettingscontainerresources_processes")
-				secondaryText: pids.value
+				secondaryText: root.liveUsageValid && pids.valid ? pids.value : "-"
 			}
 
 			SettingsListHeader {
