@@ -87,7 +87,10 @@ FocusScope {
 					x: Theme.geometry_tabBar_horizontalMargin
 					width: parent.width - 2*x
 					elide: Text.ElideRight
-					text: modelData.value
+					// A preset's stored value is not always the most useful text to
+					// present. For example, a memory selector stores 1536 MiB but is
+					// much easier to scan when its button reads "1.5 GB".
+					text: modelData.display ?? modelData.value
 					color: mouseArea.enabled === false && model.index !== root.currentIndex
 						   ? Theme.color_font_disabled
 						   : (mouseArea.pressed || model.index === root.currentIndex

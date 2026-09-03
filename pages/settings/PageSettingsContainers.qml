@@ -25,7 +25,7 @@ Page {
 
 	// docs/dbus-api.md: MaxMemoryLimitBytes/MaxCpuLimit are the host ceiling
 	// (RAM minus a fixed OS/Venus reserve; host core count) - the same bound
-	// PageSettingsContainerResources.qml's Memory/CPU-maximum sliders use.
+	// PageSettingsContainerResources.qml's Memory/CPU-maximum controls use.
 	// AllocatedMemoryLimitBytes/AllocatedCpuLimit are already the backend's
 	// own authoritative sum of every container's own Resources/MemoryLimit,
 	// CpuLimit PLUS its ContainerRuntime/Resources aggregate when enabled -

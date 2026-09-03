@@ -35,12 +35,12 @@ import Victron.VenusOS
 	mode, so a write here always reaches the one that actually applies),
 	which persists and applies live but never recreates the parent.
 
-	Memory/CPU maximum are sliders from 0 (which already means "unlimited" per
-	the schema, see below) to the host ceiling published at the containers
-	service's top-level /System/MaxMemoryLimitBytes and /System/MaxCpuLimit -
-	so there is no separate "Unlimited" switch here: sliding all the way to 0
-	already produces the same wire value backend/podman.py already treats as
-	unlimited. Same bound for both own-container and aggregate: a child's
+	Memory/CPU maximum range from 0 (which already means "unlimited" per the
+	schema, see below) to the host ceiling published at the containers service's
+	top-level /System/MaxMemoryLimitBytes and /System/MaxCpuLimit. Memory uses a
+	preset number picker and CPU uses a slider; setting either to 0 produces the
+	same wire value backend/podman.py already treats as unlimited. The same bound
+	applies to both own-container and aggregate: a child's
 	aggregate envelope lives in its own separate cgroup (RUNTIME_API_CGROUP_
 	ROOT or CHILD_SCOPE_CGROUP_ROOT in backend/podman.py, depending on mode),
 	not carved out of the parent's own (DEDICATED_CGROUP_ROOT) - it's an
@@ -55,7 +55,25 @@ Page {
 	required property string containerPrefix
 	property bool isAggregate: false
 
-	readonly property int memoryStepMib: 64
+	readonly property int memoryStepMib: 1
+	readonly property var memoryPresetMib: [256, 512, 768, 1024, 1536, 2048]
+
+	function memoryPresets(maximumMib) {
+		const options = [{
+			value: 0,
+			display: "0",
+			enabled: true
+		}]
+		return options.concat(root.memoryPresetMib.map(function(mib) {
+			return {
+				value: mib,
+				// The selector already displays the editable value in MB. Keep
+				// these labels compact enough for all seven presets to fit.
+				display: mib < 1024 ? String(mib) : (mib / 1024) + "G",
+				enabled: mib <= maximumMib
+			}
+		}))
+	}
 
 	readonly property string resourcePrefix: root.containerPrefix + (root.isAggregate ? "/Children/Resources" : "/Resources")
 	readonly property string memoryUsageLeaf: root.isAggregate ? "MemoryUsedBytes" : "MemoryUsage"
@@ -73,7 +91,7 @@ Page {
 	VeQuickItem { id: pidsLimit; uid: root.resourcePrefix + "/PidsLimit" }
 
 	// Top-level, not per-container - the same host ceiling bounds every
-	// Memory/CPU-maximum slider in the app, own-container or aggregate alike.
+	// Memory/CPU-maximum control in the app, own-container or aggregate alike.
 	// A sub-container runtime's aggregate envelope is its own additional
 	// allocation on top of the parent's own limit (confirmed by the user
 	// 2026-08-29 - NOT carved out of it, despite an earlier misreading of a
@@ -126,22 +144,20 @@ Page {
 				text: qsTrId("pagesettingscontainerresources_limits")
 			}
 
-			ListSlider {
-				// ListSlider has no separate value-readout property - shown as
-				// part of the label itself instead, matching the startup Delay
-				// slider's own pattern (PageSettingsContainerStartup.qml).
-				// memoryLimitToText already renders "Unlimited" at 0, so
-				// dragging to the left end of the slider reads correctly
-				// without any extra unlimited-specific label handling.
-				//% "Memory maximum: %1"
-				text: qsTrId("pagesettingscontainerresources_memory_limit_slider").arg(Containers.memoryLimitToText(memoryLimit.value))
+			ListButton {
+				// This page is used for both a container's own resource limits and
+				// a sub-container runtime's aggregate limits, so this one picker
+				// covers every writable container-memory selection point.
+				//% "Memory maximum"
+				text: qsTrId("pagesettingscontainerresources_memory_limit")
+				secondaryText: memoryLimit.valid ? Containers.memoryLimitToText(memoryLimit.value) : "--"
 				//% "0 = unlimited"
 				caption: qsTrId("pagesettingscontainerresources_memory_limit_caption")
 				preferredVisible: systemMaxMemory.valid && systemMaxMemory.value > 0
-				dataItem.uid: memoryLimit.uid
-				from: 0
-				to: systemMaxMemory.value
-				stepSize: root.memoryStepMib * 1024 * 1024
+				interactive: memoryLimit.valid
+				onClicked: Global.dialogLayer.open(memorySelectorComponent, {
+					value: Containers.bytesToMebibytes(memoryLimit.value)
+				})
 			}
 
 			ListSlider {
@@ -186,6 +202,25 @@ Page {
 				text: qsTrId("pagesettingscontainerresources_aggregate_limits_note")
 				preferredVisible: root.isAggregate
 			}
+		}
+	}
+
+	Component {
+		id: memorySelectorComponent
+
+		NumberSelectorDialog {
+			//% "Memory maximum"
+			title: qsTrId("pagesettingscontainerresources_memory_limit")
+			fillValueFieldWidth: true
+			//% " MB"
+			suffix: qsTrId("pagesettingscontainerresources_mb_suffix")
+			decimals: 0
+			from: 0
+			to: Math.floor(Containers.bytesToMebibytes(systemMaxMemory.value))
+			stepSize: root.memoryStepMib
+			presets: root.memoryPresets(to)
+
+			onAccepted: memoryLimit.setValue(Containers.mebibytesToBytes(value))
 		}
 	}
 }
