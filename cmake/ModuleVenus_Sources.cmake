@@ -441,6 +441,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsContainerStartup.qml
     pages/settings/PageSettingsContainerSubcontainers.qml
     pages/settings/PageSettingsContainers.qml
+    pages/settings/PageSettingsContainerImport.qml
     pages/settings/PageSettingsDisplayAndAppearance.qml
     pages/settings/PageSettingsDisplayBrief.qml
     pages/settings/PageSettingsDisplayMinMax.qml

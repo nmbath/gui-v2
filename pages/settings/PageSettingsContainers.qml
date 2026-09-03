@@ -22,6 +22,7 @@ Page {
 	id: root
 
 	readonly property string containersServiceUid: BackendConnection.serviceUidForType("containers")
+	readonly property string importServiceUid: BackendConnection.serviceUidForType("import")
 
 	// docs/dbus-api.md: MaxMemoryLimitBytes/MaxCpuLimit are the host ceiling
 	// (RAM minus a fixed OS/Venus reserve; host core count) - the same bound
@@ -39,6 +40,7 @@ Page {
 	VeQuickItem { id: systemMaxCpu; uid: root.containersServiceUid + "/System/MaxCpuLimit" }
 	VeQuickItem { id: allocatedMemory; uid: root.containersServiceUid + "/System/AllocatedMemoryLimitBytes" }
 	VeQuickItem { id: allocatedCpu; uid: root.containersServiceUid + "/System/AllocatedCpuLimit" }
+	VeQuickItem { id: importServiceConnected; uid: root.importServiceUid + "/Connected" }
 
 	// The backend's own Allocated total already excludes each Unlimited (0)
 	// contributor from the sum (same "0 = no cap" convention as everywhere
@@ -228,6 +230,23 @@ Page {
 				VeQuickItem {
 					id: serviceState
 					uid: root.containersServiceUid + "/State"
+				}
+			}
+
+			ListButton {
+				//% "Add container from file"
+				text: qsTrId("pagesettingscontainers_add_from_file")
+				//% "Add"
+				secondaryText: qsTrId("pagesettingscontainers_add")
+				preferredVisible: enabledSwitch.checked && importServiceConnected.valid
+						&& importServiceConnected.value === 1
+				writeAccessLevel: VenusOS.User_AccessType_User
+				onClicked: {
+					//% "Preparing container import…"
+					Global.showToastNotification(VenusOS.Notification_Info,
+							qsTrId("pagesettingscontainers_preparing_import"), 3000)
+					Global.pageManager.pushPage("/pages/settings/PageSettingsContainerImport.qml",
+							{"title": text})
 				}
 			}
 
