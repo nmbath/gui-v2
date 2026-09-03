@@ -4,6 +4,7 @@
 */
 
 import QtQuick
+import QtQuick.Layouts
 import Victron.VenusOS
 
 /*
@@ -62,11 +63,8 @@ Page {
 	VeQuickItem { id: cpuLimit; uid: root.containerPrefix + "/Resources/CpuLimit" }
 	VeQuickItem { id: pids; uid: root.containerPrefix + "/Resources/Pids" }
 	VeQuickItem { id: pidsLimit; uid: root.containerPrefix + "/Resources/PidsLimit" }
-	VeQuickItem { id: diskTotal; uid: root.containerPrefix + "/DiskUsage/TotalBytes" }
 	VeQuickItem { id: diskImage; uid: root.containerPrefix + "/DiskUsage/ImageBytes" }
 	VeQuickItem { id: diskLocal; uid: root.containerPrefix + "/DiskUsage/ExclusiveBytes" }
-	VeQuickItem { id: diskHostTotal; uid: root.containerPrefix + "/DiskUsage/HostTotalBytes" }
-	VeQuickItem { id: diskHostUsed; uid: root.containerPrefix + "/DiskUsage/HostUsedBytes" }
 	VeQuickItem { id: diskUpdatedAt; uid: root.containerPrefix + "/DiskUsage/UpdatedAt" }
 	VeQuickItem { id: desiredState; uid: root.settingsPrefix + "/DesiredState" }
 	VeQuickItem { id: startOnBoot; uid: root.containerPrefix + "/Lifecycle/StartOnBoot" }
@@ -99,14 +97,6 @@ Page {
 		restartTimer.start()
 	}
 
-	// CpuUsage is a percentage (100% = one full logical CPU busy for the
-	// sample period, backend/podman.py in venus-containers) while CpuLimit
-	// is in cores - same conversion PageSettingsContainerSubcontainers.qml
-	// already applies for its own aggregate gauges, needed here for the
-	// same reason: comparing a percentage against a core count directly
-	// would be meaningless.
-	readonly property real cpuUsageCores: cpuUsage.value / 100
-
 	GradientListView {
 		model: VisibleItemModel {
 			SettingsListHeader {
@@ -115,85 +105,110 @@ Page {
 				preferredVisible: !root.isDeleted
 			}
 
-			ListResourceGauge {
-				//% "Memory"
-				text: qsTrId("pagesettingscontainerresources_memory")
-				//% "%1 MB / %2 MB"
-				valueText: qsTrId("pagesettingscontainerresources_memory_usage_value")
-						.arg(Containers.bytesToMebibytes(memoryUsage.value)).arg(Containers.bytesToMebibytes(memoryLimit.value))
-				value: memoryUsage.value
-				to: memoryLimit.value
+			ListItem {
+				id: usageSummary
+
 				preferredVisible: !root.isDeleted
-			}
+				contentItem: RowLayout {
+					spacing: usageSummary.spacing
 
-			ListResourceGauge {
-				//% "CPU"
-				text: qsTrId("pagesettingscontainerresources_cpu")
-				//% "%1 / %2"
-				valueText: qsTrId("pagesettingscontainerresources_cpu_usage_value")
-						.arg(root.cpuUsageCores.toFixed(2)).arg(cpuLimit.value)
-				value: root.cpuUsageCores
-				to: cpuLimit.value
-				preferredVisible: !root.isDeleted
-			}
+					ColumnLayout {
+						spacing: 0
+						Layout.fillWidth: true
+						Layout.preferredWidth: 1
 
-			ListResourceGauge {
-				//% "Processes"
-				text: qsTrId("pagesettingscontainerresources_processes")
-				//% "%1 / %2"
-				valueText: qsTrId("pagesettingscontainerresources_pids_usage_value").arg(pids.value).arg(pidsLimit.value)
-				value: pids.value
-				to: pidsLimit.value
-				preferredVisible: !root.isDeleted
-			}
+						Label {
+							//% "Memory (MB)"
+							text: qsTrId("pagesettingscontainer_memory_mb")
+							font: usageSummary.font
+							Layout.alignment: Qt.AlignHCenter
+						}
 
-			SettingsListHeader {
-				//% "Disk usage"
-				text: qsTrId("pagesettingscontainer_disk_usage")
-				// DiskUsage/UpdatedAt is 0 until the first periodic sample -
-				// same "pending" convention vcm show/list already use,
-				// see cli.py's _format_disk_usage.
-				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
-			}
+						SecondaryListLabel {
+							//% "%1 / %2"
+							text: qsTrId("pagesettingscontainer_memory_usage_compact")
+									.arg(Containers.bytesToMebibytes(memoryUsage.value))
+									.arg(Containers.bytesToMebibytes(memoryLimit.value))
+							Layout.alignment: Qt.AlignHCenter
+						}
+					}
 
-			ListText {
-				//% "Total"
-				text: qsTrId("pagesettingscontainer_disk_total")
-				secondaryText: Containers.formatBytes(diskTotal.value)
-				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
-			}
+					ColumnLayout {
+						spacing: 0
+						Layout.fillWidth: true
+						Layout.preferredWidth: 1
 
-			ListText {
-				//% "Image"
-				text: qsTrId("pagesettingscontainer_disk_image")
-				secondaryText: Containers.formatBytes(diskImage.value)
-				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
-			}
+						Label {
+							//% "CPU"
+							text: qsTrId("pagesettingscontainerresources_cpu")
+							font: usageSummary.font
+							Layout.alignment: Qt.AlignHCenter
+						}
 
-			ListText {
-				//% "Local"
-				text: qsTrId("pagesettingscontainer_disk_local")
-				secondaryText: Containers.formatBytes(diskLocal.value)
-				//% "Writable layer + managed storage - the part unique to this container"
-				caption: qsTrId("pagesettingscontainer_disk_local_caption")
-				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value
-			}
+						SecondaryListLabel {
+							//% "%1% / %2"
+							text: qsTrId("pagesettingscontainer_cpu_usage_compact")
+									.arg(Math.round(cpuUsage.value)).arg(cpuLimit.value)
+							Layout.alignment: Qt.AlignHCenter
+						}
+					}
 
-			ListResourceGauge {
-				//% "Disk (host)"
-				text: qsTrId("pagesettingscontainer_disk_host")
-				//% "%1 used of %2 (%3)"
-				valueText: qsTrId("pagesettingscontainer_disk_host_value")
-						.arg(Containers.formatBytes(diskHostUsed.value))
-						.arg(Containers.formatBytes(diskHostTotal.value))
-						.arg(diskHostTotal.value > 0
-							? Math.round(diskHostUsed.value / diskHostTotal.value * 100) + "%"
-							: "-")
-				//% "How full the disk this container's own storage lives on actually is - usually the same for every container, since most share one disk."
-				caption: qsTrId("pagesettingscontainer_disk_host_caption")
-				value: diskHostUsed.value
-				to: diskHostTotal.value
-				preferredVisible: !root.isDeleted && !!diskUpdatedAt.value && diskHostTotal.value > 0
+					ColumnLayout {
+						spacing: 0
+						Layout.fillWidth: true
+						Layout.preferredWidth: 1
+
+						Label {
+							//% "Processes"
+							text: qsTrId("pagesettingscontainerresources_processes")
+							font: usageSummary.font
+							Layout.alignment: Qt.AlignHCenter
+						}
+
+						SecondaryListLabel {
+							//% "%1 / %2"
+							text: qsTrId("pagesettingscontainerresources_pids_usage_value")
+									.arg(pids.value).arg(pidsLimit.value)
+							Layout.alignment: Qt.AlignHCenter
+						}
+					}
+
+					ColumnLayout {
+						spacing: 0
+						Layout.fillWidth: true
+						Layout.preferredWidth: 1
+
+						Label {
+							//% "Image"
+							text: qsTrId("pagesettingscontainer_disk_image")
+							font: usageSummary.font
+							Layout.alignment: Qt.AlignHCenter
+						}
+
+						SecondaryListLabel {
+							text: diskUpdatedAt.value ? Containers.formatBytes(diskImage.value) : "--"
+							Layout.alignment: Qt.AlignHCenter
+						}
+					}
+
+					ColumnLayout {
+						spacing: 0
+						Layout.fillWidth: true
+						Layout.preferredWidth: 1
+
+						Label {
+							//% "Local"
+							text: qsTrId("pagesettingscontainer_disk_local")
+							font: usageSummary.font
+							Layout.alignment: Qt.AlignHCenter
+						}
+
+						SecondaryListLabel {
+							text: diskUpdatedAt.value ? Containers.formatBytes(diskLocal.value) : "--"
+							Layout.alignment: Qt.AlignHCenter
+						}
+					}
+				}
 			}
 
 			SettingsListHeader {

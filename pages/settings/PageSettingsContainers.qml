@@ -57,12 +57,14 @@ Page {
 	property int unlimitedCpuCount: 0
 	property int activeContainerCount: 0
 	property int deletedContainerCount: 0
+	property string hostDiskSourcePrefix
 
 	function recomputeUnlimitedCounts() {
 		let unlimitedMemory = 0
 		let unlimitedCpu = 0
 		let activeContainers = 0
 		let deletedContainers = 0
+		let diskSourcePrefix = ""
 		for (let i = 0; i < containerRepeater.count; ++i) {
 			const row = containerRepeater.itemAt(i)
 			if (!row) {
@@ -73,6 +75,9 @@ Page {
 				continue
 			}
 			activeContainers++
+			if (!diskSourcePrefix) {
+				diskSourcePrefix = row.containerPrefix
+			}
 			if (row.memoryLimitBytes <= 0) {
 				unlimitedMemory++
 			}
@@ -92,6 +97,7 @@ Page {
 		root.unlimitedCpuCount = unlimitedCpu
 		root.activeContainerCount = activeContainers
 		root.deletedContainerCount = deletedContainers
+		root.hostDiskSourcePrefix = diskSourcePrefix
 	}
 
 	function assignedMemoryText() {
@@ -126,6 +132,23 @@ Page {
 		}
 		dynamicSortFilter: true
 		filterFlags: VeQItemSortTableModel.FilterOffline
+	}
+
+	// Host disk figures describe the storage backing the container service,
+	// rather than any one container. The backend currently publishes the same
+	// host sample beneath each application tree, so use the first active tree
+	// as the source and present it once at this parent level.
+	VeQuickItem {
+		id: diskHostTotal
+		uid: root.hostDiskSourcePrefix ? root.hostDiskSourcePrefix + "/DiskUsage/HostTotalBytes" : ""
+	}
+	VeQuickItem {
+		id: diskHostUsed
+		uid: root.hostDiskSourcePrefix ? root.hostDiskSourcePrefix + "/DiskUsage/HostUsedBytes" : ""
+	}
+	VeQuickItem {
+		id: diskUpdatedAt
+		uid: root.hostDiskSourcePrefix ? root.hostDiskSourcePrefix + "/DiskUsage/UpdatedAt" : ""
 	}
 
 	GradientListView {
@@ -211,6 +234,21 @@ Page {
 					valueText: root.assignedCpuText()
 					value: allocatedCpu.value
 					to: systemMaxCpu.value
+				}
+
+				ListResourceGauge {
+					//% "Disk (host)"
+					text: qsTrId("pagesettingscontainer_disk_host")
+					//% "%1 used of %2 (%3)"
+					valueText: qsTrId("pagesettingscontainer_disk_host_value")
+							.arg(Containers.formatBytes(diskHostUsed.value))
+							.arg(Containers.formatBytes(diskHostTotal.value))
+							.arg(diskHostTotal.value > 0
+								? Math.round(diskHostUsed.value / diskHostTotal.value * 100) + "%"
+								: "-")
+					value: diskHostUsed.value
+					to: diskHostTotal.value
+					preferredVisible: !!diskUpdatedAt.value && diskHostTotal.value > 0
 				}
 			}
 
