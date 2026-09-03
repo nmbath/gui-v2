@@ -41,6 +41,7 @@ Page {
 	VeQuickItem { id: allocatedMemory; uid: root.containersServiceUid + "/System/AllocatedMemoryLimitBytes" }
 	VeQuickItem { id: allocatedCpu; uid: root.containersServiceUid + "/System/AllocatedCpuLimit" }
 	VeQuickItem { id: importServiceConnected; uid: root.importServiceUid + "/Connected" }
+	VeQuickItem { id: importState; uid: root.importServiceUid + "/State" }
 
 	// The backend's own Allocated total already excludes each Unlimited (0)
 	// contributor from the sum (same "0 = no cap" convention as everywhere
@@ -280,11 +281,22 @@ Page {
 						&& importServiceConnected.value === 1
 				writeAccessLevel: VenusOS.User_AccessType_User
 				onClicked: {
-					//% "Preparing container import…"
-					Global.showToastNotification(VenusOS.Notification_Info,
-							qsTrId("pagesettingscontainers_preparing_import"), 3000)
-					Global.pageManager.pushPage("/pages/settings/PageSettingsContainerImport.qml",
-							{"title": text})
+					if (importState.value === 3) {
+						Global.pageManager.pushPage("/pages/settings/PageSettingsContainerImport.qml",
+								{"title": text})
+					} else {
+						Global.dialogLayer.open(containerImportDialogComponent)
+					}
+				}
+
+				Component {
+					id: containerImportDialogComponent
+
+					ContainerImportDialog {
+						onReviewReady: Qt.callLater(Global.pageManager.pushPage,
+								"/pages/settings/PageSettingsContainerImport.qml",
+								{"title": qsTrId("pagesettingscontainers_add_from_file")})
+					}
 				}
 			}
 

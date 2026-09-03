@@ -179,6 +179,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/controls/TextValidationField.qml
 
     components/dialogs/ColorWheelDialog.qml
+    components/dialogs/ContainerImportDialog.qml
     components/dialogs/CurrentLimitDialog.qml
     components/dialogs/DateSelectorDialog.qml
     components/dialogs/DialogHeader_Portrait.qml
