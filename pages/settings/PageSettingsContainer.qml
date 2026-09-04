@@ -484,7 +484,7 @@ Page {
 				text: qsTrId("pagesettingscontainer_purge_container")
 				//% "Purge"
 				secondaryText: qsTrId("pagesettingscontainer_purge")
-				//% "Removes the definition, identity and all managed storage"
+				//% "Removes the definition, settings, managed storage and logs"
 				caption: qsTrId("pagesettingscontainer_purge_caption")
 				preferredVisible: root.isDeleted
 				writeAccessLevel: VenusOS.User_AccessType_Installer
@@ -493,15 +493,136 @@ Page {
 				Component {
 					id: purgeConfirmationDialogComponent
 
-					ModalWarningDialog {
+					ModalDialog {
+						id: purgeDialog
+
+						property int purgeValue
+
 						//% "Permanently remove container?"
 						title: qsTrId("pagesettingscontainer_purge_confirm_title")
-						//% "The retained definition, identity and all managed storage will be permanently removed. This cannot be undone."
-						description: qsTrId("pagesettingscontainer_purge_confirm_description")
-						dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_OkAndCancel
+						dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_NoOptions
 						onAccepted: {
-							purge.setValue(1)
+							purge.setValue(purgeValue)
 							Global.pageManager.popPage()
+						}
+
+						contentItem: Item {
+							implicitWidth: Theme.geometry_modalDialog_width
+							implicitHeight: purgeComparison.implicitHeight
+									+ (2 * Theme.geometry_modalDialog_content_spacing)
+
+							GridLayout {
+								id: purgeComparison
+
+								anchors {
+									left: parent.left
+									right: parent.right
+									verticalCenter: parent.verticalCenter
+									margins: Theme.geometry_modalDialog_content_spacing
+								}
+								columns: 3
+								columnSpacing: Theme.geometry_modalDialog_content_spacing
+								rowSpacing: Theme.geometry_modalDialog_content_spacing / 2
+
+								Label {
+									//% "Removed item"
+									text: qsTrId("pagesettingscontainer_purge_removed_item")
+									font.bold: true
+									Layout.fillWidth: true
+								}
+								Label {
+									//% "Purge"
+									text: qsTrId("pagesettingscontainer_purge")
+									font.bold: true
+									horizontalAlignment: Text.AlignHCenter
+									Layout.preferredWidth: 150
+								}
+								Label {
+									//% "Purge everything"
+									text: qsTrId("pagesettingscontainer_purge_everything")
+									font.bold: true
+									horizontalAlignment: Text.AlignHCenter
+									wrapMode: Text.Wrap
+									Layout.preferredWidth: 150
+								}
+
+								//% "Container runtime"
+								Label { text: qsTrId("pagesettingscontainer_purge_runtime") }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+
+								//% "Definition and settings"
+								Label { text: qsTrId("pagesettingscontainer_purge_definition") }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+
+								//% "Managed storage"
+								Label { text: qsTrId("pagesettingscontainer_purge_storage") }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+
+								//% "Container logs"
+								Label { text: qsTrId("pagesettingscontainer_purge_logs") }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+
+								//% "Cached image (if unused)"
+								Label { text: qsTrId("pagesettingscontainer_purge_cached_image") }
+								Label { text: "-"; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+
+								//% "Dedicated identity (if used)"
+								Label { text: qsTrId("pagesettingscontainer_purge_identity") }
+								Label { text: "-"; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+								Label { text: "\u2713"; color: Theme.color_ok; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+							}
+						}
+
+						footer: FocusScope {
+							implicitHeight: Theme.geometry_modalDialog_footer_height
+							focus: true
+							Keys.onEscapePressed: purgeDialog.reject()
+							Keys.enabled: Global.keyNavigationEnabled
+
+							SeparatorBar {
+								anchors { left: parent.left; right: parent.right; top: parent.top }
+							}
+
+							RowLayout {
+								anchors { fill: parent; topMargin: 1 }
+								spacing: 0
+
+								Button {
+									text: CommonWords.cancel
+									flat: true
+									Layout.fillWidth: true
+									Layout.fillHeight: true
+									onClicked: purgeDialog.reject()
+								}
+								Button {
+									//% "Purge"
+									text: qsTrId("pagesettingscontainer_purge")
+									flat: true
+									Layout.fillWidth: true
+									Layout.fillHeight: true
+									onClicked: {
+										purgeDialog.purgeValue = 1
+										purgeDialog.accept()
+									}
+								}
+								Button {
+									//% "Purge everything"
+									text: qsTrId("pagesettingscontainer_purge_everything")
+									color: Theme.color_red
+									flat: true
+									Layout.fillWidth: true
+									Layout.fillHeight: true
+									onClicked: {
+										purgeDialog.purgeValue = 2
+										purgeDialog.accept()
+									}
+								}
+							}
 						}
 					}
 				}
