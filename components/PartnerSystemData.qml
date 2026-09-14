@@ -40,18 +40,69 @@ QtObject {
 		return batteries[1]
 	}
 
-	function metricAvailable(dataSource) {
+	function mappedBattery(batteries, selector) {
+		if (!batteries || !selector) {
+			return null
+		}
+		let match = null
+		for (let i = 0; i < batteries.length; ++i) {
+			const battery = batteries[i]
+			if (selector.name && battery.name !== selector.name) {
+				continue
+			}
+			if (selector.serviceId && battery.id !== selector.serviceId) {
+				continue
+			}
+			if (selector.deviceInstance !== undefined
+					&& battery.instance !== selector.deviceInstance) {
+				continue
+			}
+			// Ambiguous names are not safe role mappings. An installation-resolved
+			// service ID or device instance can disambiguate them.
+			if (match) {
+				return null
+			}
+			match = battery
+		}
+		return match
+	}
+
+	function selectedBattery(dataSource, selector) {
+		if (dataSource.startsWith("system.battery.")) {
+			return mappedBattery(root._batteries, selector)
+		}
+		return root._additionalBattery
+	}
+
+	function batteryServiceUid(dataSource, selector) {
+		const battery = selectedBattery(dataSource, selector)
+		if (!battery) {
+			return ""
+		}
+		return battery.instance === undefined
+			? battery.id
+			: BackendConnection.serviceUidFromName(battery.id, battery.instance)
+	}
+
+	function metricAvailable(dataSource, selector) {
 		switch (dataSource) {
 		case "system.firstAdditionalBattery.stateOfCharge":
 		case "system.firstAdditionalBattery.voltage":
 		case "system.firstAdditionalBattery.power":
-			return !!root._additionalBattery
+		case "system.battery.starter.stateOfCharge":
+		case "system.battery.starter.voltage":
+		case "system.battery.starter.power":
+		case "system.battery.auxiliary.stateOfCharge":
+		case "system.battery.auxiliary.voltage":
+		case "system.battery.auxiliary.power":
+			return !!selectedBattery(dataSource, selector)
 		default:
 			return true
 		}
 	}
 
-	function metricValue(dataSource) {
+	function metricValue(dataSource, selector) {
+		const battery = selectedBattery(dataSource, selector)
 		switch (dataSource) {
 		case "system.houseBattery.stateOfCharge": return houseBattery.stateOfCharge
 		case "system.houseBattery.voltage": return houseBattery.voltage
@@ -59,17 +110,46 @@ QtObject {
 		case "system.solar.power": return solar.powerWatts
 		case "system.acLoad.power": return ac.loadWatts
 		case "system.dcLoad.power": return dc.loadWatts
-		case "system.firstAdditionalBattery.stateOfCharge": return additionalBattery.stateOfCharge
-		case "system.firstAdditionalBattery.voltage": return additionalBattery.voltage
-		case "system.firstAdditionalBattery.power": return additionalBattery.powerWatts
+		case "system.firstAdditionalBattery.stateOfCharge":
+		case "system.battery.starter.stateOfCharge":
+		case "system.battery.auxiliary.stateOfCharge": return finiteOr(battery?.soc, NaN)
+		case "system.firstAdditionalBattery.voltage":
+		case "system.battery.starter.voltage":
+		case "system.battery.auxiliary.voltage": return finiteOr(battery?.voltage, NaN)
+		case "system.firstAdditionalBattery.power":
+		case "system.battery.starter.power":
+		case "system.battery.auxiliary.power": return finiteOr(battery?.power, NaN)
 		default: return NaN
 		}
 	}
 
+	property var _batteries: []
 	property var _additionalBattery: null
 	readonly property VeQuickItem _batteriesItem: VeQuickItem {
 		uid: Global.system.serviceUid + "/Batteries"
-		onValueChanged: root._additionalBattery = valid ? root.firstAdditionalBattery(value) : null
+		onValueChanged: {
+			root._batteries = valid ? value : []
+			root._additionalBattery = valid ? root.firstAdditionalBattery(value) : null
+		}
+	}
+
+	readonly property GuiPluginIntegrationModel _partnerBatteryIntegrations: GuiPluginIntegrationModel {
+		type: GuiPluginLoader.OverviewBattery
+	}
+	readonly property var mappedBatteryServiceUids: {
+		const result = []
+		// Referencing count and _batteries keeps this binding live as plug-ins or
+		// system battery entries change.
+		const count = _partnerBatteryIntegrations.count
+		const batteries = root._batteries
+		for (let i = 0; i < count; ++i) {
+			const configuration = _partnerBatteryIntegrations.integrationAt(i).configuration
+			const uid = batteryServiceUid(configuration.dataSource, configuration.batterySelector)
+			if (uid && result.indexOf(uid) < 0) {
+				result.push(uid)
+			}
+		}
+		return result
 	}
 
 	readonly property QtObject propulsion: QtObject {

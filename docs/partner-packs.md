@@ -22,11 +22,11 @@ A canonical manifest with `model: 3` may combine Models 1 and 2 with three decla
 
 - `briefMetric` adds a standardized read-only metric to the existing Brief side panel (inline in portrait).
 - `overviewEnergyNode` adds a source or load node to the native Overview flow layout.
-- `overviewBattery` adds a compact starter or auxiliary battery row below the house battery. It shows one approved value (for example state of charge or voltage), does not participate in the energy-flow connectors, and leaves the information-rich house-battery widget at large size.
+- `overviewBattery` adds a compact starter or auxiliary battery row below the house battery. It shows one approved value (for example state of charge or voltage), does not participate in the energy-flow connectors, and leaves the information-rich house-battery widget at large size. A uniquely mapped row opens that physical device directly and suppresses its duplicate entry from the ordinary runtime Batteries list; system configuration continues to expose the device.
 
 These integrations do not have a QML `source`. The partner declares a stable ID, short title, optional owned icon, ordering hint, semantic role, controlled `add`/`replace`/`hide` operation, unit, `readSystemData`, and an approved semantic `dataSource`. Overview nodes connect only to the battery or inverter/charger. GUIv2 owns rendering, geometry, connectors, light/dark styling, limits, and unavailable-value handling. Arbitrary D-Bus or MQTT paths and overlay coordinates are not accepted.
 
-The current semantic keys cover the active house battery, aggregate solar power, aggregate AC/DC loads, and the first additional battery's state of charge, voltage, and power. New product signals require an upstream semantic-key addition and review.
+The current semantic keys cover the active house battery, aggregate solar power, aggregate AC/DC loads, and explicitly mapped starter/auxiliary batteries. A `batteryMappings` entry selects from `com.victronenergy.system/Batteries` by an exact, unique common name; an installer may also persist its resolved service ID and device instance. Zero or ambiguous matches are unavailable and never fall back to the first non-house battery. New product signals require an upstream semantic-key addition and review.
 
 One cumulative `.vgp` can therefore install and roll back branding, partner pages, and Model 3 contributions atomically. Model 1 and Model 2 packs cannot declare Model 3 integration types.
 

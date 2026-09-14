@@ -262,11 +262,16 @@ class PartnerPackManifestTest(unittest.TestCase):
                 "model": 3,
                 "compatibleGuiV2": {"minimum": "1.3.20", "maximum": "1.x"},
                 "branding": "branding.json",
+                "batteryMappings": {
+                    "starter": {
+                        "name": "Engine starter battery",
+                    }
+                },
                 "integrations": [
                     {
                         "type": "briefMetric", "id": "starter-voltage",
                         "title": "Starter battery", "placement": "sidePanel",
-                        "dataSource": "system.firstAdditionalBattery.voltage",
+                        "dataSource": "system.battery.starter.voltage",
                         "capabilities": ["readSystemData"],
                     },
                     {
@@ -278,7 +283,7 @@ class PartnerPackManifestTest(unittest.TestCase):
                     {
                         "type": "overviewBattery", "id": "starter-battery",
                         "title": "Starter battery", "batteryRole": "starter",
-                        "dataSource": "system.firstAdditionalBattery.stateOfCharge",
+                        "dataSource": "system.battery.starter.stateOfCharge",
                         "capabilities": ["readSystemData"],
                     },
                 ],
@@ -290,8 +295,28 @@ class PartnerPackManifestTest(unittest.TestCase):
             self.assertEqual(manifest["model"], 3)
             self.assertNotIn("url", manifest["integrations"][0])
             self.assertEqual(manifest["integrations"][0]["unit"], "V")
+            self.assertEqual(manifest["integrations"][0]["batterySelector"]["name"],
+                             "Engine starter battery")
             self.assertEqual(manifest["integrations"][1]["placement"], "source")
             self.assertEqual(manifest["integrations"][2]["placement"], "battery")
+            self.assertEqual(manifest["integrations"][2]["batterySelector"]["name"],
+                             "Engine starter battery")
+
+    def test_mapped_battery_data_requires_a_mapping(self):
+        integration = {
+            "type": "briefMetric", "id": "starter-voltage",
+            "title": "Starter battery", "placement": "sidePanel",
+            "dataSource": "system.battery.starter.voltage",
+            "capabilities": ["readSystemData"],
+        }
+        with self.assertRaisesRegex(ValueError, 'requires batteryMappings.starter'):
+            MODULE.validate_integrations("partner", [integration])
+
+    def test_battery_mapping_rejects_arbitrary_dbus_service(self):
+        with self.assertRaisesRegex(ValueError, 'not a Victron D-Bus service id'):
+            MODULE.validate_battery_mappings({
+                "starter": {"serviceId": "org.example.untrusted"}
+            })
 
     def test_model_3_contribution_is_rejected_from_model_2(self):
         manifest = {

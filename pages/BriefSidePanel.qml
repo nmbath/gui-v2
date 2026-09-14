@@ -352,8 +352,10 @@ exported power v  0.4 |   /
 
 			readonly property string dataSource: configuration?.dataSource || ""
 			readonly property string unit: configuration?.unit || ""
-			readonly property bool valueAvailable: PartnerSystemData.metricAvailable(dataSource)
-			readonly property real rawValue: PartnerSystemData.metricValue(dataSource)
+			readonly property bool valueAvailable: PartnerSystemData.metricAvailable(
+				dataSource, configuration?.batterySelector)
+			readonly property real rawValue: PartnerSystemData.metricValue(
+				dataSource, configuration?.batterySelector)
 			readonly property string displayValue: valueAvailable && isFinite(rawValue)
 				? (unit === "V" ? Number(rawValue).toFixed(1) : Math.round(rawValue).toString())
 				: "--"

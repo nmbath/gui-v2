@@ -73,6 +73,12 @@ MODEL3_DATA_SOURCES = {
     'system.firstAdditionalBattery.stateOfCharge': '%',
     'system.firstAdditionalBattery.voltage': 'V',
     'system.firstAdditionalBattery.power': 'W',
+    'system.battery.starter.stateOfCharge': '%',
+    'system.battery.starter.voltage': 'V',
+    'system.battery.starter.power': 'W',
+    'system.battery.auxiliary.stateOfCharge': '%',
+    'system.battery.auxiliary.voltage': 'V',
+    'system.battery.auxiliary.power': 'W',
 }
 MODEL3_UNITS = {'%', 'V', 'W', 'A', ''}
 
@@ -408,7 +414,44 @@ def write_partner_package(filename, compiled_filename, manifest, wasm_bootstrap_
             archive.writestr(info, payloads[path], compress_type=zipfile.ZIP_DEFLATED,
                 compresslevel=9)
 
-def validate_integrations(name, integrations):
+def validate_battery_mappings(value):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        fail('"batteryMappings" must be an object')
+    unknown_roles = sorted(set(value) - {'starter', 'auxiliary'})
+    if unknown_roles:
+        fail('batteryMappings has unsupported roles: ' + ', '.join(unknown_roles))
+    result = {}
+    for role, selector in value.items():
+        if not isinstance(selector, dict):
+            fail(f'batteryMappings.{role} must be an object')
+        unknown_fields = sorted(set(selector) - {'name', 'serviceId', 'deviceInstance'})
+        if unknown_fields:
+            fail(f'batteryMappings.{role} has unsupported fields: ' + ', '.join(unknown_fields))
+        common_name = selector.get('name')
+        service_id = selector.get('serviceId')
+        device_instance = selector.get('deviceInstance')
+        if common_name is None and service_id is None and device_instance is None:
+            fail(f'batteryMappings.{role} must provide name, serviceId or deviceInstance')
+        compiled = {}
+        if common_name is not None:
+            compiled['name'] = require_string(common_name, f'batteryMappings.{role}.name')
+        if service_id is not None:
+            service_id = require_string(service_id, f'batteryMappings.{role}.serviceId')
+            if not re.fullmatch(r'com\.victronenergy\.[A-Za-z0-9_.-]+', service_id):
+                fail(f'batteryMappings.{role}.serviceId is not a Victron D-Bus service id')
+            compiled['serviceId'] = service_id
+        if device_instance is not None:
+            if not isinstance(device_instance, int) or isinstance(device_instance, bool) or device_instance < 0:
+                fail(f'batteryMappings.{role}.deviceInstance must be a non-negative integer')
+            compiled['deviceInstance'] = device_instance
+        result[role] = compiled
+    return result
+
+
+def validate_integrations(name, integrations, battery_mappings=None):
+    battery_mappings = battery_mappings or {}
     if not isinstance(integrations, list):
         fail('"integrations" must be an array')
     if sum(1 for integration in integrations
@@ -484,6 +527,11 @@ def validate_integrations(name, integrations):
                 if unit not in MODEL3_UNITS:
                     fail(f'integrations[{index}] has unsupported unit: {unit}')
                 compiled['unit'] = unit
+                if data_source.startswith('system.battery.'):
+                    battery_role = data_source.split('.')[2]
+                    if battery_role not in battery_mappings:
+                        fail(f'integrations[{index}] requires batteryMappings.{battery_role}')
+                    compiled['batterySelector'] = battery_mappings[battery_role]
             if integration_type == 'briefMetric':
                 placement = integration.get('placement', 'sidePanel')
                 if placement != 'sidePanel':
@@ -513,8 +561,12 @@ def validate_integrations(name, integrations):
                 battery_role = integration.get('batteryRole', 'auxiliary')
                 if battery_role not in ('starter', 'auxiliary'):
                     fail(f'integrations[{index}].batteryRole must be starter or auxiliary')
-                if not data_source.startswith('system.firstAdditionalBattery.'):
-                    fail(f'integrations[{index}] overviewBattery must use firstAdditionalBattery data')
+                expected_prefixes = (
+                    'system.firstAdditionalBattery.',
+                    f'system.battery.{battery_role}.',
+                )
+                if not data_source.startswith(expected_prefixes):
+                    fail(f'integrations[{index}] overviewBattery data does not match batteryRole')
                 compiled['batteryRole'] = battery_role
                 compiled['placement'] = 'battery'
         result.append(compiled)
@@ -541,6 +593,7 @@ def load_manifest(filename):
                 for integration in manifest.get('integrations', [])):
             fail('Model 3 integrations require "model": 3')
         source_integrations = normalize_canonical_integrations(manifest.get('integrations', []))
+        battery_mappings = validate_battery_mappings(manifest.get('batteryMappings'))
         branding, canonical_branding = validate_canonical_branding(
             name, require_string(manifest.get('name'), 'name'), manifest['branding'])
         compatibility = manifest.get('compatibleGuiV2', {})
@@ -553,7 +606,8 @@ def load_manifest(filename):
         branding = validate_branding(name, manifest.get('branding'))
         minimum = manifest.get('minRequiredVersion', '')
         maximum = manifest.get('maxRequiredVersion', '')
-    integrations = validate_integrations(name, source_integrations)
+        battery_mappings = {}
+    integrations = validate_integrations(name, source_integrations, battery_mappings)
     if not integrations and not branding:
         fail('partner pack must contain branding or at least one integration')
     return {

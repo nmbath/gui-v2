@@ -816,11 +816,50 @@ void GuiPluginLoader::populatePlugins()
 				QStringLiteral("system.dcLoad.power"),
 				QStringLiteral("system.firstAdditionalBattery.stateOfCharge"),
 				QStringLiteral("system.firstAdditionalBattery.voltage"),
-				QStringLiteral("system.firstAdditionalBattery.power")
+				QStringLiteral("system.firstAdditionalBattery.power"),
+				QStringLiteral("system.battery.starter.stateOfCharge"),
+				QStringLiteral("system.battery.starter.voltage"),
+				QStringLiteral("system.battery.starter.power"),
+				QStringLiteral("system.battery.auxiliary.stateOfCharge"),
+				QStringLiteral("system.battery.auxiliary.voltage"),
+				QStringLiteral("system.battery.auxiliary.power")
 			};
 			const QString contributionDataSource = integration.value(QStringLiteral("dataSource")).toString();
 			const bool invalidContributionDataSource = model3Contribution && !contributionHidesData
 					&& !model3DataSources.contains(contributionDataSource);
+			const bool mappedBatteryDataSource = contributionDataSource.startsWith(QStringLiteral("system.battery."));
+			const QJsonValue batterySelectorValue = integration.value(QStringLiteral("batterySelector"));
+			bool invalidBatterySelector = mappedBatteryDataSource && !batterySelectorValue.isObject();
+			if (mappedBatteryDataSource && batterySelectorValue.isObject()) {
+				const QJsonObject selector = batterySelectorValue.toObject();
+				const QSet<QString> allowedSelectorFields {
+					QStringLiteral("name"), QStringLiteral("serviceId"), QStringLiteral("deviceInstance")
+				};
+				for (auto it = selector.constBegin(); it != selector.constEnd(); ++it) {
+					if (!allowedSelectorFields.contains(it.key())) {
+						invalidBatterySelector = true;
+					}
+				}
+				const QJsonValue nameValue = selector.value(QStringLiteral("name"));
+				const QJsonValue serviceIdValue = selector.value(QStringLiteral("serviceId"));
+				const QString serviceId = serviceIdValue.toString();
+				const QJsonValue deviceInstanceValue = selector.value(QStringLiteral("deviceInstance"));
+				const int deviceInstance = deviceInstanceValue.toInt(-1);
+				const bool validName = nameValue.isUndefined()
+						|| (nameValue.isString() && !nameValue.toString().isEmpty());
+				const bool validServiceId = serviceIdValue.isUndefined()
+						|| (serviceIdValue.isString()
+							&& serviceId.startsWith(QStringLiteral("com.victronenergy."))
+							&& !serviceId.contains(QLatin1Char('/')));
+				const bool validDeviceInstance = deviceInstanceValue.isUndefined()
+						|| (deviceInstanceValue.isDouble() && deviceInstance >= 0
+							&& deviceInstanceValue.toDouble() == deviceInstance);
+				invalidBatterySelector = invalidBatterySelector
+						|| (!selector.contains(QStringLiteral("name"))
+							&& !selector.contains(QStringLiteral("serviceId"))
+							&& !selector.contains(QStringLiteral("deviceInstance")))
+						|| !validName || !validServiceId || !validDeviceInstance;
+			}
 			const bool invalidContributionCapability = model3Contribution && !contributionHidesData
 					&& !integrationCapabilities.contains(QStringLiteral("readSystemData"));
 			const bool duplicateContributionId = model3Contribution
@@ -833,12 +872,20 @@ void GuiPluginLoader::populatePlugins()
 			const bool invalidConnectionTarget = integrationType == GuiPluginLoader::OverviewEnergyNode
 					&& connectionTarget != QStringLiteral("battery")
 					&& connectionTarget != QStringLiteral("inverterCharger");
+			const QString batteryRole = integration.value(QStringLiteral("batteryRole")).toString();
+			const bool invalidBatteryRole = integrationType == GuiPluginLoader::OverviewBattery
+					&& ((batteryRole != QStringLiteral("starter")
+							&& batteryRole != QStringLiteral("auxiliary"))
+						|| (!contributionDataSource.startsWith(QStringLiteral("system.firstAdditionalBattery."))
+							&& !contributionDataSource.startsWith(
+								QStringLiteral("system.battery.%1.").arg(batteryRole))));
 			if (invalidType || missingDeviceListFields || missingNavigationFields || missingIcon
 					|| invalidPlacement || duplicateNavigationId || resourceOutsidePlugin
 					|| invalidCapabilities || invalidCardType || missingContributionFields
-					|| invalidContributionDataSource || invalidContributionCapability
+					|| invalidContributionDataSource || invalidBatterySelector || invalidContributionCapability
 					|| duplicateContributionId || invalidContributionRole
 					|| invalidContributionOperation || invalidContributionTarget || invalidConnectionTarget
+					|| invalidBatteryRole
 					|| (!model3Contribution && integrationUrl.isEmpty())) {
 				QStringList reasons;
 				if (invalidType)              reasons << QStringLiteral("invalid type");
@@ -852,12 +899,14 @@ void GuiPluginLoader::populatePlugins()
 				if (invalidCardType)          reasons << QStringLiteral("invalid cardType");
 				if (missingContributionFields) reasons << QStringLiteral("missing contribution fields");
 				if (invalidContributionDataSource) reasons << QStringLiteral("unsupported contribution dataSource");
+				if (invalidBatterySelector) reasons << QStringLiteral("invalid or missing batterySelector");
 				if (invalidContributionCapability) reasons << QStringLiteral("missing readSystemData capability");
 				if (duplicateContributionId) reasons << QStringLiteral("duplicate contribution id");
 				if (invalidContributionRole) reasons << QStringLiteral("invalid contribution role");
 				if (invalidContributionOperation) reasons << QStringLiteral("invalid contribution operation");
 				if (invalidContributionTarget) reasons << QStringLiteral("invalid contribution target");
 				if (invalidConnectionTarget) reasons << QStringLiteral("invalid connectionTarget");
+				if (invalidBatteryRole) reasons << QStringLiteral("invalid or mismatched batteryRole");
 				if (!model3Contribution && integrationUrl.isEmpty()) reasons << QStringLiteral("missing url");
 				qCWarning(venusGui).noquote() << "Ignoring invalid integration at index" << j << "in plugin" << pluginName
 					<< "- type:" << integrationType

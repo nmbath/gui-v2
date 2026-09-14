@@ -17,14 +17,37 @@ OverviewWidget {
 	property url iconSource
 	readonly property string dataSource: configuration?.dataSource || ""
 	readonly property string unit: configuration?.unit || ""
-	readonly property real flowPower: PartnerSystemData.metricValue(dataSource)
-	readonly property bool valueAvailable: PartnerSystemData.metricAvailable(dataSource)
+	readonly property bool batteryContribution: !!configuration?.batteryRole
+	readonly property string batteryServiceUid: batteryContribution
+		? PartnerSystemData.batteryServiceUid(dataSource, configuration?.batterySelector) : ""
+	readonly property real flowPower: PartnerSystemData.metricValue(dataSource, configuration?.batterySelector)
+	readonly property bool valueAvailable: PartnerSystemData.metricAvailable(dataSource, configuration?.batterySelector)
 	readonly property string displayValue: valueAvailable && isFinite(flowPower)
 		? (unit === "V" ? Number(flowPower).toFixed(1) : Math.round(flowPower).toString())
 		: "--"
 
 	type: VenusOS.OverviewWidget_Type_GenericDcSource
-	enabled: true
+	enabled: !batteryContribution || !!batteryServiceUid
+
+	onClicked: {
+		if (!batteryContribution || !batteryServiceUid) {
+			return
+		}
+		const serviceType = BackendConnection.serviceTypeFromUid(batteryServiceUid)
+		if (serviceType === "vebus") {
+			Global.pageManager.pushPage("/pages/vebusdevice/PageVeBus.qml", {
+				"bindPrefix": batteryServiceUid,
+			})
+		} else if (serviceType === "genset") {
+			Global.pageManager.pushPage("/pages/settings/devicelist/PageGenset.qml", {
+				"bindPrefix": batteryServiceUid,
+			})
+		} else {
+			Global.pageManager.pushPage("/pages/settings/devicelist/battery/PageBattery.qml", {
+				"bindPrefix": batteryServiceUid,
+			})
+		}
+	}
 
 	contentItem: ColumnLayout {
 		spacing: Theme.geometry_overviewPage_widget_content_spacing
