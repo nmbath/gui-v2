@@ -25,6 +25,12 @@ FocusScope {
 		} else if (rightButton.activeFocus || sleepButton.activeFocus) {
 			breadcrumbs.focusEdgeHint = Qt.RightEdge
 		} else {
+			for (let i = 0; i < pluginPaneButtons.count; ++i) {
+				if (pluginPaneButtons.itemAt(i)?.activeFocus) {
+					breadcrumbs.focusEdgeHint = Qt.RightEdge
+					return
+				}
+			}
 			// Focus is coming elsewhere, so do not change the current index
 			breadcrumbs.focusEdgeHint = -1
 		}
@@ -51,7 +57,13 @@ FocusScope {
 	StatusBarButton {
 		id: leftButton
 
+		readonly property bool controlsPaneActive: (Global.mainView?.cardsActive ?? false)
+				&& Global.mainView.cardsLoader.sourceComponent === Global.mainView.controlCardsComponent
+
 		readonly property int buttonType: {
+			if (controlsPaneActive) {
+				return VenusOS.StatusBar_LeftButton_ControlsActive
+			}
 			const customButton = Global.mainView.currentPage?.topLeftButton ?? VenusOS.StatusBar_LeftButton_None
 			if (customButton === VenusOS.StatusBar_LeftButton_None && pageStack.opened) {
 				return VenusOS.StatusBar_LeftButton_Back
@@ -68,6 +80,7 @@ FocusScope {
 			: buttonType === VenusOS.StatusBar_LeftButton_Back ? "qrc:/images/icon_back_32.svg"
 			: ""
 		enabled: buttonType !== VenusOS.StatusBar_LeftButton_None
+		visible: !(Global.mainView?.cardsActive ?? false) || controlsPaneActive || pageStack.opened
 		KeyNavigation.right: auxButton
 
 		onClicked: {
@@ -96,8 +109,8 @@ FocusScope {
 	StatusBarButton {
 		id: auxButton
 
-		readonly property bool auxCardsOpened: Global.mainView.cardsActive
-				&& leftButton.buttonType !== VenusOS.StatusBar_LeftButton_ControlsActive
+		readonly property bool auxCardsOpened: (Global.mainView?.cardsActive ?? false)
+				&& Global.mainView.cardsLoader.sourceComponent === Global.mainView.auxCardsComponent
 
 		// Expand clickable area on right and bottom edges, and on left if leftButton is hidden.
 		anchors {
@@ -108,12 +121,12 @@ FocusScope {
 		rightInset: Theme.geometry_statusBar_spacing
 		bottomInset: Theme.geometry_statusBar_spacing
 
-		visible: (!root.pageStack.opened && Global.switches.groups.count > 0)
+		visible: (!root.pageStack.opened && Global.switches.groups.count > 0
+				&& !(Global.mainView?.cardsActive ?? false))
 				|| auxCardsOpened // allow cards to be closed if all switches are disconnected while opened
-		icon.source: leftButton.buttonType === VenusOS.StatusBar_LeftButton_ControlsActive ? ""
-				: auxCardsOpened ? "qrc:/images/icon_smartswitch_on_32.svg"
+		icon.source: auxCardsOpened ? "qrc:/images/icon_smartswitch_on_32.svg"
 				: "qrc:/images/icon_smartswitch_off_32.svg"
-		enabled: leftButton.buttonType !== VenusOS.StatusBar_LeftButton_ControlsActive
+		enabled: visible
 		KeyNavigation.right: breadcrumbs
 
 		onClicked: {
@@ -276,6 +289,13 @@ FocusScope {
 		visible: enabled
 
 		onClicked: NotificationModel.acknowledgeAll()
+		KeyNavigation.right: pluginPaneButtons.count > 0
+				? pluginPaneButtons.itemAt(0) : rightButton
+	}
+
+	GuiPluginIntegrationModel {
+		id: pluginQuickAccessModel
+		type: GuiPluginLoader.QuickAccessPane
 	}
 
 	Row {
@@ -283,6 +303,73 @@ FocusScope {
 
 		height: parent.height
 		anchors.right: parent.right
+
+		Repeater {
+			id: pluginPaneButtons
+
+			model: pluginQuickAccessModel
+
+			delegate: StatusBarButton {
+				id: pluginPaneButton
+
+				required property int index
+				required property string pluginName
+				required property string title
+				required property url url
+				required property var capabilities
+				readonly property url pluginIcon: pluginQuickAccessModel.integrationAt(index).icon
+				readonly property url pluginIconActive: pluginQuickAccessModel.integrationAt(index).iconActive
+				readonly property bool paneOpened: (Global.mainView?.cardsActive ?? false)
+						&& Global.mainView.cardsLoader.sourceComponent === _paneComponent
+
+				visible: !root.pageStack.opened
+						&& (!(Global.mainView?.cardsActive ?? false) || paneOpened)
+				enabled: visible
+				leftInset: Theme.geometry_statusBar_spacing
+				bottomInset: Theme.geometry_statusBar_spacing
+				icon.cache: false
+				icon.source: paneOpened && String(pluginIconActive).length > 0
+						? pluginIconActive : pluginIcon
+
+				KeyNavigation.left: index > 0 ? pluginPaneButtons.itemAt(index - 1) : alarmButton
+				KeyNavigation.right: index < pluginPaneButtons.count - 1
+						? pluginPaneButtons.itemAt(index + 1) : rightButton.visible ? rightButton : sleepButton
+
+				onClicked: {
+					if (paneOpened) {
+						Global.mainView.cardsLoader.hide()
+					} else {
+						Global.mainView.cardsLoader.show(_paneComponent)
+					}
+				}
+
+				onActiveFocusChanged: if (activeFocus) root.updateBreadcrumbsFocusHint()
+
+				Component {
+					id: _paneComponent
+
+					Page {
+						title: pluginPaneButton.title
+						focusPolicy: Qt.TabFocus
+
+						onActiveFocusChanged: {
+							if (activeFocus && _paneContentLoader.item) {
+								_paneContentLoader.item.forceActiveFocus()
+							}
+						}
+
+						Loader {
+							id: _paneContentLoader
+							anchors.fill: parent
+							Component.onCompleted: setSource(pluginPaneButton.url, {
+								"data": pluginPaneButton.capabilities.indexOf("readSystemData") >= 0
+									? PartnerSystemData : ({})
+							})
+						}
+					}
+				}
+			}
+		}
 
 		StatusBarButton {
 			id: rightButton
@@ -304,7 +391,8 @@ FocusScope {
 							 : buttonType === VenusOS.StatusBar_RightButton_Refresh
 							   ? "qrc:/images/icon_refresh_32.svg"
 							   : ""
-			KeyNavigation.left: alarmButton
+			KeyNavigation.left: pluginPaneButtons.count > 0
+					? pluginPaneButtons.itemAt(pluginPaneButtons.count - 1) : alarmButton
 			KeyNavigation.right: sleepButton
 
 			onClicked: root.sidePanelToggled()
@@ -321,7 +409,8 @@ FocusScope {
 			// Expand clickable area on right and bottom edges, and on left edge if right button is
 			// hidden. This is the right-most button in the row, so on the right edge, use
 			// Theme.geometry_statusBar_horizontalMargin instead of Theme.geometry_statusBar_spacing.
-			leftInset: rightButton.visible ? 0 : Theme.geometry_statusBar_spacing
+			leftInset: rightButton.visible || pluginPaneButtons.count > 0
+					? 0 : Theme.geometry_statusBar_spacing
 			rightInset: Theme.geometry_statusBar_horizontalMargin
 			bottomInset: Theme.geometry_statusBar_spacing
 
@@ -345,6 +434,13 @@ FocusScope {
 		enabled: Global.keyNavigationEnabled
 		function onActiveFocusItemChanged() {
 			if (Global.main.activeFocusItem === root) {
+				for (let i = 0; i < pluginPaneButtons.count; ++i) {
+					const button = pluginPaneButtons.itemAt(i)
+					if (button?.visible && button.enabled) {
+						button.focus = true
+						return
+					}
+				}
 				for (const button of [leftButton, auxButton, breadcrumbs, notificationButton, alarmButton, rightButton, sleepButton]) {
 					if (button.enabled) {
 						button.focus = true

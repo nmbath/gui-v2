@@ -142,7 +142,8 @@ There are currently 5 supported types of integrations:
 		  existing quick action pane views (i.e. either a
 		  controls card, or a switches card).
 
-** TODO: actually support 4/5. **
+Quick access panes are supported by the status bars. Quick access pane cards
+remain reserved until their host-card rendering contract is completed.
 */
 class GuiPluginIntegration
 {
@@ -156,6 +157,7 @@ class GuiPluginIntegration
 
 	// valid for navigation page and quick access pane integrations
 	Q_PROPERTY(QUrl icon READ icon)
+	Q_PROPERTY(QUrl iconActive READ iconActive)
 
 	// valid for device list settings and navigation page integrations
 	Q_PROPERTY(QString title READ title)
@@ -178,6 +180,7 @@ public:
 	QStringList capabilities() const { return m_capabilities; }
 	QVariantMap configuration() const { return m_configuration; }
 	QUrl icon() const { return m_icon; }
+	QUrl iconActive() const { return m_iconActive; }
 	QUrl url() const { return m_url; }
 	GuiPluginLoader::IntegrationType type() const { return m_type; }
 	GuiPluginLoader::QuickAccessPaneCardType cardType() const { return m_cardType; }
@@ -193,6 +196,7 @@ private:
 	QStringList m_capabilities;
 	QVariantMap m_configuration;
 	QUrl m_icon;
+	QUrl m_iconActive;
 	QUrl m_url;
 	GuiPluginLoader::IntegrationType m_type = GuiPluginLoader::InvalidIntegrationType;
 	GuiPluginLoader::QuickAccessPaneCardType m_cardType = GuiPluginLoader::InvalidCardType;
@@ -312,6 +316,7 @@ public:
 		TitleRole,
 		ProductIdRole,
 		IconRole,
+		IconActiveRole,
 		UrlRole,
 		TypeRole,
 		CardTypeRole,

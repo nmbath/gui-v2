@@ -675,7 +675,7 @@ void GuiPluginLoader::populatePlugins()
 		}
 
 		QVector<GuiPluginIntegration> integrations;
-		QSet<QString> navigationIds;
+		QSet<QString> ownedPageIds;
 		QSet<QString> contributionIds;
 		const QJsonArray pluginIntegrations = iva.toArray();
 		for (qsizetype j = 0; j < pluginIntegrations.size(); ++j) {
@@ -733,6 +733,7 @@ void GuiPluginLoader::populatePlugins()
 			const QString integrationProductId = integration.value(QStringLiteral("productId")).toString();
 			const QString integrationTitle = integration.value(QStringLiteral("title")).toString();
 			const QString integrationIcon = integration.value(QStringLiteral("icon")).toString();
+			const QString integrationIconActive = integration.value(QStringLiteral("iconActive")).toString();
 			const QString integrationPlacement = integration.value(QStringLiteral("placement")).toString(QStringLiteral("beforeNotifications"));
 			const int integrationOrder = integration.value(QStringLiteral("order")).toInt(0);
 			const QJsonValue integrationCapabilitiesValue = integration.value(QStringLiteral("capabilities"));
@@ -795,15 +796,19 @@ void GuiPluginLoader::populatePlugins()
 				QStringLiteral("beforeNotifications"), QStringLiteral("afterNotifications"),
 				QStringLiteral("beforeSettings")
 			};
-			const bool missingNavigationFields = integrationType == GuiPluginLoader::NavigationPage
+			const bool ownedPageIntegration = integrationType == GuiPluginLoader::NavigationPage
+					|| integrationType == GuiPluginLoader::QuickAccessPane;
+			const bool missingNavigationFields = ownedPageIntegration
 					&& schemaVersion >= 2 && (integrationId.isEmpty() || integrationTitle.isEmpty());
 			const bool invalidPlacement = integrationType == GuiPluginLoader::NavigationPage
 					&& !navigationPlacements.contains(integrationPlacement);
-			const bool duplicateNavigationId = integrationType == GuiPluginLoader::NavigationPage
-					&& !integrationId.isEmpty() && navigationIds.contains(integrationId);
+			const bool duplicateNavigationId = ownedPageIntegration
+					&& !integrationId.isEmpty() && ownedPageIds.contains(integrationId);
 			const bool resourceOutsidePlugin = schemaVersion >= 2
 					&& ((!model3Contribution && !integrationUrl.startsWith(ownedResourcePrefix))
-						|| (!integrationIcon.isEmpty() && !integrationIcon.startsWith(ownedResourcePrefix)));
+						|| (!integrationIcon.isEmpty() && !integrationIcon.startsWith(ownedResourcePrefix))
+						|| (!integrationIconActive.isEmpty()
+							&& !integrationIconActive.startsWith(ownedResourcePrefix)));
 			const bool missingContributionFields = model3Contribution
 					&& (integrationId.isEmpty() || (!contributionHidesData
 						&& (integrationTitle.isEmpty() || integration.value(QStringLiteral("dataSource")).toString().isEmpty())));
@@ -940,9 +945,9 @@ void GuiPluginLoader::populatePlugins()
 				if (invalidType)              reasons << QStringLiteral("invalid type");
 				if (missingDeviceListFields)  reasons << QStringLiteral("missing productId or title");
 				if (missingIcon)              reasons << QStringLiteral("missing icon");
-				if (missingNavigationFields)  reasons << QStringLiteral("missing navigation id or title");
+				if (missingNavigationFields)  reasons << QStringLiteral("missing page id or title");
 				if (invalidPlacement)         reasons << QStringLiteral("invalid placement");
-				if (duplicateNavigationId)    reasons << QStringLiteral("duplicate navigation id");
+				if (duplicateNavigationId)    reasons << QStringLiteral("duplicate page id");
 				if (resourceOutsidePlugin)    reasons << QStringLiteral("resource outside plugin namespace");
 				if (invalidCapabilities)      reasons << QStringLiteral("invalid or unsupported capabilities");
 				if (invalidCardType)          reasons << QStringLiteral("invalid cardType");
@@ -976,12 +981,13 @@ void GuiPluginLoader::populatePlugins()
 				pi.m_title = integrationTitle;
 			} else if (integrationType == GuiPluginLoader::NavigationPage || integrationType == GuiPluginLoader::QuickAccessPane) {
 				pi.m_icon = QUrl(integrationIcon);
+				pi.m_iconActive = QUrl(integrationIconActive);
 				pi.m_title = integrationTitle.isEmpty() ? pluginName : integrationTitle;
 				pi.m_placement = integrationPlacement;
 				pi.m_order = integrationOrder;
 				pi.m_capabilities = integrationCapabilities;
-				if (integrationType == GuiPluginLoader::NavigationPage && !integrationId.isEmpty()) {
-					navigationIds.insert(integrationId);
+				if (!integrationId.isEmpty()) {
+					ownedPageIds.insert(integrationId);
 				}
 			} else if (integrationType == GuiPluginLoader::QuickAccessPaneCard) {
 				pi.m_cardType = static_cast<GuiPluginLoader::QuickAccessPaneCardType>(integrationCardType);
@@ -1446,6 +1452,8 @@ QVariant GuiPluginIntegrationModel::data(const QModelIndex &index, int role) con
 		return QVariant(m_integrations.at(row).productId());
 	case IconRole:
 		return QVariant(m_integrations.at(row).icon());
+	case IconActiveRole:
+		return QVariant(m_integrations.at(row).iconActive());
 	case UrlRole:
 		return QVariant(m_integrations.at(row).url());
 	case TypeRole:
@@ -1480,6 +1488,7 @@ QHash<int, QByteArray> GuiPluginIntegrationModel::roleNames() const
 		{ TitleRole, "title" },
 		{ ProductIdRole, "productId" },
 		{ IconRole, "icon" },
+		{ IconActiveRole, "iconActive" },
 		{ UrlRole, "url" },
 		{ TypeRole, "type" },
 		{ CardTypeRole, "cardType" },

@@ -528,7 +528,9 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
                 f'integrations[{index}].url')
             compiled.pop('source', None)
 
-        if integration_type == 'navigationPage' or integration_type in MODEL3_INTEGRATION_TYPES:
+        identified_integration = integration_type in ('navigationPage', 'quickAccessPane') \
+            or integration_type in MODEL3_INTEGRATION_TYPES
+        if identified_integration:
             integration_id = require_string(integration.get('id'), f'integrations[{index}].id')
             if integration_id in integration_ids:
                 fail(f'duplicate integration id: {integration_id}')
@@ -565,8 +567,12 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
             if integration.get('icon'):
                 compiled['icon'] = resource_url(name, integration['icon'], f'integrations[{index}].icon')
 
-        if integration_type == 'navigationPage':
+        if integration_type in ('navigationPage', 'quickAccessPane'):
             compiled['icon'] = resource_url(name, integration.get('icon'), f'integrations[{index}].icon')
+            if integration.get('iconActive'):
+                compiled['iconActive'] = resource_url(
+                    name, integration['iconActive'], f'integrations[{index}].iconActive')
+        if integration_type == 'navigationPage':
             placement = integration.get('placement', 'beforeNotifications')
             if placement not in NAVIGATION_PLACEMENTS:
                 fail(f'invalid navigation placement: {placement}')

@@ -76,6 +76,33 @@ class PartnerPackManifestTest(unittest.TestCase):
                 self.assertEqual(MODULE.collect_filenames(".", ".svg"), ["assets/logo.svg"])
                 self.assertEqual(MODULE.collect_filenames(".", ".png"), [])
 
+    def test_quick_access_pane_compiles_owned_icons_and_data_capability(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_pack(directory)
+            root = Path(directory)
+            (root / "pages" / "Quick.qml").write_text("import QtQuick\n", encoding="utf-8")
+            (root / "assets" / "quick-on.svg").write_text("<svg/>", encoding="utf-8")
+            path = root / "manifest.json"
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            manifest["integrations"].append({
+                "type": "quickAccessPane",
+                "id": "quick-view",
+                "title": "Quick view",
+                "icon": "assets/nav.svg",
+                "iconActive": "assets/quick-on.svg",
+                "source": "pages/Quick.qml",
+                "capabilities": ["readSystemData"],
+            })
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with working_directory(directory):
+                compiled = MODULE.load_manifest("manifest.json")["integrations"][1]
+            self.assertEqual(compiled["type"], "quickAccessPane")
+            self.assertEqual(compiled["id"], "quick-view")
+            self.assertEqual(compiled["url"], "qrc:/acme-marine/pages/Quick.qml")
+            self.assertEqual(compiled["icon"], "qrc:/acme-marine/assets/nav.svg")
+            self.assertEqual(compiled["iconActive"], "qrc:/acme-marine/assets/quick-on.svg")
+            self.assertEqual(compiled["capabilities"], ["readSystemData"])
+
     def test_compiler_sets_reproducible_resource_timestamp(self):
         self.assertEqual(os.environ["SOURCE_DATE_EPOCH"], "946684800")
 
