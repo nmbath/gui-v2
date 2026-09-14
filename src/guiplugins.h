@@ -16,6 +16,7 @@
 #include <QVector>
 #include <QPointer>
 #include <QMap>
+#include <QVariantMap>
 
 #include <QTimer>
 
@@ -52,7 +53,10 @@ public:
 		DeviceListSettingsPage,
 		NavigationPage,
 		QuickAccessPane,
-		QuickAccessPaneCard
+		QuickAccessPaneCard,
+		BriefMetric,
+		OverviewEnergyNode,
+		OverviewBattery
 	};
 	Q_ENUM(IntegrationType)
 
@@ -96,6 +100,7 @@ private:
 	bool loadPluginData(const GuiPlugin &plugin);
 	void unloadPluginData(bool clearCache);
 	bool installPluginTranslatorForLanguage(const QString &pluginName, QLocale::Language language);
+	void activatePartnerBranding(const QVector<GuiPlugin> &plugins);
 	QString m_pluginsJson;
 	QVector<GuiPlugin> m_plugins;
 	QHash<QString, QHash<QLocale::Language, QTranslator*> > m_pluginTranslators;
@@ -137,8 +142,7 @@ There are currently 5 supported types of integrations:
 		  existing quick action pane views (i.e. either a
 		  controls card, or a switches card).
 
-** TODO: actually support 3/4/5. **
-In the prototype, only type 1 and 2 are supported.
+** TODO: actually support 4/5. **
 */
 class GuiPluginIntegration
 {
@@ -148,21 +152,31 @@ class GuiPluginIntegration
 	Q_PROPERTY(QString pluginName READ pluginName)
 	Q_PROPERTY(GuiPluginLoader::IntegrationType type READ type)
 	Q_PROPERTY(QUrl url READ url)
+	Q_PROPERTY(QString id READ id)
 
 	// valid for navigation page and quick access pane integrations
 	Q_PROPERTY(QUrl icon READ icon)
 
-	// valid for device list settings page integrations only
+	// valid for device list settings and navigation page integrations
 	Q_PROPERTY(QString title READ title)
 	Q_PROPERTY(QString productId READ productId)
+	Q_PROPERTY(QString placement READ placement)
+	Q_PROPERTY(int order READ order)
+	Q_PROPERTY(QStringList capabilities READ capabilities)
+	Q_PROPERTY(QVariantMap configuration READ configuration)
 
 	// valid for quick access pane card integrations only
 	Q_PROPERTY(GuiPluginLoader::QuickAccessPaneCardType cardType READ cardType)
 
 public:
 	QString pluginName() const { return m_pluginName; }
+	QString id() const { return m_id; }
 	QString title() const { return m_title; }
 	QString productId() const { return m_productId; }
+	QString placement() const { return m_placement; }
+	int order() const { return m_order; }
+	QStringList capabilities() const { return m_capabilities; }
+	QVariantMap configuration() const { return m_configuration; }
 	QUrl icon() const { return m_icon; }
 	QUrl url() const { return m_url; }
 	GuiPluginLoader::IntegrationType type() const { return m_type; }
@@ -171,8 +185,13 @@ public:
 private:
 	friend class GuiPluginLoader;
 	QString m_pluginName;
+	QString m_id;
 	QString m_title;
 	QString m_productId;
+	QString m_placement;
+	int m_order = 0;
+	QStringList m_capabilities;
+	QVariantMap m_configuration;
 	QUrl m_icon;
 	QUrl m_url;
 	GuiPluginLoader::IntegrationType m_type = GuiPluginLoader::InvalidIntegrationType;
@@ -188,6 +207,7 @@ class GuiPlugin
 {
 	Q_GADGET
 	Q_PROPERTY(QString name READ name)
+	Q_PROPERTY(int schemaVersion READ schemaVersion)
 	Q_PROPERTY(QString version READ version)
 	Q_PROPERTY(QString minRequiredVersion READ minRequiredVersion)
 	Q_PROPERTY(QString maxRequiredVersion READ maxRequiredVersion)
@@ -195,9 +215,11 @@ class GuiPlugin
 	Q_PROPERTY(QVector<QUrl> translations READ translations)
 	Q_PROPERTY(QVector<GuiPluginIntegration> integrations READ integrations)
 	Q_PROPERTY(QColor color READ color)
+	Q_PROPERTY(QVariantMap branding READ branding)
 
 public:
 	QString name() const { return m_name; }
+	int schemaVersion() const { return m_schemaVersion; }
 	QString version() const { return m_version; }
 	QString minRequiredVersion() const { return m_minRequiredVersion; }
 	QString maxRequiredVersion() const { return m_maxRequiredVersion; }
@@ -205,10 +227,12 @@ public:
 	QVector<QUrl> translations() const { return m_translations; }
 	QVector<GuiPluginIntegration> integrations() const { return m_integrations; }
 	QColor color() const { return m_color; }
+	QVariantMap branding() const { return m_branding; }
 
 private:
 	friend class GuiPluginLoader;
 	QString m_name;
+	int m_schemaVersion = 1;
 	QString m_version;
 	QString m_minRequiredVersion;
 	QString m_maxRequiredVersion;
@@ -216,6 +240,7 @@ private:
 	QByteArray m_resource;
 	QVector<QUrl> m_translations;
 	QVector<GuiPluginIntegration> m_integrations;
+	QVariantMap m_branding;
 };
 
 class GuiPluginModel : public QAbstractListModel, public QQmlParserStatus
@@ -230,13 +255,15 @@ public:
 	enum RoleNames {
 		PluginRole = Qt::UserRole,
 		NameRole,
+		SchemaVersionRole,
 		VersionRole,
 		MinRequiredVersionRole,
 		MaxRequiredVersionRole,
 		ColorRole,
 		ResourceRole,
 		TranslationsRole,
-		IntegrationsRole
+		IntegrationsRole,
+		BrandingRole
 	};
 
 	explicit GuiPluginModel(QObject *parent = nullptr);
@@ -280,13 +307,18 @@ public:
 	enum RoleNames {
 		IntegrationRole = Qt::UserRole,
 		PluginNameRole,
+		IdRole,
 		PluginColorRole,
 		TitleRole,
 		ProductIdRole,
 		IconRole,
 		UrlRole,
 		TypeRole,
-		CardTypeRole
+		CardTypeRole,
+		PlacementRole,
+		OrderRole,
+		CapabilitiesRole,
+		ConfigurationRole
 	};
 
 	explicit GuiPluginIntegrationModel(QObject *parent = nullptr);

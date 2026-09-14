@@ -12,11 +12,14 @@ import Victron.VenusOS
   If the page allows key navigation, it should set focusPolicy to include Qt.TabFocus.
 */
 Page {
+	readonly property bool isSwipeViewPage: true
 	id: root
 
 	required property url iconSource
 	required property string url
 	required property SwipeView view
+	property string pageId: url
+	property string sourcePlugin
 	property bool showTopGradient
 	property bool showBottomGradient
 

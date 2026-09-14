@@ -39,6 +39,8 @@ endif()
 target_link_libraries(${TEST_NAME} PRIVATE
     VictronVenusOS
     VictronVenusOSplugin
+    VictronPartnerSdk
+    VictronPartnerSdkplugin
     VictronVenusOSShaders
     VictronVenusOSShadersplugin
     VictronGauges

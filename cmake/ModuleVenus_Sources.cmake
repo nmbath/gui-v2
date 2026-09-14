@@ -1,6 +1,7 @@
 set (VictronVenusOS_QML_MODULE_SINGLETON_SOURCES # All qml singletons have to be added here
     components/CommonWords.qml
     components/FirmwareVersion.qml
+    components/PartnerSystemData.qml
     Global.qml
 )
 set_source_files_properties(${VictronVenusOS_QML_MODULE_SINGLETON_SOURCES} PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -86,6 +87,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/OverviewEnergyIndicator.qml
     components/OverviewLayoutConditions.qml
     components/Page.qml
+	components/PartnerContributionCard.qml
+	components/PartnerContributionStrip.qml
     components/PageGensetModel.qml
     components/PageStack.qml
     components/VeQuickItemsQuotient.qml
@@ -682,6 +685,8 @@ list(APPEND VictronVenusOS_CPP_SOURCES
     src/filteredservicemodel.cpp
     src/guiplugins.h
     src/guiplugins.cpp
+    src/partnerbrand.cpp
+    src/partnerbrand.h
     src/runtimedevicemodel.h
     src/runtimedevicemodel.cpp
     src/theme.h

@@ -244,7 +244,9 @@ FocusScope {
 
 			y: root.height + 4  // nudge below the visible area for wasm
 			width: parent.width
-			backgroundColor: root.backgroundColor
+			backgroundColor: Theme.partnerThemeActive
+				? Theme.color_navigationBar_background
+				: root.backgroundColor
 			opacity: 0
 			pages: swipePageModel.pages
 			moreButton: visiblePageCount < pages.length ? moreButtonComponent : null

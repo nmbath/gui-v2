@@ -39,6 +39,17 @@ FocusScope {
 		return false
 	}
 
+	function setCurrentPageId(pageId) {
+		for (let i = 0; i < pages.length; ++i) {
+			if (pages[i].pageId === pageId) {
+				_currentIndex = i
+				return true
+			}
+		}
+		console.warn("setCurrentPageId(): cannot find page", pageId)
+		return false
+	}
+
 	function setCurrentIndex(index) {
 		if (index === _currentIndex) {
 			return
@@ -53,6 +64,10 @@ FocusScope {
 	function getCurrentPage() {
 		const url = pages[currentIndex]?.url ?? ""
 		return url.substring(url.lastIndexOf("/") + 1)
+	}
+
+	function getCurrentPageId() {
+		return pages[currentIndex]?.pageId ?? ""
 	}
 
 	implicitWidth: Theme.geometry_screen_width
