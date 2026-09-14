@@ -411,6 +411,9 @@ def write_partner_package(filename, compiled_filename, manifest, wasm_bootstrap_
 def validate_integrations(name, integrations):
     if not isinstance(integrations, list):
         fail('"integrations" must be an array')
+    if sum(1 for integration in integrations
+            if isinstance(integration, dict) and integration.get('type') == 'overviewBattery') > 1:
+        fail('Model 3 supports one overviewBattery (the secondary battery)')
     result = []
     integration_ids = set()
     for index, integration in enumerate(integrations):
@@ -434,7 +437,17 @@ def validate_integrations(name, integrations):
                 fail(f'duplicate integration id: {integration_id}')
             integration_ids.add(integration_id)
             compiled['id'] = integration_id
-            compiled['title'] = require_string(integration.get('title'), f'integrations[{index}].title')
+            operation = integration.get('operation', 'add') if integration_type in MODEL3_INTEGRATION_TYPES else 'add'
+            if operation not in ('add', 'replace', 'hide'):
+                fail(f'integrations[{index}].operation must be add, replace or hide')
+            if integration_type == 'overviewBattery' and operation != 'add':
+                fail(f'integrations[{index}] overviewBattery only supports operation add')
+            if integration_type in MODEL3_INTEGRATION_TYPES:
+                compiled['operation'] = operation
+            if operation == 'hide':
+                compiled['title'] = integration.get('title', '')
+            else:
+                compiled['title'] = require_string(integration.get('title'), f'integrations[{index}].title')
             order = integration.get('order', 0)
             if not isinstance(order, int) or isinstance(order, bool):
                 fail(f'integrations[{index}].order must be an integer')
@@ -449,7 +462,7 @@ def validate_integrations(name, integrations):
                     + ', '.join(unknown_capabilities))
             if len(capabilities) != len(set(capabilities)):
                 fail(f'integrations[{index}].capabilities contains duplicates')
-            if integration_type in MODEL3_INTEGRATION_TYPES and 'readSystemData' not in capabilities:
+            if integration_type in MODEL3_INTEGRATION_TYPES and operation != 'hide' and 'readSystemData' not in capabilities:
                 fail(f'integrations[{index}] must request readSystemData')
             compiled['capabilities'] = capabilities
             if integration.get('icon'):
@@ -462,25 +475,40 @@ def validate_integrations(name, integrations):
                 fail(f'invalid navigation placement: {placement}')
             compiled['placement'] = placement
         elif integration_type in MODEL3_INTEGRATION_TYPES:
-            data_source = require_string(integration.get('dataSource'), f'integrations[{index}].dataSource')
-            if data_source not in MODEL3_DATA_SOURCES:
-                fail(f'integrations[{index}] has unsupported dataSource: {data_source}')
-            compiled['dataSource'] = data_source
-            unit = integration.get('unit', MODEL3_DATA_SOURCES[data_source])
-            if unit not in MODEL3_UNITS:
-                fail(f'integrations[{index}] has unsupported unit: {unit}')
-            compiled['unit'] = unit
+            if operation != 'hide':
+                data_source = require_string(integration.get('dataSource'), f'integrations[{index}].dataSource')
+                if data_source not in MODEL3_DATA_SOURCES:
+                    fail(f'integrations[{index}] has unsupported dataSource: {data_source}')
+                compiled['dataSource'] = data_source
+                unit = integration.get('unit', MODEL3_DATA_SOURCES[data_source])
+                if unit not in MODEL3_UNITS:
+                    fail(f'integrations[{index}] has unsupported unit: {unit}')
+                compiled['unit'] = unit
             if integration_type == 'briefMetric':
-                placement = integration.get('placement', 'footer')
-                if placement != 'footer':
+                placement = integration.get('placement', 'sidePanel')
+                if placement != 'sidePanel':
                     fail(f'integrations[{index}] has unsupported Brief placement: {placement}')
                 compiled['placement'] = placement
+                if operation in ('replace', 'hide'):
+                    target = integration.get('target')
+                    if target not in ('solar', 'generator', 'acInput', 'dcInput', 'acLoads', 'dcLoads'):
+                        fail(f'integrations[{index}] has unsupported Brief target: {target}')
+                    compiled['target'] = target
             elif integration_type == 'overviewEnergyNode':
                 role = integration.get('role')
                 if role not in ('source', 'load'):
                     fail(f'integrations[{index}].role must be source or load')
                 compiled['role'] = role
                 compiled['placement'] = role
+                connection_target = integration.get('connectionTarget', 'battery')
+                if connection_target not in ('battery', 'inverterCharger'):
+                    fail(f'integrations[{index}].connectionTarget must be battery or inverterCharger')
+                compiled['connectionTarget'] = connection_target
+                if operation in ('replace', 'hide'):
+                    target = integration.get('target')
+                    if target not in ('solar', 'acLoads', 'dcLoads'):
+                        fail(f'integrations[{index}] has unsupported Overview target: {target}')
+                    compiled['target'] = target
             else:
                 battery_role = integration.get('batteryRole', 'auxiliary')
                 if battery_role not in ('starter', 'auxiliary'):

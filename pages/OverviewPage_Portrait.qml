@@ -19,6 +19,38 @@ FocusScope {
 
 	required property bool animationEnabled
 
+	function _partnerNodeCount(role) {
+		let count = 0
+		for (let i = 0; i < partnerEnergyNodeRepeater.count; ++i) {
+			const configuration = partnerEnergyNodeRepeater.itemAt(i)?.configuration || ({})
+			if (configuration.role === role && configuration.operation !== "hide") {
+				count++
+			}
+		}
+		return count
+	}
+
+	function _partnerSuppresses(target) {
+		for (let i = 0; i < partnerEnergyNodeRepeater.count; ++i) {
+			const configuration = partnerEnergyNodeRepeater.itemAt(i)?.configuration || ({})
+			if ((configuration.operation === "hide" || configuration.operation === "replace")
+					&& configuration.target === target) {
+				return true
+			}
+		}
+		return false
+	}
+
+	GuiPluginIntegrationModel {
+		id: partnerEnergyNodes
+		type: GuiPluginLoader.OverviewEnergyNode
+	}
+
+	GuiPluginIntegrationModel {
+		id: partnerBatteries
+		type: GuiPluginLoader.OverviewBattery
+	}
+
 	// The maximum number of widgets currently shown in the vertical space. This is the sum of the
 	// max column count from all three sections.
 	readonly property int maximumColumnCount: inputLayout.maximumColumnCount
@@ -181,12 +213,13 @@ FocusScope {
 				id: rightInputColumn
 
 				readonly property int widgetCount: widgetCountWithoutDcsource + (combineDcSources ? 1 : dcSourceModel.count)
+						+ root._partnerNodeCount("source")
 				readonly property int widgetSize: root._widgetSizeForSectionColumnCount(widgetCount)
 
 				// For dcsource inputs, if we can create one widget per meter type and still fit
 				// them into the left hand side (i.e. if there are no more than 3 widgets overall),
 				// then do that. Otherwise, combine them into the one widget.
-				readonly property int widgetCountWithoutDcsource: (layoutConditions.showSolar ? 1 : 0)
+				readonly property int widgetCountWithoutDcsource: (layoutConditions.showSolar && !root._partnerSuppresses("solar") ? 1 : 0)
 						  // There is only one widget per service type.
 						+ (dcgensetModel.count ? 1 : 0)
 						+ (alternatorModel.count ? 1 : 0)
@@ -200,7 +233,7 @@ FocusScope {
 				Loader {
 					id: solarWidgetLoader
 
-					active: layoutConditions.showSolar
+					active: layoutConditions.showSolar && !root._partnerSuppresses("solar")
 					visible: active
 					sourceComponent: SolarYieldWidget {
 						size: rightInputColumn.widgetSize
@@ -294,6 +327,26 @@ FocusScope {
 						Layout.minimumHeight: root._widgetHeightForSize(rightInputColumn.widgetSize)
 					}
 				}
+
+				Repeater {
+					id: partnerEnergyNodeRepeater
+					model: partnerEnergyNodes.count
+
+					delegate: PartnerOverviewWidget {
+						required property int index
+						readonly property var integration: partnerEnergyNodes.integrationAt(index)
+						configuration: integration.configuration
+						title: integration.title
+						visible: configuration.role === "source" && configuration.operation !== "hide"
+						iconSource: integration.icon
+						size: rightInputColumn.widgetSize
+						animationEnabled: root.animationEnabled
+
+						Layout.fillWidth: true
+						Layout.fillHeight: visible
+						Layout.minimumHeight: visible ? root._widgetHeightForSize(rightInputColumn.widgetSize) : 0
+					}
+				}
 			}
 		}
 
@@ -358,15 +411,40 @@ FocusScope {
 				Layout.minimumHeight: Theme.geometry_overviewPage_widget_height_l
 			}
 
-			BatteryWidget {
-				id: batteryWidget
-
-				size: VenusOS.OverviewWidget_Size_L
-				animationEnabled: root.animationEnabled
-
+			ColumnLayout {
+				spacing: Theme.geometry_overviewPage_widget_spacing
 				Layout.fillWidth: true
 				Layout.fillHeight: true
-				Layout.minimumHeight: Theme.geometry_overviewPage_widget_height_l
+
+				BatteryWidget {
+					id: batteryWidget
+
+					size: VenusOS.OverviewWidget_Size_L
+					animationEnabled: root.animationEnabled
+
+					Layout.fillWidth: true
+					Layout.fillHeight: true
+					Layout.minimumHeight: root._widgetHeightForSize(size)
+				}
+
+				Repeater {
+					model: partnerBatteries.count
+					delegate: PartnerOverviewWidget {
+						required property int index
+						readonly property var integration: partnerBatteries.integrationAt(index)
+						configuration: integration.configuration
+						title: integration.title
+						visible: configuration.operation !== "hide"
+						iconSource: integration.icon
+						size: VenusOS.OverviewWidget_Size_XS
+						animationEnabled: root.animationEnabled
+						Layout.fillWidth: true
+						Layout.fillHeight: false
+						Layout.minimumHeight: visible ? root._widgetHeightForSize(size) : 0
+						Layout.preferredHeight: visible ? root._widgetHeightForSize(size) : 0
+						Layout.maximumHeight: visible ? root._widgetHeightForSize(size) : 0
+					}
+				}
 			}
 		}
 
@@ -413,7 +491,7 @@ FocusScope {
 		RowLayout {
 			id: loadsLayout
 
-			readonly property int maximumColumnCount: Math.max(layoutConditions.showDcLoads ? 1 : 0, leftLoadsColumn.widgetCount)
+			readonly property int maximumColumnCount: Math.max(rightLoadsColumn.widgetCount, leftLoadsColumn.widgetCount)
 
 			spacing: Theme.geometry_overviewPage_widget_spacing
 			Layout.fillHeight: true
@@ -422,7 +500,7 @@ FocusScope {
 			ColumnLayout {
 				id: leftLoadsColumn
 
-				readonly property int widgetCount: (layoutConditions.showAcLoads ? 1 : 0)
+				readonly property int widgetCount: (layoutConditions.showAcLoads && !root._partnerSuppresses("acLoads") ? 1 : 0)
 						+ (layoutConditions.showEssentialLoads ? 1 : 0)
 						+ (layoutConditions.showEvChargers ? 1 : 0)
 
@@ -440,7 +518,7 @@ FocusScope {
 				Loader {
 					id: acLoadsWidgetLoader
 
-					active: layoutConditions.showAcLoads
+					active: layoutConditions.showAcLoads && !root._partnerSuppresses("acLoads")
 					visible: active
 					sourceComponent: AcLoadsWidget {
 						size: leftLoadsColumn.displayWidgetSize
@@ -488,19 +566,43 @@ FocusScope {
 				}
 			}
 
-			// DC loads widget
-			Loader {
-				active: layoutConditions.showDcLoads
-				visible: active
-				sourceComponent: DcLoadsWidget {
-					size: VenusOS.OverviewWidget_Size_L
-					animationEnabled: root.animationEnabled
-				}
-				onStatusChanged: if (status === Loader.Error) console.warn("Unable to load dc loads widget")
+			ColumnLayout {
+				id: rightLoadsColumn
+				readonly property int widgetCount: (layoutConditions.showDcLoads && !root._partnerSuppresses("dcLoads") ? 1 : 0)
+						+ root._partnerNodeCount("load")
+				readonly property int widgetSize: root._widgetSizeForSectionColumnCount(widgetCount)
+				spacing: Theme.geometry_overviewPage_widget_spacing
+				visible: widgetCount > 0
 
-				Layout.fillWidth: true
-				Layout.fillHeight: true
-				Layout.minimumHeight: root._widgetHeightForSize(VenusOS.OverviewWidget_Size_L)
+				Loader {
+					active: layoutConditions.showDcLoads && !root._partnerSuppresses("dcLoads")
+					visible: active
+					sourceComponent: DcLoadsWidget {
+						size: rightLoadsColumn.widgetSize
+						animationEnabled: root.animationEnabled
+					}
+					onStatusChanged: if (status === Loader.Error) console.warn("Unable to load dc loads widget")
+					Layout.fillWidth: true
+					Layout.fillHeight: true
+					Layout.minimumHeight: active ? root._widgetHeightForSize(rightLoadsColumn.widgetSize) : 0
+				}
+
+				Repeater {
+					model: partnerEnergyNodes.count
+					delegate: PartnerOverviewWidget {
+						required property int index
+						readonly property var integration: partnerEnergyNodes.integrationAt(index)
+						configuration: integration.configuration
+						title: integration.title
+						visible: configuration.role === "load" && configuration.operation !== "hide"
+						iconSource: integration.icon
+						size: rightLoadsColumn.widgetSize
+						animationEnabled: root.animationEnabled
+						Layout.fillWidth: true
+						Layout.fillHeight: visible
+						Layout.minimumHeight: visible ? root._widgetHeightForSize(size) : 0
+					}
+				}
 			}
 		}
 	}

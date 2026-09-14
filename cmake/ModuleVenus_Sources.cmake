@@ -87,8 +87,6 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/OverviewEnergyIndicator.qml
     components/OverviewLayoutConditions.qml
     components/Page.qml
-	components/PartnerContributionCard.qml
-	components/PartnerContributionStrip.qml
     components/PageGensetModel.qml
     components/PageStack.qml
     components/VeQuickItemsQuotient.qml
@@ -314,6 +312,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/widgets/EvcsWidget.qml
     components/widgets/InverterChargerWidget.qml
     components/widgets/OverviewWidget.qml
+    components/widgets/PartnerOverviewWidget.qml
     components/widgets/OverviewElectricalQuantityLabel.qml
     components/widgets/SolarYieldWidget.qml
     components/widgets/WidgetConnector.qml

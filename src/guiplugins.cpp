@@ -759,6 +759,26 @@ void GuiPluginLoader::populatePlugins()
 			const bool model3Contribution = integrationType == GuiPluginLoader::BriefMetric
 					|| integrationType == GuiPluginLoader::OverviewEnergyNode
 					|| integrationType == GuiPluginLoader::OverviewBattery;
+			const QString contributionOperation = integration.value(QStringLiteral("operation")).toString(QStringLiteral("add"));
+			const QString contributionTarget = integration.value(QStringLiteral("target")).toString();
+			const bool contributionHidesData = contributionOperation == QStringLiteral("hide");
+			const bool invalidContributionOperation = model3Contribution
+					&& contributionOperation != QStringLiteral("add")
+					&& contributionOperation != QStringLiteral("replace")
+					&& contributionOperation != QStringLiteral("hide");
+			static const QSet<QString> briefContributionTargets {
+				QStringLiteral("solar"), QStringLiteral("generator"), QStringLiteral("acInput"),
+				QStringLiteral("dcInput"), QStringLiteral("acLoads"), QStringLiteral("dcLoads")
+			};
+			static const QSet<QString> overviewContributionTargets {
+				QStringLiteral("solar"), QStringLiteral("acLoads"), QStringLiteral("dcLoads")
+			};
+			const bool contributionNeedsTarget = contributionOperation == QStringLiteral("replace")
+					|| contributionOperation == QStringLiteral("hide");
+			const bool invalidContributionTarget = contributionNeedsTarget
+					&& ((integrationType == GuiPluginLoader::BriefMetric && !briefContributionTargets.contains(contributionTarget))
+						|| (integrationType == GuiPluginLoader::OverviewEnergyNode && !overviewContributionTargets.contains(contributionTarget))
+						|| integrationType == GuiPluginLoader::OverviewBattery);
 			const bool invalidType = integrationType == GuiPluginLoader::InvalidIntegrationType
 					|| integrationType > GuiPluginLoader::OverviewBattery;
 			const bool missingDeviceListFields = integrationType == GuiPluginLoader::DeviceListSettingsPage
@@ -785,8 +805,8 @@ void GuiPluginLoader::populatePlugins()
 					&& ((!model3Contribution && !integrationUrl.startsWith(ownedResourcePrefix))
 						|| (!integrationIcon.isEmpty() && !integrationIcon.startsWith(ownedResourcePrefix)));
 			const bool missingContributionFields = model3Contribution
-					&& (integrationId.isEmpty() || integrationTitle.isEmpty()
-						|| integration.value(QStringLiteral("dataSource")).toString().isEmpty());
+					&& (integrationId.isEmpty() || (!contributionHidesData
+						&& (integrationTitle.isEmpty() || integration.value(QStringLiteral("dataSource")).toString().isEmpty())));
 			static const QSet<QString> model3DataSources {
 				QStringLiteral("system.houseBattery.stateOfCharge"),
 				QStringLiteral("system.houseBattery.voltage"),
@@ -799,9 +819,9 @@ void GuiPluginLoader::populatePlugins()
 				QStringLiteral("system.firstAdditionalBattery.power")
 			};
 			const QString contributionDataSource = integration.value(QStringLiteral("dataSource")).toString();
-			const bool invalidContributionDataSource = model3Contribution
+			const bool invalidContributionDataSource = model3Contribution && !contributionHidesData
 					&& !model3DataSources.contains(contributionDataSource);
-			const bool invalidContributionCapability = model3Contribution
+			const bool invalidContributionCapability = model3Contribution && !contributionHidesData
 					&& !integrationCapabilities.contains(QStringLiteral("readSystemData"));
 			const bool duplicateContributionId = model3Contribution
 					&& contributionIds.contains(integrationId);
@@ -809,11 +829,16 @@ void GuiPluginLoader::populatePlugins()
 			const bool invalidContributionRole = integrationType == GuiPluginLoader::OverviewEnergyNode
 					&& contributionRole != QStringLiteral("source")
 					&& contributionRole != QStringLiteral("load");
+			const QString connectionTarget = integration.value(QStringLiteral("connectionTarget")).toString(QStringLiteral("battery"));
+			const bool invalidConnectionTarget = integrationType == GuiPluginLoader::OverviewEnergyNode
+					&& connectionTarget != QStringLiteral("battery")
+					&& connectionTarget != QStringLiteral("inverterCharger");
 			if (invalidType || missingDeviceListFields || missingNavigationFields || missingIcon
 					|| invalidPlacement || duplicateNavigationId || resourceOutsidePlugin
 					|| invalidCapabilities || invalidCardType || missingContributionFields
 					|| invalidContributionDataSource || invalidContributionCapability
 					|| duplicateContributionId || invalidContributionRole
+					|| invalidContributionOperation || invalidContributionTarget || invalidConnectionTarget
 					|| (!model3Contribution && integrationUrl.isEmpty())) {
 				QStringList reasons;
 				if (invalidType)              reasons << QStringLiteral("invalid type");
@@ -830,6 +855,9 @@ void GuiPluginLoader::populatePlugins()
 				if (invalidContributionCapability) reasons << QStringLiteral("missing readSystemData capability");
 				if (duplicateContributionId) reasons << QStringLiteral("duplicate contribution id");
 				if (invalidContributionRole) reasons << QStringLiteral("invalid contribution role");
+				if (invalidContributionOperation) reasons << QStringLiteral("invalid contribution operation");
+				if (invalidContributionTarget) reasons << QStringLiteral("invalid contribution target");
+				if (invalidConnectionTarget) reasons << QStringLiteral("invalid connectionTarget");
 				if (!model3Contribution && integrationUrl.isEmpty()) reasons << QStringLiteral("missing url");
 				qCWarning(venusGui).noquote() << "Ignoring invalid integration at index" << j << "in plugin" << pluginName
 					<< "- type:" << integrationType

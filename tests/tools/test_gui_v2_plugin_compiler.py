@@ -265,7 +265,7 @@ class PartnerPackManifestTest(unittest.TestCase):
                 "integrations": [
                     {
                         "type": "briefMetric", "id": "starter-voltage",
-                        "title": "Starter battery", "placement": "footer",
+                        "title": "Starter battery", "placement": "sidePanel",
                         "dataSource": "system.firstAdditionalBattery.voltage",
                         "capabilities": ["readSystemData"],
                     },
@@ -311,6 +311,17 @@ class PartnerPackManifestTest(unittest.TestCase):
             with working_directory(directory), self.assertRaisesRegex(
                     ValueError, 'Model 3 integrations require'):
                 MODULE.load_manifest("partner.json")
+
+    def test_more_than_one_overview_battery_is_rejected(self):
+        battery = {
+            "type": "overviewBattery", "title": "Starter battery",
+            "batteryRole": "starter",
+            "dataSource": "system.firstAdditionalBattery.stateOfCharge",
+            "capabilities": ["readSystemData"],
+        }
+        integrations = [dict(battery, id="starter"), dict(battery, id="auxiliary")]
+        with self.assertRaisesRegex(ValueError, 'one overviewBattery'):
+            MODULE.validate_integrations("partner", integrations)
 
     def test_partner_package_is_deterministic_and_has_install_layout(self):
         with tempfile.TemporaryDirectory() as directory:
