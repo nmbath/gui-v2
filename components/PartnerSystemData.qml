@@ -84,6 +84,51 @@ QtObject {
 			: BackendConnection.serviceUidFromName(battery.id, battery.instance)
 	}
 
+	function mappedDevice(selector) {
+		if (!selector) {
+			return null
+		}
+		let match = null
+		const count = AllDevicesModel.count
+		for (let i = 0; i < count; ++i) {
+			const device = AllDevicesModel.deviceAt(i)
+			if (selector.name && device.name !== selector.name) {
+				continue
+			}
+			if (selector.serviceType && device.serviceType !== selector.serviceType) {
+				continue
+			}
+			if (selector.deviceInstance !== undefined
+					&& device.deviceInstance !== selector.deviceInstance) {
+				continue
+			}
+			if (selector.serviceId) {
+				const expectedUid = BackendConnection.serviceUidFromName(
+					selector.serviceId, device.deviceInstance)
+				if (device.serviceUid !== expectedUid) {
+					continue
+				}
+			}
+			if (match) {
+				return null
+			}
+			match = device
+		}
+		return match
+	}
+
+	function mappedDeviceServiceUid(selector) {
+		return mappedDevice(selector)?.serviceUid || ""
+	}
+
+	function mappedDeviceName(selector, fallback) {
+		return mappedDevice(selector)?.name || fallback || qsTr("Mapped device")
+	}
+
+	function batteryName(dataSource, selector, fallback) {
+		return selectedBattery(dataSource, selector)?.name || fallback || qsTr("Battery")
+	}
+
 	function metricAvailable(dataSource, selector) {
 		switch (dataSource) {
 		case "system.firstAdditionalBattery.stateOfCharge":
@@ -191,6 +236,16 @@ QtObject {
 			? Global.acInputs.sourceToText(Global.acInputs.activeInSource) : qsTr("Not available")
 		readonly property real loadWatts: Math.round(root.finiteOr(
 			Global.system?.load?.ac?.power, 0))
+	}
+
+	readonly property VeQuickItem _relay1State: VeQuickItem {
+		uid: Global.system.serviceUid + "/Relay/0/State"
+	}
+
+	readonly property QtObject relays: QtObject {
+		readonly property string relay1Name: qsTr("GX relay 1")
+		readonly property bool relay1Available: root._relay1State.valid
+		readonly property bool relay1On: root._relay1State.valid && Number(root._relay1State.value) !== 0
 	}
 
 	readonly property QtObject tanks: QtObject {

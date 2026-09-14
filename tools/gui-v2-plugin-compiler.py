@@ -79,8 +79,23 @@ MODEL3_DATA_SOURCES = {
     'system.battery.auxiliary.stateOfCharge': '%',
     'system.battery.auxiliary.voltage': 'V',
     'system.battery.auxiliary.power': 'W',
+    'system.device.chargingSource.power': 'W',
+    'system.device.consumer.power': 'W',
 }
 MODEL3_UNITS = {'%', 'V', 'W', 'A', ''}
+DEVICE_MAPPING_PATHS = {
+    'chargingSource': {
+        'alternator': '/Dc/0/Power',
+        'solarcharger': '/Yield/Power',
+        'charger': '/Dc/0/Power',
+        'dcsource': '/Dc/0/Power',
+    },
+    'consumer': {
+        'acload': '/Ac/Power',
+        'heatpump': '/Ac/Power',
+        'dcload': '/Dc/0/Power',
+    },
+}
 
 def collect_filenames(directory, suffix):
     files = []
@@ -450,8 +465,47 @@ def validate_battery_mappings(value):
     return result
 
 
-def validate_integrations(name, integrations, battery_mappings=None):
+def validate_device_mappings(value):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        fail('"deviceMappings" must be an object')
+    unknown_roles = sorted(set(value) - set(DEVICE_MAPPING_PATHS))
+    if unknown_roles:
+        fail('deviceMappings has unsupported roles: ' + ', '.join(unknown_roles))
+    result = {}
+    for role, selector in value.items():
+        if not isinstance(selector, dict):
+            fail(f'deviceMappings.{role} must be an object')
+        unknown_fields = sorted(set(selector) - {'name', 'serviceType', 'serviceId', 'deviceInstance'})
+        if unknown_fields:
+            fail(f'deviceMappings.{role} has unsupported fields: ' + ', '.join(unknown_fields))
+        common_name = require_string(selector.get('name'), f'deviceMappings.{role}.name')
+        service_type = require_string(selector.get('serviceType'), f'deviceMappings.{role}.serviceType')
+        if service_type not in DEVICE_MAPPING_PATHS[role]:
+            fail(f'deviceMappings.{role}.serviceType is not supported for this role')
+        compiled = {'name': common_name, 'serviceType': service_type}
+        service_id = selector.get('serviceId')
+        if service_id is not None:
+            service_id = require_string(service_id, f'deviceMappings.{role}.serviceId')
+            if not re.fullmatch(rf'com\.victronenergy\.{re.escape(service_type)}\.[A-Za-z0-9_.-]+', service_id):
+                fail(f'deviceMappings.{role}.serviceId does not match serviceType')
+            compiled['serviceId'] = service_id
+        device_instance = selector.get('deviceInstance')
+        if device_instance is not None:
+            if not isinstance(device_instance, int) or isinstance(device_instance, bool) or device_instance < 0:
+                fail(f'deviceMappings.{role}.deviceInstance must be a non-negative integer')
+            compiled['deviceInstance'] = device_instance
+        result[role] = {
+            'selector': compiled,
+            'measurementPath': DEVICE_MAPPING_PATHS[role][service_type],
+        }
+    return result
+
+
+def validate_integrations(name, integrations, battery_mappings=None, device_mappings=None):
     battery_mappings = battery_mappings or {}
+    device_mappings = device_mappings or {}
     if not isinstance(integrations, list):
         fail('"integrations" must be an array')
     if sum(1 for integration in integrations
@@ -532,6 +586,15 @@ def validate_integrations(name, integrations, battery_mappings=None):
                     if battery_role not in battery_mappings:
                         fail(f'integrations[{index}] requires batteryMappings.{battery_role}')
                     compiled['batterySelector'] = battery_mappings[battery_role]
+                if data_source.startswith('system.device.'):
+                    device_role = data_source.split('.')[2]
+                    if device_role not in device_mappings:
+                        fail(f'integrations[{index}] requires deviceMappings.{device_role}')
+                    expected_role = 'source' if device_role == 'chargingSource' else 'load'
+                    if integration_type == 'overviewEnergyNode' and integration.get('role') != expected_role:
+                        fail(f'integrations[{index}] role does not match mapped device role')
+                    compiled['deviceSelector'] = device_mappings[device_role]['selector']
+                    compiled['measurementPath'] = device_mappings[device_role]['measurementPath']
             if integration_type == 'briefMetric':
                 placement = integration.get('placement', 'sidePanel')
                 if placement != 'sidePanel':
@@ -594,6 +657,7 @@ def load_manifest(filename):
             fail('Model 3 integrations require "model": 3')
         source_integrations = normalize_canonical_integrations(manifest.get('integrations', []))
         battery_mappings = validate_battery_mappings(manifest.get('batteryMappings'))
+        device_mappings = validate_device_mappings(manifest.get('deviceMappings'))
         branding, canonical_branding = validate_canonical_branding(
             name, require_string(manifest.get('name'), 'name'), manifest['branding'])
         compatibility = manifest.get('compatibleGuiV2', {})
@@ -607,7 +671,8 @@ def load_manifest(filename):
         minimum = manifest.get('minRequiredVersion', '')
         maximum = manifest.get('maxRequiredVersion', '')
         battery_mappings = {}
-    integrations = validate_integrations(name, source_integrations, battery_mappings)
+        device_mappings = {}
+    integrations = validate_integrations(name, source_integrations, battery_mappings, device_mappings)
     if not integrations and not branding:
         fail('partner pack must contain branding or at least one integration')
     return {

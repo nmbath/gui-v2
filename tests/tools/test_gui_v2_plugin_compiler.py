@@ -318,6 +318,31 @@ class PartnerPackManifestTest(unittest.TestCase):
                 "starter": {"serviceId": "org.example.untrusted"}
             })
 
+    def test_device_mapping_compiles_selector_and_curated_power_path(self):
+        mappings = MODULE.validate_device_mappings({
+            "consumer": {"name": "Immersion Heater", "serviceType": "acload"}
+        })
+        integrations = MODULE.validate_integrations("partner", [{
+            "type": "overviewEnergyNode", "id": "immersion-heater",
+            "title": "Consumer", "role": "load",
+            "dataSource": "system.device.consumer.power",
+            "capabilities": ["readSystemData"],
+        }], device_mappings=mappings)
+        self.assertEqual(integrations[0]["deviceSelector"]["name"], "Immersion Heater")
+        self.assertEqual(integrations[0]["measurementPath"], "/Ac/Power")
+
+    def test_device_mapping_role_must_match_overview_role(self):
+        mappings = MODULE.validate_device_mappings({
+            "chargingSource": {"name": "Alternator", "serviceType": "alternator"}
+        })
+        with self.assertRaisesRegex(ValueError, 'role does not match mapped device role'):
+            MODULE.validate_integrations("partner", [{
+                "type": "overviewEnergyNode", "id": "alternator",
+                "title": "Alternator", "role": "load",
+                "dataSource": "system.device.chargingSource.power",
+                "capabilities": ["readSystemData"],
+            }], device_mappings=mappings)
+
     def test_model_3_contribution_is_rejected_from_model_2(self):
         manifest = {
             "schemaVersion": 2,

@@ -822,12 +822,15 @@ void GuiPluginLoader::populatePlugins()
 				QStringLiteral("system.battery.starter.power"),
 				QStringLiteral("system.battery.auxiliary.stateOfCharge"),
 				QStringLiteral("system.battery.auxiliary.voltage"),
-				QStringLiteral("system.battery.auxiliary.power")
+				QStringLiteral("system.battery.auxiliary.power"),
+				QStringLiteral("system.device.chargingSource.power"),
+				QStringLiteral("system.device.consumer.power")
 			};
 			const QString contributionDataSource = integration.value(QStringLiteral("dataSource")).toString();
 			const bool invalidContributionDataSource = model3Contribution && !contributionHidesData
 					&& !model3DataSources.contains(contributionDataSource);
 			const bool mappedBatteryDataSource = contributionDataSource.startsWith(QStringLiteral("system.battery."));
+			const bool mappedDeviceDataSource = contributionDataSource.startsWith(QStringLiteral("system.device."));
 			const QJsonValue batterySelectorValue = integration.value(QStringLiteral("batterySelector"));
 			bool invalidBatterySelector = mappedBatteryDataSource && !batterySelectorValue.isObject();
 			if (mappedBatteryDataSource && batterySelectorValue.isObject()) {
@@ -860,6 +863,51 @@ void GuiPluginLoader::populatePlugins()
 							&& !selector.contains(QStringLiteral("deviceInstance")))
 						|| !validName || !validServiceId || !validDeviceInstance;
 			}
+			const QJsonValue deviceSelectorValue = integration.value(QStringLiteral("deviceSelector"));
+			const QJsonObject deviceSelector = deviceSelectorValue.toObject();
+			const QString mappedDeviceRole = contributionDataSource.section(QLatin1Char('.'), 2, 2);
+			const QString mappedDeviceType = deviceSelector.value(QStringLiteral("serviceType")).toString();
+			const QString mappedDeviceName = deviceSelector.value(QStringLiteral("name")).toString();
+			const QString measurementPath = integration.value(QStringLiteral("measurementPath")).toString();
+			const QHash<QString, QHash<QString, QString>> deviceMeasurementPaths {
+				{ QStringLiteral("chargingSource"), {
+					{ QStringLiteral("alternator"), QStringLiteral("/Dc/0/Power") },
+					{ QStringLiteral("solarcharger"), QStringLiteral("/Yield/Power") },
+					{ QStringLiteral("charger"), QStringLiteral("/Dc/0/Power") },
+					{ QStringLiteral("dcsource"), QStringLiteral("/Dc/0/Power") },
+				} },
+				{ QStringLiteral("consumer"), {
+					{ QStringLiteral("acload"), QStringLiteral("/Ac/Power") },
+					{ QStringLiteral("heatpump"), QStringLiteral("/Ac/Power") },
+					{ QStringLiteral("dcload"), QStringLiteral("/Dc/0/Power") },
+				} },
+			};
+			bool invalidDeviceSelector = mappedDeviceDataSource
+					&& (!deviceSelectorValue.isObject() || mappedDeviceName.isEmpty()
+						|| !deviceMeasurementPaths.value(mappedDeviceRole).contains(mappedDeviceType)
+						|| measurementPath != deviceMeasurementPaths.value(mappedDeviceRole).value(mappedDeviceType));
+			if (mappedDeviceDataSource && deviceSelectorValue.isObject()) {
+				const QSet<QString> allowedDeviceSelectorFields {
+					QStringLiteral("name"), QStringLiteral("serviceType"),
+					QStringLiteral("serviceId"), QStringLiteral("deviceInstance")
+				};
+				for (auto it = deviceSelector.constBegin(); it != deviceSelector.constEnd(); ++it) {
+					if (!allowedDeviceSelectorFields.contains(it.key())) {
+						invalidDeviceSelector = true;
+					}
+				}
+				const QJsonValue serviceIdValue = deviceSelector.value(QStringLiteral("serviceId"));
+				const QJsonValue deviceInstanceValue = deviceSelector.value(QStringLiteral("deviceInstance"));
+				invalidDeviceSelector = invalidDeviceSelector
+						|| (!serviceIdValue.isUndefined()
+							&& (!serviceIdValue.isString()
+								|| !serviceIdValue.toString().startsWith(
+									QStringLiteral("com.victronenergy.%1.").arg(mappedDeviceType))))
+						|| (!deviceInstanceValue.isUndefined()
+							&& (!deviceInstanceValue.isDouble()
+								|| deviceInstanceValue.toInt(-1) < 0
+								|| deviceInstanceValue.toDouble() != deviceInstanceValue.toInt(-1)));
+			}
 			const bool invalidContributionCapability = model3Contribution && !contributionHidesData
 					&& !integrationCapabilities.contains(QStringLiteral("readSystemData"));
 			const bool duplicateContributionId = model3Contribution
@@ -882,7 +930,8 @@ void GuiPluginLoader::populatePlugins()
 			if (invalidType || missingDeviceListFields || missingNavigationFields || missingIcon
 					|| invalidPlacement || duplicateNavigationId || resourceOutsidePlugin
 					|| invalidCapabilities || invalidCardType || missingContributionFields
-					|| invalidContributionDataSource || invalidBatterySelector || invalidContributionCapability
+					|| invalidContributionDataSource || invalidBatterySelector || invalidDeviceSelector
+					|| invalidContributionCapability
 					|| duplicateContributionId || invalidContributionRole
 					|| invalidContributionOperation || invalidContributionTarget || invalidConnectionTarget
 					|| invalidBatteryRole
@@ -900,6 +949,7 @@ void GuiPluginLoader::populatePlugins()
 				if (missingContributionFields) reasons << QStringLiteral("missing contribution fields");
 				if (invalidContributionDataSource) reasons << QStringLiteral("unsupported contribution dataSource");
 				if (invalidBatterySelector) reasons << QStringLiteral("invalid or missing batterySelector");
+				if (invalidDeviceSelector) reasons << QStringLiteral("invalid or missing deviceSelector");
 				if (invalidContributionCapability) reasons << QStringLiteral("missing readSystemData capability");
 				if (duplicateContributionId) reasons << QStringLiteral("duplicate contribution id");
 				if (invalidContributionRole) reasons << QStringLiteral("invalid contribution role");

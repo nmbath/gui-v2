@@ -352,15 +352,24 @@ exported power v  0.4 |   /
 
 			readonly property string dataSource: configuration?.dataSource || ""
 			readonly property string unit: configuration?.unit || ""
-			readonly property bool valueAvailable: PartnerSystemData.metricAvailable(
-				dataSource, configuration?.batterySelector)
-			readonly property real rawValue: PartnerSystemData.metricValue(
-				dataSource, configuration?.batterySelector)
+			readonly property bool deviceContribution: !!configuration?.deviceSelector
+			readonly property string deviceServiceUid: deviceContribution
+				? PartnerSystemData.mappedDeviceServiceUid(configuration?.deviceSelector) : ""
+			readonly property bool valueAvailable: deviceContribution
+				? !!deviceServiceUid && deviceMetric.valid && isFinite(rawValue)
+				: PartnerSystemData.metricAvailable(dataSource, configuration?.batterySelector)
+			readonly property real rawValue: deviceContribution
+				? Number(deviceMetric.value)
+				: PartnerSystemData.metricValue(dataSource, configuration?.batterySelector)
 			readonly property string displayValue: valueAvailable && isFinite(rawValue)
 				? (unit === "V" ? Number(rawValue).toFixed(1) : Math.round(rawValue).toString())
 				: "--"
 
-			title: integration.title
+			title: configuration?.batterySelector
+				? PartnerSystemData.batteryName(dataSource, configuration.batterySelector, integration.title)
+				: deviceContribution
+					? PartnerSystemData.mappedDeviceName(configuration.deviceSelector, integration.title)
+					: integration.title
 			icon.source: integration.icon
 			loadersActive: true
 			visible: configuration.operation !== "hide"
@@ -375,6 +384,12 @@ exported power v  0.4 |   /
 			}
 
 			Layout.fillWidth: true
+
+			VeQuickItem {
+				id: deviceMetric
+				uid: partnerMetric.deviceServiceUid && partnerMetric.configuration?.measurementPath
+					? partnerMetric.deviceServiceUid + partnerMetric.configuration.measurementPath : ""
+			}
 		}
 	}
 }
