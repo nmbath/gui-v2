@@ -20,6 +20,9 @@ Item {
 	GuiPluginIntegrationModel {
 		id: contributionModel
 		type: root.integrationType
+
+		onCountChanged: console.info("Partner contribution model updated:",
+				root.integrationType, "count:", count)
 	}
 
 	Row {
@@ -29,13 +32,26 @@ Item {
 		Repeater {
 			model: contributionModel
 
-			delegate: PartnerContributionCard {
+			delegate: Item {
+				id: contributionDelegate
+
 				required property int index
+				required property string title
+				required property var configuration
 				required property url icon
 
 				visible: index < root.maximumVisibleContributions
-				iconSource: icon
-				compact: root.compact
+				width: card.width
+				height: card.height
+
+				PartnerContributionCard {
+					id: card
+
+					title: contributionDelegate.title
+					configuration: contributionDelegate.configuration
+					iconSource: contributionDelegate.icon
+					compact: root.compact
+				}
 			}
 		}
 	}

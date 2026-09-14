@@ -23,8 +23,12 @@ Rectangle {
 		? (unit === "V" ? Number(rawValue).toFixed(1) : Math.round(rawValue).toString())
 		: "--"
 
-	width: compact ? Theme.geometry_grid_width * 3 : Theme.geometry_grid_width * 4
-	height: compact ? Theme.geometry_grid_height * 2 : Theme.geometry_grid_height * 3
+	width: compact
+		? Theme.geometry_overviewPage_widget_leftWidgetWidth
+		: Theme.geometry_overviewPage_widget_centerWidgetWidth
+	height: compact
+		? Theme.geometry_overviewPage_widget_height_xs
+		: Theme.geometry_overviewPage_widget_height_s
 	color: Theme.color_card_background
 	border.width: Theme.geometry_overviewPage_widget_border_width
 	border.color: Theme.color_overviewPage_widget_border
@@ -32,8 +36,8 @@ Rectangle {
 
 	RowLayout {
 		anchors.fill: parent
-		anchors.margins: Theme.geometry_grid_width / 2
-		spacing: Theme.geometry_grid_width / 2
+		anchors.margins: Theme.geometry_overviewPage_widget_content_horizontalMargin
+		spacing: Theme.geometry_overviewPage_widget_content_spacing
 
 		CP.ColorImage {
 			visible: root.iconSource.toString() !== ""
@@ -50,7 +54,7 @@ Rectangle {
 			Label {
 				text: root.title
 				color: Theme.color_font_secondary
-				font.pixelSize: Theme.font_caption_size
+				font.pixelSize: Theme.font_size_caption
 				elide: Text.ElideRight
 				Layout.fillWidth: true
 			}
@@ -58,7 +62,7 @@ Rectangle {
 			Label {
 				text: root.displayValue + (root.unit ? " " + root.unit : "")
 				color: Theme.color_font_primary
-				font.pixelSize: root.compact ? Theme.font_body1_size : Theme.font_h3_size
+				font.pixelSize: root.compact ? Theme.font_size_body1 : Theme.font_size_h3
 				font.bold: true
 				Layout.fillWidth: true
 			}

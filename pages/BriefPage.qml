@@ -111,7 +111,8 @@ SwipeViewPage {
 	PartnerContributionStrip {
 		anchors.horizontalCenter: parent.horizontalCenter
 		anchors.bottom: parent.bottom
-		anchors.bottomMargin: Theme.geometry_navigationBar_height + Theme.geometry_grid_height
+		anchors.bottomMargin: Theme.geometry_navigationBar_height
+			+ Theme.geometry_overviewPage_widget_spacing
 		integrationType: GuiPluginLoader.BriefMetric
 		compact: true
 		z: 10
