@@ -22,4 +22,5 @@ SwipeViewPage {
 	width: view ? view.width : implicitWidth
 	height: view ? view.height : implicitHeight
 	visible: !!view && view.currentItem === root
+
 }

@@ -8,7 +8,7 @@ Compile a schema version 2 pack from its root directory:
 python3 ../../../tools/gui-v2-plugin-compiler.py --manifest manifest.json --output acme-marine.json
 ```
 
-The manifest supports existing settings integrations, additive `navigationPage` integrations, and `quickAccessPane` integrations. A navigation page requires a stable `id`, `title`, icon, QML source, named placement, and optional numeric order. Its root object must be `PartnerNavigationPage`; GUIv2 injects `view`, `url`, `iconSource`, `title`, and the declared read-only data capability when it creates the page.
+The manifest supports existing settings integrations, additive `navigationPage` integrations, and `quickAccessPane` integrations. A navigation page requires a stable `id`, `title`, icon, QML source, named placement, and optional numeric order. Its root object must be `PartnerNavigationPage`; GUIv2 injects `view`, `url`, `iconSource`, `title`, and the declared read-only `partnerData` capability when it creates the page. The distinct name deliberately avoids shadowing Qt Quick Item's built-in `data` child list.
 
 A `quickAccessPane` adds a partner-owned icon to the upper-right status-bar group. Selecting it opens the partner's responsive pane in GUIv2's standard card host; selecting it again closes the pane. The integration requires a stable `id`, `title`, icon, QML source, and declared capabilities, and may provide a distinct active icon. The pane receives only the capabilities it declares. GUIv2 retains placement, focus navigation, portrait/landscape hosting, mutual exclusion with other card panes, and failure isolation.
 

@@ -211,7 +211,7 @@ FocusScope {
 							anchors.fill: parent
 							Component.onCompleted: {
 								const properties = {
-									"data": pluginPaneButton.capabilities.indexOf("readSystemData") >= 0
+									"partnerData": pluginPaneButton.capabilities.indexOf("readSystemData") >= 0
 										? PartnerSystemData : ({})
 								}
 								if (pluginPaneButton.configuration?.dataBindings) {

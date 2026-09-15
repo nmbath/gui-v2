@@ -22,9 +22,9 @@ QtObject {
 
 	readonly property int cardRadius: Theme.geometry_card_radius
 	readonly property int pageMargin: Theme.geometry_page_content_horizontalMargin
-	readonly property int bodyFontSize: Theme.font_size_body
-	readonly property int headingFontSize: Theme.font_size_h2
-	readonly property int sectionFontSize: Theme.font_size_h3
+	readonly property int bodyFontSize: Theme.font_size_body1
+	readonly property int headingFontSize: Theme.font_size_body3
+	readonly property int sectionFontSize: Theme.font_size_h2
 	readonly property int captionFontSize: Theme.font_size_caption
 	readonly property bool portrait: Theme.screenSize === Theme.Portrait
 }

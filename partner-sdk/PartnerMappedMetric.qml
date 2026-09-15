@@ -11,28 +11,28 @@ import Victron.VenusOS
 Item {
 	id: root
 
-	required property var data
+	required property var partnerData
 	required property var binding
 	property string fallbackName: ""
 
 	readonly property string dataSource: binding?.dataSource || ""
 	readonly property string unit: binding?.unit || ""
-	readonly property bool demoBinding: data.demoMode && typeof binding?.demoValue === "number"
+	readonly property bool demoBinding: partnerData.demoMode && typeof binding?.demoValue === "number"
 	readonly property bool deviceBinding: !!binding?.deviceSelector
 	readonly property string deviceServiceUid: deviceBinding
-			? data.mappedDeviceServiceUid(binding.deviceSelector) : ""
+			? partnerData.mappedDeviceServiceUid(binding.deviceSelector) : ""
 	readonly property bool available: demoBinding || (deviceBinding
 			? !!deviceServiceUid && deviceMetric.valid && isFinite(value)
-			: data.metricAvailable(dataSource, binding?.batterySelector))
+			: partnerData.metricAvailable(dataSource, binding?.batterySelector))
 	readonly property real value: demoBinding
 			? Number(binding.demoValue) : deviceBinding
 			? Number(deviceMetric.value)
-			: data.metricValue(dataSource, binding?.batterySelector)
+			: partnerData.metricValue(dataSource, binding?.batterySelector)
 	readonly property string displayName: demoBinding && binding?.demoName
 			? binding.demoName : binding?.batterySelector
-			? data.batteryName(dataSource, binding.batterySelector, fallbackName)
+			? partnerData.batteryName(dataSource, binding.batterySelector, fallbackName)
 			: deviceBinding
-				? data.mappedDeviceName(binding.deviceSelector, fallbackName)
+				? partnerData.mappedDeviceName(binding.deviceSelector, fallbackName)
 				: fallbackName
 
 	visible: false

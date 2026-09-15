@@ -115,7 +115,7 @@ ObjectModel {
 				"iconSource": model.icon,
 				"title": model.title,
 				"configuration": configuration,
-				"data": capabilities.indexOf("readSystemData") >= 0 ? PartnerSystemData : ({})
+				"partnerData": capabilities.indexOf("readSystemData") >= 0 ? PartnerSystemData : ({})
 			})
 			onStatusChanged: {
 				if (status === Loader.Error) {
