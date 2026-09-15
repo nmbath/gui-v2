@@ -37,3 +37,11 @@ One cumulative `.vgp` can therefore install and roll back branding, partner page
 The browser's pre-QML loader optionally reads a same-origin `branding.json`. It accepts a title, same-origin dark/light loading logos and favicon, and strict hex colours. The Victron mark outside the simulated GX display remains firmware-owned and cannot be replaced by a partner pack. A missing, slow, cross-origin, or invalid descriptor falls back to the standard loader after 250 ms.
 
 See `examples/partner-packs/acme-marine` for a complete development example.
+
+## Native development deployment
+
+When replacing the native GUI binary or host QML files directly on a GX, stop
+`start-gui` and invalidate `/.cache/Venus/qmlcache` before restarting it. Qt
+keys this cache by QML URL; retaining entries created by a different host build
+can crash the QML worker when changed filesystem sources are compiled. This is
+a development-only step and is not required for a normal VGP-only install.
