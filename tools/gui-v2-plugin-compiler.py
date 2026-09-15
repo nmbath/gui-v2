@@ -36,6 +36,7 @@ INTEGRATION_TYPES = {
     "briefMetric": 6,
     "overviewEnergyNode": 7,
     "overviewBattery": 8,
+    "briefLayout": 9,
 }
 NAVIGATION_PLACEMENTS = {
     "beforeBrief",
@@ -62,6 +63,7 @@ MODEL3_INTEGRATION_TYPES = {
     'briefMetric',
     'overviewEnergyNode',
     'overviewBattery',
+    'briefLayout',
 }
 MODEL3_DATA_SOURCES = {
     'system.houseBattery.stateOfCharge': '%',
@@ -99,6 +101,15 @@ DEVICE_MAPPING_PATHS = {
         'heatpump': '/Ac/Power',
         'dcload': '/Dc/0/Power',
     },
+}
+
+# These service types already contribute to native Overview widgets or load
+# aggregates. Adding them as separate flow nodes would represent the same
+# physical energy twice. New reviewed service types may be added without being
+# placed in this set when GUIv2 has no native representation for them.
+NATIVE_OVERVIEW_DEVICE_TYPES = {
+    'alternator', 'solarcharger', 'charger', 'dcsource',
+    'acload', 'heatpump', 'dcload',
 }
 
 def collect_filenames(directory, suffix):
@@ -520,7 +531,7 @@ def validate_data_bindings(value, battery_mappings, device_mappings, context):
             fail(f'{context} has invalid binding id: {binding_id}')
         if not isinstance(binding, dict):
             fail(f'{context}.{binding_id} must be an object')
-        unknown_fields = sorted(set(binding) - {'dataSource', 'unit'})
+        unknown_fields = sorted(set(binding) - {'dataSource', 'unit', 'demoName', 'demoValue'})
         if unknown_fields:
             fail(f'{context}.{binding_id} has unsupported fields: ' + ', '.join(unknown_fields))
         data_source = require_string(binding.get('dataSource'), f'{context}.{binding_id}.dataSource')
@@ -530,6 +541,15 @@ def validate_data_bindings(value, battery_mappings, device_mappings, context):
         if unit not in MODEL3_UNITS:
             fail(f'{context}.{binding_id} has unsupported unit: {unit}')
         compiled = {'dataSource': data_source, 'unit': unit}
+        if 'demoValue' in binding:
+            demo_value = binding['demoValue']
+            if not isinstance(demo_value, (int, float)) or isinstance(demo_value, bool):
+                fail(f'{context}.{binding_id}.demoValue must be a number')
+            compiled['demoValue'] = demo_value
+            compiled['demoName'] = require_string(
+                binding.get('demoName'), f'{context}.{binding_id}.demoName')
+        elif 'demoName' in binding:
+            fail(f'{context}.{binding_id}.demoName requires demoValue')
         if data_source.startswith('system.battery.'):
             battery_role = data_source.split('.')[2]
             if battery_role not in battery_mappings:
@@ -553,6 +573,9 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
     if sum(1 for integration in integrations
             if isinstance(integration, dict) and integration.get('type') == 'overviewBattery') > 1:
         fail('Model 3 supports one overviewBattery (the secondary battery)')
+    if sum(1 for integration in integrations
+            if isinstance(integration, dict) and integration.get('type') == 'briefLayout') > 1:
+        fail('Model 3 supports one briefLayout policy')
     result = []
     integration_ids = set()
     for index, integration in enumerate(integrations):
@@ -623,6 +646,52 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
             if placement not in NAVIGATION_PLACEMENTS:
                 fail(f'invalid navigation placement: {placement}')
             compiled['placement'] = placement
+        elif integration_type == 'briefLayout':
+            if operation != 'add':
+                fail(f'integrations[{index}] briefLayout only supports operation add')
+            mode = integration.get('mode', 'partnerDefault')
+            if mode not in ('user', 'partnerDefault', 'partnerLocked'):
+                fail(f'integrations[{index}].mode must be user, partnerDefault or partnerLocked')
+            gauges = integration.get('centerGauges', [])
+            if not isinstance(gauges, list) or not 1 <= len(gauges) <= 4:
+                fail(f'integrations[{index}].centerGauges must contain 1 to 4 gauges')
+            compiled_gauges = []
+            allowed_gauges = {
+                'system.houseBattery.stateOfCharge',
+                'system.battery.starter.stateOfCharge',
+                'system.battery.auxiliary.stateOfCharge',
+                'system.tank.freshWater.level',
+                'system.tank.fuel.level',
+                'system.tank.wasteWater.level',
+            }
+            for gauge_index, gauge in enumerate(gauges):
+                if not isinstance(gauge, dict) or set(gauge) != {'dataSource'}:
+                    fail(f'integrations[{index}].centerGauges[{gauge_index}] must only contain dataSource')
+                data_source = require_string(gauge.get('dataSource'),
+                    f'integrations[{index}].centerGauges[{gauge_index}].dataSource')
+                if data_source not in allowed_gauges:
+                    fail(f'integrations[{index}].centerGauges[{gauge_index}] has unsupported dataSource')
+                compiled_gauge = {'dataSource': data_source}
+                if data_source.startswith('system.battery.'):
+                    role = data_source.split('.')[2]
+                    if role not in battery_mappings:
+                        fail(f'integrations[{index}].centerGauges[{gauge_index}] requires batteryMappings.{role}')
+                    compiled_gauge['batterySelector'] = battery_mappings[role]
+                compiled_gauges.append(compiled_gauge)
+            center_detail = integration.get('centerDetail', 'system.houseBattery.stateOfCharge')
+            if center_detail not in {
+                    'system.houseBattery.stateOfCharge',
+                    'system.battery.starter.stateOfCharge',
+                    'system.battery.auxiliary.stateOfCharge'}:
+                fail(f'integrations[{index}].centerDetail has unsupported dataSource')
+            compiled['mode'] = mode
+            compiled['centerGauges'] = compiled_gauges
+            compiled['centerDetail'] = {'dataSource': center_detail}
+            if center_detail.startswith('system.battery.'):
+                role = center_detail.split('.')[2]
+                if role not in battery_mappings:
+                    fail(f'integrations[{index}].centerDetail requires batteryMappings.{role}')
+                compiled['centerDetail']['batterySelector'] = battery_mappings[role]
         elif integration_type in MODEL3_INTEGRATION_TYPES:
             if operation != 'hide':
                 data_source = require_string(integration.get('dataSource'), f'integrations[{index}].dataSource')
@@ -667,6 +736,23 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
                 if connection_target not in ('battery', 'inverterCharger'):
                     fail(f'integrations[{index}].connectionTarget must be battery or inverterCharger')
                 compiled['connectionTarget'] = connection_target
+                demo_only = integration.get('demoOnly', False)
+                if not isinstance(demo_only, bool):
+                    fail(f'integrations[{index}].demoOnly must be a boolean')
+                if demo_only:
+                    demo_value = integration.get('demoValue')
+                    if not isinstance(demo_value, (int, float)) or isinstance(demo_value, bool):
+                        fail(f'integrations[{index}].demoValue must be a number for a demo-only node')
+                    compiled['demoOnly'] = True
+                    compiled['demoValue'] = demo_value
+                    compiled['demoName'] = require_string(
+                        integration.get('demoName'), f'integrations[{index}].demoName')
+                elif operation == 'add' and data_source.startswith('system.device.'):
+                    device_role = data_source.split('.')[2]
+                    service_type = device_mappings[device_role]['selector']['serviceType']
+                    if service_type in NATIVE_OVERVIEW_DEVICE_TYPES:
+                        fail(f'integrations[{index}] would duplicate a native Overview service type: '
+                            f'{service_type}')
                 if operation in ('replace', 'hide'):
                     target = integration.get('target')
                     if target not in ('solar', 'acLoads', 'dcLoads'):

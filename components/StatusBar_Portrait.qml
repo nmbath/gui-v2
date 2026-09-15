@@ -50,46 +50,6 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 			onClicked: Global.pageManager.popPage()
 		}
 
-		Breadcrumbs {
-			id: breadcrumbs
-
-			pageStack: root.pageStack
-			Layout.fillWidth: true
-			Layout.topMargin: ((backButton.height - height) / 2) - Theme.geometry_statusBar_spacing/2
-			Layout.alignment: Qt.AlignTop
-		}
-
-		Label {
-			leftPadding: Theme.geometry_statusBar_horizontalMargin
-			rightPadding: Theme.geometry_statusBar_spacing
-			verticalAlignment: Text.AlignVCenter
-			font.pixelSize: Theme.font_size_body2
-			fontSizeMode: Text.HorizontalFit
-			text: Global.mainView?.currentPage?.title ?? ""
-			visible: !breadcrumbs.visible
-
-			Layout.fillWidth: true
-			Layout.alignment: Qt.AlignTop
-			Layout.preferredHeight: Theme.geometry_statusBar_button_height
-		}
-
-		StatusBarButton {
-			id: notificationButton
-
-			enabled: Global.notifications?.statusBarNotificationIconVisible ?? false
-			visible: !breadcrumbs.visible && enabled
-			leftInset: Theme.geometry_statusBar_spacing
-			rightInset: Theme.geometry_statusBar_spacing / 2
-			bottomInset: Theme.geometry_statusBar_spacing
-			color: Global.notifications?.statusBarNotificationIconColor ?? "transparent"
-			icon.source: Global.notifications?.statusBarNotificationIconSource ?? ""
-
-			Layout.alignment: Qt.AlignTop
-			KeyNavigation.right: controlCardsButton
-
-			onClicked: Global.mainView.goToNotificationsPage()
-		}
-
 		StatusBarButton {
 			id: controlCardsButton
 
@@ -223,6 +183,45 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 					}
 				}
 			}
+		}
+
+		Breadcrumbs {
+			id: breadcrumbs
+
+			pageStack: root.pageStack
+			Layout.fillWidth: true
+			Layout.topMargin: ((backButton.height - height) / 2) - Theme.geometry_statusBar_spacing/2
+			Layout.alignment: Qt.AlignTop
+		}
+
+		Label {
+			leftPadding: Theme.geometry_statusBar_spacing
+			rightPadding: Theme.geometry_statusBar_spacing
+			verticalAlignment: Text.AlignVCenter
+			font.pixelSize: Theme.font_size_body2
+			fontSizeMode: Text.HorizontalFit
+			text: Global.mainView?.currentPage?.title ?? ""
+			visible: !breadcrumbs.visible
+
+			Layout.fillWidth: true
+			Layout.alignment: Qt.AlignTop
+			Layout.preferredHeight: Theme.geometry_statusBar_button_height
+		}
+
+		StatusBarButton {
+			id: notificationButton
+
+			enabled: Global.notifications?.statusBarNotificationIconVisible ?? false
+			visible: !breadcrumbs.visible && enabled
+			leftInset: Theme.geometry_statusBar_spacing / 2
+			rightInset: Theme.geometry_statusBar_horizontalMargin
+			bottomInset: Theme.geometry_statusBar_spacing
+			color: Global.notifications?.statusBarNotificationIconColor ?? "transparent"
+			icon.source: Global.notifications?.statusBarNotificationIconSource ?? ""
+
+			Layout.alignment: Qt.AlignTop
+
+			onClicked: Global.mainView.goToNotificationsPage()
 		}
 	}
 }

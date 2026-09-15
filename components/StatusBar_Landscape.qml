@@ -27,7 +27,7 @@ FocusScope {
 		} else {
 			for (let i = 0; i < pluginPaneButtons.count; ++i) {
 				if (pluginPaneButtons.itemAt(i)?.activeFocus) {
-					breadcrumbs.focusEdgeHint = Qt.RightEdge
+					breadcrumbs.focusEdgeHint = Qt.LeftEdge
 					return
 				}
 			}
@@ -127,7 +127,8 @@ FocusScope {
 		icon.source: auxCardsOpened ? "qrc:/images/icon_smartswitch_on_32.svg"
 				: "qrc:/images/icon_smartswitch_off_32.svg"
 		enabled: visible
-		KeyNavigation.right: breadcrumbs
+		KeyNavigation.right: pluginPaneButtons.count > 0
+			? pluginPaneButtons.itemAt(0) : breadcrumbs
 
 		onClicked: {
 			if (auxCardsOpened) {
@@ -144,13 +145,94 @@ FocusScope {
 		}
 	}
 
+	Row {
+		id: pluginButtonRow
+
+		height: parent.height
+		anchors.left: auxButton.visible ? auxButton.right : leftButton.right
+
+		Repeater {
+			id: pluginPaneButtons
+
+			model: pluginQuickAccessModel
+
+			delegate: StatusBarButton {
+				id: pluginPaneButton
+
+				required property int index
+				required property string pluginName
+				required property string title
+				required property url url
+				required property var capabilities
+				required property var configuration
+				readonly property url pluginIcon: pluginQuickAccessModel.integrationAt(index).icon
+				readonly property url pluginIconActive: pluginQuickAccessModel.integrationAt(index).iconActive
+				readonly property bool paneOpened: (Global.mainView?.cardsActive ?? false)
+						&& Global.mainView.cardsLoader.sourceComponent === _paneComponent
+
+				visible: !root.pageStack.opened
+						&& (!(Global.mainView?.cardsActive ?? false) || paneOpened)
+				enabled: visible
+				leftInset: Theme.geometry_statusBar_spacing
+				bottomInset: Theme.geometry_statusBar_spacing
+				icon.cache: false
+				icon.source: paneOpened && String(pluginIconActive).length > 0
+						? pluginIconActive : pluginIcon
+
+				KeyNavigation.left: index > 0 ? pluginPaneButtons.itemAt(index - 1) : auxButton
+				KeyNavigation.right: index < pluginPaneButtons.count - 1
+						? pluginPaneButtons.itemAt(index + 1) : breadcrumbs
+
+				onClicked: {
+					if (paneOpened) {
+						Global.mainView.cardsLoader.hide()
+					} else {
+						Global.mainView.cardsLoader.show(_paneComponent)
+					}
+				}
+
+				onActiveFocusChanged: if (activeFocus) root.updateBreadcrumbsFocusHint()
+
+				Component {
+					id: _paneComponent
+
+					Page {
+						title: pluginPaneButton.title
+						focusPolicy: Qt.TabFocus
+
+						onActiveFocusChanged: {
+							if (activeFocus && _paneContentLoader.item) {
+								_paneContentLoader.item.forceActiveFocus()
+							}
+						}
+
+						Loader {
+							id: _paneContentLoader
+							anchors.fill: parent
+							Component.onCompleted: {
+								const properties = {
+									"data": pluginPaneButton.capabilities.indexOf("readSystemData") >= 0
+										? PartnerSystemData : ({})
+								}
+								if (pluginPaneButton.configuration?.dataBindings) {
+									properties.configuration = pluginPaneButton.configuration
+								}
+								setSource(pluginPaneButton.url, properties)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	Breadcrumbs {
 		id: breadcrumbs
 
 		anchors {
 			top: parent.top
 			topMargin: Theme.geometry_settings_breadcrumb_topMargin
-			left: leftButton.right
+			left: pluginButtonRow.right
 			leftMargin: Theme.geometry_settings_breadcrumb_horizontalMargin
 			right: rightButtonRow.left
 		}
@@ -289,8 +371,7 @@ FocusScope {
 		visible: enabled
 
 		onClicked: NotificationModel.acknowledgeAll()
-		KeyNavigation.right: pluginPaneButtons.count > 0
-				? pluginPaneButtons.itemAt(0) : rightButton
+		KeyNavigation.right: rightButton
 	}
 
 	GuiPluginIntegrationModel {
@@ -303,80 +384,6 @@ FocusScope {
 
 		height: parent.height
 		anchors.right: parent.right
-
-		Repeater {
-			id: pluginPaneButtons
-
-			model: pluginQuickAccessModel
-
-			delegate: StatusBarButton {
-				id: pluginPaneButton
-
-				required property int index
-				required property string pluginName
-				required property string title
-				required property url url
-				required property var capabilities
-				required property var configuration
-				readonly property url pluginIcon: pluginQuickAccessModel.integrationAt(index).icon
-				readonly property url pluginIconActive: pluginQuickAccessModel.integrationAt(index).iconActive
-				readonly property bool paneOpened: (Global.mainView?.cardsActive ?? false)
-						&& Global.mainView.cardsLoader.sourceComponent === _paneComponent
-
-				visible: !root.pageStack.opened
-						&& (!(Global.mainView?.cardsActive ?? false) || paneOpened)
-				enabled: visible
-				leftInset: Theme.geometry_statusBar_spacing
-				bottomInset: Theme.geometry_statusBar_spacing
-				icon.cache: false
-				icon.source: paneOpened && String(pluginIconActive).length > 0
-						? pluginIconActive : pluginIcon
-
-				KeyNavigation.left: index > 0 ? pluginPaneButtons.itemAt(index - 1) : alarmButton
-				KeyNavigation.right: index < pluginPaneButtons.count - 1
-						? pluginPaneButtons.itemAt(index + 1) : rightButton.visible ? rightButton : sleepButton
-
-				onClicked: {
-					if (paneOpened) {
-						Global.mainView.cardsLoader.hide()
-					} else {
-						Global.mainView.cardsLoader.show(_paneComponent)
-					}
-				}
-
-				onActiveFocusChanged: if (activeFocus) root.updateBreadcrumbsFocusHint()
-
-				Component {
-					id: _paneComponent
-
-					Page {
-						title: pluginPaneButton.title
-						focusPolicy: Qt.TabFocus
-
-						onActiveFocusChanged: {
-							if (activeFocus && _paneContentLoader.item) {
-								_paneContentLoader.item.forceActiveFocus()
-							}
-						}
-
-						Loader {
-							id: _paneContentLoader
-							anchors.fill: parent
-							Component.onCompleted: {
-								const properties = {
-									"data": pluginPaneButton.capabilities.indexOf("readSystemData") >= 0
-										? PartnerSystemData : ({})
-								}
-								if (pluginPaneButton.configuration?.dataBindings) {
-									properties.configuration = pluginPaneButton.configuration
-								}
-								setSource(pluginPaneButton.url, properties)
-							}
-						}
-					}
-				}
-			}
-		}
 
 		StatusBarButton {
 			id: rightButton

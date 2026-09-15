@@ -13,6 +13,8 @@ import Victron.VenusOS
 QtObject {
 	id: root
 
+	readonly property bool demoMode: _demoMode.valid && Number(_demoMode.value) > 0
+
 	function finiteOr(value, fallback) {
 		return typeof value === "number" && isFinite(value) ? value : fallback
 	}
@@ -252,6 +254,10 @@ QtObject {
 
 	readonly property VeQuickItem _relay1State: VeQuickItem {
 		uid: Global.system.serviceUid + "/Relay/0/State"
+	}
+
+	readonly property VeQuickItem _demoMode: VeQuickItem {
+		uid: Global.systemSettings.serviceUid + "/Settings/Gui/DemoMode"
 	}
 
 	readonly property QtObject relays: QtObject {

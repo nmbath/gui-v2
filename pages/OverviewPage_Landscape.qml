@@ -97,6 +97,12 @@ FocusScope {
 		return false
 	}
 
+	function _partnerNodeVisible(widget, role) {
+		return widget && widget.configuration.role === role
+				&& widget.configuration.operation !== "hide"
+				&& (widget.configuration.demoOnly !== true || PartnerSystemData.demoMode)
+	}
+
 	function _resetCenterWidgets() {
 		let widgets = [inverterChargerWidget, batteryWidget]
 		for (let i = 0; i < partnerBatteryRepeater.count; ++i) {
@@ -389,7 +395,7 @@ FocusScope {
 		}
 		for (i = 0; i < partnerEnergyNodeRepeater.count; ++i) {
 			widget = partnerEnergyNodeRepeater.itemAt(i)
-			if (widget && widget.configuration.role === "source" && widget.configuration.operation !== "hide") {
+			if (_partnerNodeVisible(widget, "source")) {
 				widgetCandidates.push(widget)
 			}
 		}
@@ -424,7 +430,7 @@ FocusScope {
 		}
 		for (let i = 0; i < partnerEnergyNodeRepeater.count; ++i) {
 			const widget = partnerEnergyNodeRepeater.itemAt(i)
-			if (widget && widget.configuration.role === "load" && widget.configuration.operation !== "hide") {
+			if (_partnerNodeVisible(widget, "load")) {
 				widgets.push(widget)
 			}
 		}

@@ -369,18 +369,50 @@ class PartnerPackManifestTest(unittest.TestCase):
                 "starter": {"serviceId": "org.example.untrusted"}
             })
 
-    def test_device_mapping_compiles_selector_and_curated_power_path(self):
+    def test_native_device_mapping_is_rejected_as_duplicate_overview_node(self):
+        mappings = MODULE.validate_device_mappings({
+            "consumer": {"name": "Immersion Heater", "serviceType": "acload"}
+        })
+        with self.assertRaisesRegex(ValueError, 'duplicate a native Overview service type'):
+            MODULE.validate_integrations("partner", [{
+                "type": "overviewEnergyNode", "id": "immersion-heater",
+                "title": "Consumer", "role": "load",
+                "dataSource": "system.device.consumer.power",
+                "capabilities": ["readSystemData"],
+            }], device_mappings=mappings)
+
+    def test_demo_only_overview_node_compiles_curated_fixture(self):
         mappings = MODULE.validate_device_mappings({
             "consumer": {"name": "Immersion Heater", "serviceType": "acload"}
         })
         integrations = MODULE.validate_integrations("partner", [{
-            "type": "overviewEnergyNode", "id": "immersion-heater",
-            "title": "Consumer", "role": "load",
+            "type": "overviewEnergyNode", "id": "hotel-load-demo",
+            "title": "Demo hotel load", "role": "load",
             "dataSource": "system.device.consumer.power",
-            "capabilities": ["readSystemData"],
+            "capabilities": ["readSystemData"], "demoOnly": True,
+            "demoName": "Demo hotel load", "demoValue": 185,
         }], device_mappings=mappings)
         self.assertEqual(integrations[0]["deviceSelector"]["name"], "Immersion Heater")
         self.assertEqual(integrations[0]["measurementPath"], "/Ac/Power")
+        self.assertEqual(integrations[0]["demoValue"], 185)
+
+    def test_brief_layout_compiles_mapped_battery_without_overwriting_user_settings(self):
+        mappings = MODULE.validate_battery_mappings({
+            "starter": {"name": "Hydropack battery"}
+        })
+        integrations = MODULE.validate_integrations("partner", [{
+            "type": "briefLayout", "id": "brief-layout", "title": "Acme",
+            "mode": "partnerLocked",
+            "centerGauges": [
+                {"dataSource": "system.houseBattery.stateOfCharge"},
+                {"dataSource": "system.battery.starter.stateOfCharge"},
+            ],
+            "centerDetail": "system.houseBattery.stateOfCharge",
+            "capabilities": ["readSystemData"],
+        }], battery_mappings=mappings)
+        self.assertEqual(integrations[0]["mode"], "partnerLocked")
+        self.assertEqual(integrations[0]["centerGauges"][1]["batterySelector"]["name"],
+                         "Hydropack battery")
 
     def test_device_mapping_role_must_match_overview_role(self):
         mappings = MODULE.validate_device_mappings({

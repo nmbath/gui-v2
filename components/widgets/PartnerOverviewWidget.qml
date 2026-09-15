@@ -19,28 +19,34 @@ OverviewWidget {
 	readonly property string unit: configuration?.unit || ""
 	readonly property bool batteryContribution: !!configuration?.batteryRole
 	readonly property bool deviceContribution: !!configuration?.deviceSelector
+	readonly property bool demoContribution: PartnerSystemData.demoMode
+			&& configuration?.demoOnly === true
+			&& typeof configuration?.demoValue === "number"
 	readonly property string batteryServiceUid: batteryContribution
 		? PartnerSystemData.batteryServiceUid(dataSource, configuration?.batterySelector) : ""
 	readonly property string deviceServiceUid: deviceContribution
 		? PartnerSystemData.mappedDeviceServiceUid(configuration?.deviceSelector) : ""
 	readonly property string mappedServiceUid: batteryContribution ? batteryServiceUid : deviceServiceUid
-	readonly property string displayTitle: batteryContribution
+	readonly property string displayTitle: demoContribution && configuration?.demoName
+		? configuration.demoName : batteryContribution
 		? PartnerSystemData.batteryName(dataSource, configuration?.batterySelector, title)
 		: deviceContribution
 			? PartnerSystemData.mappedDeviceName(configuration?.deviceSelector, title)
 			: title
-	readonly property real flowPower: deviceContribution
+	readonly property real flowPower: demoContribution
+		? Number(configuration.demoValue) : deviceContribution
 		? Number(deviceMetric.value)
 		: PartnerSystemData.metricValue(dataSource, configuration?.batterySelector)
-	readonly property bool valueAvailable: deviceContribution
+	readonly property bool valueAvailable: demoContribution || (deviceContribution
 		? !!deviceServiceUid && deviceMetric.valid && isFinite(flowPower)
-		: PartnerSystemData.metricAvailable(dataSource, configuration?.batterySelector)
+		: PartnerSystemData.metricAvailable(dataSource, configuration?.batterySelector))
 	readonly property string displayValue: valueAvailable && isFinite(flowPower)
 		? (unit === "V" ? Number(flowPower).toFixed(1) : Math.round(flowPower).toString())
 		: "--"
 
 	type: VenusOS.OverviewWidget_Type_GenericDcSource
-	enabled: (!batteryContribution && !deviceContribution) || !!mappedServiceUid
+	visible: configuration?.demoOnly !== true || PartnerSystemData.demoMode
+	enabled: demoContribution || (!batteryContribution && !deviceContribution) || !!mappedServiceUid
 
 	VeQuickItem {
 		id: deviceMetric
@@ -49,7 +55,7 @@ OverviewWidget {
 	}
 
 	onClicked: {
-		if ((!batteryContribution && !deviceContribution) || !mappedServiceUid) {
+		if (demoContribution || (!batteryContribution && !deviceContribution) || !mappedServiceUid) {
 			return
 		}
 		const serviceType = BackendConnection.serviceTypeFromUid(mappedServiceUid)

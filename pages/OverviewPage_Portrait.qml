@@ -23,7 +23,8 @@ FocusScope {
 		let count = 0
 		for (let i = 0; i < partnerEnergyNodeRepeater.count; ++i) {
 			const configuration = partnerEnergyNodeRepeater.itemAt(i)?.configuration || ({})
-			if (configuration.role === role && configuration.operation !== "hide") {
+			if (configuration.role === role && configuration.operation !== "hide"
+					&& (configuration.demoOnly !== true || PartnerSystemData.demoMode)) {
 				count++
 			}
 		}
@@ -338,6 +339,7 @@ FocusScope {
 						configuration: integration.configuration
 						title: integration.title
 						visible: configuration.role === "source" && configuration.operation !== "hide"
+								&& (configuration.demoOnly !== true || PartnerSystemData.demoMode)
 						iconSource: integration.icon
 						size: rightInputColumn.widgetSize
 						animationEnabled: root.animationEnabled
@@ -595,6 +597,7 @@ FocusScope {
 						configuration: integration.configuration
 						title: integration.title
 						visible: configuration.role === "load" && configuration.operation !== "hide"
+								&& (configuration.demoOnly !== true || PartnerSystemData.demoMode)
 						iconSource: integration.icon
 						size: rightLoadsColumn.widgetSize
 						animationEnabled: root.animationEnabled

@@ -725,6 +725,7 @@ void GuiPluginLoader::populatePlugins()
 					{ QStringLiteral("briefMetric"), GuiPluginLoader::BriefMetric },
 					{ QStringLiteral("overviewEnergyNode"), GuiPluginLoader::OverviewEnergyNode },
 					{ QStringLiteral("overviewBattery"), GuiPluginLoader::OverviewBattery },
+					{ QStringLiteral("briefLayout"), GuiPluginLoader::BriefLayout },
 				};
 				integrationType = stringIntegrationTypes.value(integrationTypeValue.toString(), 0);
 			}
@@ -759,6 +760,10 @@ void GuiPluginLoader::populatePlugins()
 
 			const bool model3Contribution = integrationType == GuiPluginLoader::BriefMetric
 					|| integrationType == GuiPluginLoader::OverviewEnergyNode
+					|| integrationType == GuiPluginLoader::OverviewBattery
+					|| integrationType == GuiPluginLoader::BriefLayout;
+			const bool model3DataContribution = integrationType == GuiPluginLoader::BriefMetric
+					|| integrationType == GuiPluginLoader::OverviewEnergyNode
 					|| integrationType == GuiPluginLoader::OverviewBattery;
 			const QString contributionOperation = integration.value(QStringLiteral("operation")).toString(QStringLiteral("add"));
 			const QString contributionTarget = integration.value(QStringLiteral("target")).toString();
@@ -781,7 +786,7 @@ void GuiPluginLoader::populatePlugins()
 						|| (integrationType == GuiPluginLoader::OverviewEnergyNode && !overviewContributionTargets.contains(contributionTarget))
 						|| integrationType == GuiPluginLoader::OverviewBattery);
 			const bool invalidType = integrationType == GuiPluginLoader::InvalidIntegrationType
-					|| integrationType > GuiPluginLoader::OverviewBattery;
+					|| integrationType > GuiPluginLoader::BriefLayout;
 			const bool missingDeviceListFields = integrationType == GuiPluginLoader::DeviceListSettingsPage
 					&& (integrationProductId.isEmpty() || integrationTitle.isEmpty());
 			const bool missingIcon = (integrationType == GuiPluginLoader::NavigationPage
@@ -809,7 +814,7 @@ void GuiPluginLoader::populatePlugins()
 						|| (!integrationIcon.isEmpty() && !integrationIcon.startsWith(ownedResourcePrefix))
 						|| (!integrationIconActive.isEmpty()
 							&& !integrationIconActive.startsWith(ownedResourcePrefix)));
-			const bool missingContributionFields = model3Contribution
+			const bool missingContributionFields = model3DataContribution
 					&& (integrationId.isEmpty() || (!contributionHidesData
 						&& (integrationTitle.isEmpty() || integration.value(QStringLiteral("dataSource")).toString().isEmpty())));
 			static const QSet<QString> model3DataSources {
@@ -832,7 +837,7 @@ void GuiPluginLoader::populatePlugins()
 				QStringLiteral("system.device.consumer.power")
 			};
 			const QString contributionDataSource = integration.value(QStringLiteral("dataSource")).toString();
-			const bool invalidContributionDataSource = model3Contribution && !contributionHidesData
+			const bool invalidContributionDataSource = model3DataContribution && !contributionHidesData
 					&& !model3DataSources.contains(contributionDataSource);
 			const bool mappedBatteryDataSource = contributionDataSource.startsWith(QStringLiteral("system.battery."));
 			const bool mappedDeviceDataSource = contributionDataSource.startsWith(QStringLiteral("system.device."));
@@ -913,6 +918,17 @@ void GuiPluginLoader::populatePlugins()
 								|| deviceInstanceValue.toInt(-1) < 0
 								|| deviceInstanceValue.toDouble() != deviceInstanceValue.toInt(-1)));
 			}
+			static const QSet<QString> nativeOverviewDeviceTypes {
+				QStringLiteral("alternator"), QStringLiteral("solarcharger"),
+				QStringLiteral("charger"), QStringLiteral("dcsource"),
+				QStringLiteral("acload"), QStringLiteral("heatpump"),
+				QStringLiteral("dcload")
+			};
+			const bool invalidNativeOverviewDuplicate = integrationType == GuiPluginLoader::OverviewEnergyNode
+					&& contributionOperation == QStringLiteral("add")
+					&& integration.value(QStringLiteral("demoOnly")).toBool(false) == false
+					&& mappedDeviceDataSource
+					&& nativeOverviewDeviceTypes.contains(mappedDeviceType);
 			const bool invalidContributionCapability = model3Contribution && !contributionHidesData
 					&& !integrationCapabilities.contains(QStringLiteral("readSystemData"));
 			const bool duplicateContributionId = model3Contribution
@@ -932,14 +948,44 @@ void GuiPluginLoader::populatePlugins()
 						|| (!contributionDataSource.startsWith(QStringLiteral("system.firstAdditionalBattery."))
 							&& !contributionDataSource.startsWith(
 								QStringLiteral("system.battery.%1.").arg(batteryRole))));
+			const bool briefLayout = integrationType == GuiPluginLoader::BriefLayout;
+			const QString briefLayoutMode = integration.value(QStringLiteral("mode")).toString();
+			const QJsonValue centerGaugesValue = integration.value(QStringLiteral("centerGauges"));
+			const QJsonArray centerGauges = centerGaugesValue.toArray();
+			static const QSet<QString> briefGaugeDataSources {
+				QStringLiteral("system.houseBattery.stateOfCharge"),
+				QStringLiteral("system.battery.starter.stateOfCharge"),
+				QStringLiteral("system.battery.auxiliary.stateOfCharge"),
+				QStringLiteral("system.tank.freshWater.level"),
+				QStringLiteral("system.tank.fuel.level"),
+				QStringLiteral("system.tank.wasteWater.level")
+			};
+			bool invalidBriefLayout = briefLayout
+					&& ((briefLayoutMode != QStringLiteral("user")
+							&& briefLayoutMode != QStringLiteral("partnerDefault")
+							&& briefLayoutMode != QStringLiteral("partnerLocked"))
+						|| !centerGaugesValue.isArray() || centerGauges.isEmpty()
+						|| centerGauges.size() > 4);
+			if (briefLayout && !invalidBriefLayout) {
+				for (const QJsonValue &gaugeValue : centerGauges) {
+					if (!gaugeValue.isObject()
+							|| !briefGaugeDataSources.contains(
+								gaugeValue.toObject().value(QStringLiteral("dataSource")).toString())) {
+						invalidBriefLayout = true;
+						break;
+					}
+				}
+			}
 			if (invalidType || missingDeviceListFields || missingNavigationFields || missingIcon
 					|| invalidPlacement || duplicateNavigationId || resourceOutsidePlugin
 					|| invalidCapabilities || invalidCardType || missingContributionFields
 					|| invalidContributionDataSource || invalidBatterySelector || invalidDeviceSelector
+					|| invalidNativeOverviewDuplicate
 					|| invalidContributionCapability
 					|| duplicateContributionId || invalidContributionRole
 					|| invalidContributionOperation || invalidContributionTarget || invalidConnectionTarget
 					|| invalidBatteryRole
+					|| invalidBriefLayout
 					|| (!model3Contribution && integrationUrl.isEmpty())) {
 				QStringList reasons;
 				if (invalidType)              reasons << QStringLiteral("invalid type");
@@ -955,6 +1001,7 @@ void GuiPluginLoader::populatePlugins()
 				if (invalidContributionDataSource) reasons << QStringLiteral("unsupported contribution dataSource");
 				if (invalidBatterySelector) reasons << QStringLiteral("invalid or missing batterySelector");
 				if (invalidDeviceSelector) reasons << QStringLiteral("invalid or missing deviceSelector");
+				if (invalidNativeOverviewDuplicate) reasons << QStringLiteral("duplicates a native Overview service type");
 				if (invalidContributionCapability) reasons << QStringLiteral("missing readSystemData capability");
 				if (duplicateContributionId) reasons << QStringLiteral("duplicate contribution id");
 				if (invalidContributionRole) reasons << QStringLiteral("invalid contribution role");
@@ -962,6 +1009,7 @@ void GuiPluginLoader::populatePlugins()
 				if (invalidContributionTarget) reasons << QStringLiteral("invalid contribution target");
 				if (invalidConnectionTarget) reasons << QStringLiteral("invalid connectionTarget");
 				if (invalidBatteryRole) reasons << QStringLiteral("invalid or mismatched batteryRole");
+				if (invalidBriefLayout) reasons << QStringLiteral("invalid briefLayout policy");
 				if (!model3Contribution && integrationUrl.isEmpty()) reasons << QStringLiteral("missing url");
 				qCWarning(venusGui).noquote() << "Ignoring invalid integration at index" << j << "in plugin" << pluginName
 					<< "- type:" << integrationType

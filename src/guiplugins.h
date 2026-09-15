@@ -56,7 +56,8 @@ public:
 		QuickAccessPaneCard,
 		BriefMetric,
 		OverviewEnergyNode,
-		OverviewBattery
+		OverviewBattery,
+		BriefLayout
 	};
 	Q_ENUM(IntegrationType)
 
