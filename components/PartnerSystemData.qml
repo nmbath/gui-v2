@@ -130,7 +130,14 @@ QtObject {
 	}
 
 	function metricAvailable(dataSource, selector) {
+		if (!dataSource) {
+			return false
+		}
 		switch (dataSource) {
+		case "system.tank.freshWater.level": return !!freshWaterModel && freshWaterModel.count > 0
+		case "system.tank.fuel.level": return !!fuelModel && fuelModel.count > 0
+		case "system.tank.wasteWater.level": return !!wasteModel && wasteModel.count > 0
+		case "system.gxRelay.1.state": return _relay1State.valid
 		case "system.firstAdditionalBattery.stateOfCharge":
 		case "system.firstAdditionalBattery.voltage":
 		case "system.firstAdditionalBattery.power":
@@ -155,6 +162,10 @@ QtObject {
 		case "system.solar.power": return solar.powerWatts
 		case "system.acLoad.power": return ac.loadWatts
 		case "system.dcLoad.power": return dc.loadWatts
+		case "system.tank.freshWater.level": return tanks.freshWaterPercent
+		case "system.tank.fuel.level": return tanks.fuelPercent
+		case "system.tank.wasteWater.level": return tanks.wastePercent
+		case "system.gxRelay.1.state": return _relay1State.valid ? Number(_relay1State.value) : NaN
 		case "system.firstAdditionalBattery.stateOfCharge":
 		case "system.battery.starter.stateOfCharge":
 		case "system.battery.auxiliary.stateOfCharge": return finiteOr(battery?.soc, NaN)

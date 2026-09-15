@@ -70,6 +70,10 @@ MODEL3_DATA_SOURCES = {
     'system.solar.power': 'W',
     'system.acLoad.power': 'W',
     'system.dcLoad.power': 'W',
+    'system.tank.freshWater.level': '%',
+    'system.tank.fuel.level': '%',
+    'system.tank.wasteWater.level': '%',
+    'system.gxRelay.1.state': '',
     'system.firstAdditionalBattery.stateOfCharge': '%',
     'system.firstAdditionalBattery.voltage': 'V',
     'system.firstAdditionalBattery.power': 'W',
@@ -503,6 +507,44 @@ def validate_device_mappings(value):
     return result
 
 
+def validate_data_bindings(value, battery_mappings, device_mappings, context):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        fail(f'"{context}" must be an object')
+    if len(value) > 32:
+        fail(f'"{context}" supports at most 32 bindings')
+    result = {}
+    for binding_id, binding in value.items():
+        if not re.fullmatch(r'[a-z][A-Za-z0-9]*', binding_id):
+            fail(f'{context} has invalid binding id: {binding_id}')
+        if not isinstance(binding, dict):
+            fail(f'{context}.{binding_id} must be an object')
+        unknown_fields = sorted(set(binding) - {'dataSource', 'unit'})
+        if unknown_fields:
+            fail(f'{context}.{binding_id} has unsupported fields: ' + ', '.join(unknown_fields))
+        data_source = require_string(binding.get('dataSource'), f'{context}.{binding_id}.dataSource')
+        if data_source not in MODEL3_DATA_SOURCES:
+            fail(f'{context}.{binding_id} has unsupported dataSource: {data_source}')
+        unit = binding.get('unit', MODEL3_DATA_SOURCES[data_source])
+        if unit not in MODEL3_UNITS:
+            fail(f'{context}.{binding_id} has unsupported unit: {unit}')
+        compiled = {'dataSource': data_source, 'unit': unit}
+        if data_source.startswith('system.battery.'):
+            battery_role = data_source.split('.')[2]
+            if battery_role not in battery_mappings:
+                fail(f'{context}.{binding_id} requires batteryMappings.{battery_role}')
+            compiled['batterySelector'] = battery_mappings[battery_role]
+        elif data_source.startswith('system.device.'):
+            device_role = data_source.split('.')[2]
+            if device_role not in device_mappings:
+                fail(f'{context}.{binding_id} requires deviceMappings.{device_role}')
+            compiled['deviceSelector'] = device_mappings[device_role]['selector']
+            compiled['measurementPath'] = device_mappings[device_role]['measurementPath']
+        result[binding_id] = compiled
+    return result
+
+
 def validate_integrations(name, integrations, battery_mappings=None, device_mappings=None):
     battery_mappings = battery_mappings or {}
     device_mappings = device_mappings or {}
@@ -572,6 +614,10 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
             if integration.get('iconActive'):
                 compiled['iconActive'] = resource_url(
                     name, integration['iconActive'], f'integrations[{index}].iconActive')
+            if 'dataBindings' in integration:
+                compiled['dataBindings'] = validate_data_bindings(
+                    integration.get('dataBindings'), battery_mappings, device_mappings,
+                    f'integrations[{index}].dataBindings')
         if integration_type == 'navigationPage':
             placement = integration.get('placement', 'beforeNotifications')
             if placement not in NAVIGATION_PLACEMENTS:

@@ -103,6 +103,30 @@ class PartnerPackManifestTest(unittest.TestCase):
             self.assertEqual(compiled["iconActive"], "qrc:/acme-marine/assets/quick-on.svg")
             self.assertEqual(compiled["capabilities"], ["readSystemData"])
 
+    def test_navigation_page_compiles_semantic_data_bindings(self):
+        battery_mappings = MODULE.validate_battery_mappings({
+            "starter": {"name": "Engine battery"},
+        })
+        device_mappings = MODULE.validate_device_mappings({
+            "consumer": {"name": "Water heater", "serviceType": "acload"},
+        })
+        compiled = MODULE.validate_data_bindings({
+            "starterVoltage": {"dataSource": "system.battery.starter.voltage"},
+            "heaterPower": {"dataSource": "system.device.consumer.power"},
+            "freshWater": {"dataSource": "system.tank.freshWater.level"},
+        }, battery_mappings, device_mappings, "dataBindings")
+        self.assertEqual(compiled["starterVoltage"]["batterySelector"]["name"],
+                         "Engine battery")
+        self.assertEqual(compiled["heaterPower"]["measurementPath"],
+                         "/Ac/Power")
+        self.assertEqual(compiled["freshWater"]["unit"], "%")
+
+    def test_navigation_binding_rejects_unmapped_device_role(self):
+        with self.assertRaisesRegex(ValueError, "requires deviceMappings.consumer"):
+            MODULE.validate_data_bindings({
+                "load": {"dataSource": "system.device.consumer.power"},
+            }, {}, {}, "dataBindings")
+
     def test_compiler_sets_reproducible_resource_timestamp(self):
         self.assertEqual(os.environ["SOURCE_DATE_EPOCH"], "946684800")
 

@@ -317,6 +317,7 @@ FocusScope {
 				required property string title
 				required property url url
 				required property var capabilities
+				required property var configuration
 				readonly property url pluginIcon: pluginQuickAccessModel.integrationAt(index).icon
 				readonly property url pluginIconActive: pluginQuickAccessModel.integrationAt(index).iconActive
 				readonly property bool paneOpened: (Global.mainView?.cardsActive ?? false)
@@ -361,10 +362,16 @@ FocusScope {
 						Loader {
 							id: _paneContentLoader
 							anchors.fill: parent
-							Component.onCompleted: setSource(pluginPaneButton.url, {
-								"data": pluginPaneButton.capabilities.indexOf("readSystemData") >= 0
-									? PartnerSystemData : ({})
-							})
+							Component.onCompleted: {
+								const properties = {
+									"data": pluginPaneButton.capabilities.indexOf("readSystemData") >= 0
+										? PartnerSystemData : ({})
+								}
+								if (pluginPaneButton.configuration?.dataBindings) {
+									properties.configuration = pluginPaneButton.configuration
+								}
+								setSource(pluginPaneButton.url, properties)
+							}
 						}
 					}
 				}

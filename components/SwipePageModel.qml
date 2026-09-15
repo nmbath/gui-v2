@@ -107,12 +107,14 @@ ObjectModel {
 			property string placement: model.placement
 			property int pageOrder: model.order
 			property var capabilities: model.capabilities
+			property var configuration: model.configuration
 
 			Component.onCompleted: setSource(model.url, {
 				"view": root.view,
 				"url": model.url,
 				"iconSource": model.icon,
 				"title": model.title,
+				"configuration": configuration,
 				"data": capabilities.indexOf("readSystemData") >= 0 ? PartnerSystemData : ({})
 			})
 			onStatusChanged: {
