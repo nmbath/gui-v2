@@ -71,6 +71,11 @@ Page {
 					uid: Global.venusPlatform.serviceUid + "/Firmware/Backup/Activate"
 				}
 			}
+
+			ListInfoLabel {
+				text: "Running in a container - update by pulling a new image and recreating the container. See the venusOCI README for details."
+				preferredVisible: !onlineCheck.valid
+			}
 		}
 	}
 }
