@@ -73,7 +73,7 @@ Page {
 			}
 
 			ListInfoLabel {
-				text: "Running in a container - update by pulling a new image and recreating the container. See the venusOCI README for details."
+				text: "Running in a container - update by pulling a new image and recreating the container. See your deployment's documentation for details."
 				preferredVisible: !onlineCheck.valid
 			}
 		}
