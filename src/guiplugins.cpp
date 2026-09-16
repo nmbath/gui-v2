@@ -726,6 +726,7 @@ void GuiPluginLoader::populatePlugins()
 					{ QStringLiteral("overviewEnergyNode"), GuiPluginLoader::OverviewEnergyNode },
 					{ QStringLiteral("overviewBattery"), GuiPluginLoader::OverviewBattery },
 					{ QStringLiteral("briefLayout"), GuiPluginLoader::BriefLayout },
+					{ QStringLiteral("navigationPolicy"), GuiPluginLoader::NavigationPolicy },
 				};
 				integrationType = stringIntegrationTypes.value(integrationTypeValue.toString(), 0);
 			}
@@ -785,8 +786,28 @@ void GuiPluginLoader::populatePlugins()
 					&& ((integrationType == GuiPluginLoader::BriefMetric && !briefContributionTargets.contains(contributionTarget))
 						|| (integrationType == GuiPluginLoader::OverviewEnergyNode && !overviewContributionTargets.contains(contributionTarget))
 						|| integrationType == GuiPluginLoader::OverviewBattery);
+			const bool navigationPolicy = integrationType == GuiPluginLoader::NavigationPolicy;
+			const QJsonValue hiddenCorePagesValue = integration.value(QStringLiteral("hiddenCorePages"));
+			const QJsonArray hiddenCorePages = hiddenCorePagesValue.toArray();
+			static const QSet<QString> hideableCorePages {
+				QStringLiteral("boat"), QStringLiteral("brief"),
+				QStringLiteral("overview"), QStringLiteral("levels")
+			};
+			bool invalidNavigationPolicy = navigationPolicy && !hiddenCorePagesValue.isArray();
+			QSet<QString> seenHiddenCorePages;
+			if (navigationPolicy && !invalidNavigationPolicy) {
+				for (const QJsonValue &pageValue : hiddenCorePages) {
+					const QString page = pageValue.toString();
+					if (!pageValue.isString() || !hideableCorePages.contains(page)
+							|| seenHiddenCorePages.contains(page)) {
+						invalidNavigationPolicy = true;
+						break;
+					}
+					seenHiddenCorePages.insert(page);
+				}
+			}
 			const bool invalidType = integrationType == GuiPluginLoader::InvalidIntegrationType
-					|| integrationType > GuiPluginLoader::BriefLayout;
+					|| integrationType > GuiPluginLoader::NavigationPolicy;
 			const bool missingDeviceListFields = integrationType == GuiPluginLoader::DeviceListSettingsPage
 					&& (integrationProductId.isEmpty() || integrationTitle.isEmpty());
 			const bool missingIcon = (integrationType == GuiPluginLoader::NavigationPage
@@ -810,7 +831,8 @@ void GuiPluginLoader::populatePlugins()
 			const bool duplicateNavigationId = ownedPageIntegration
 					&& !integrationId.isEmpty() && ownedPageIds.contains(integrationId);
 			const bool resourceOutsidePlugin = schemaVersion >= 2
-					&& ((!model3Contribution && !integrationUrl.startsWith(ownedResourcePrefix))
+					&& ((!model3Contribution && !navigationPolicy
+							&& !integrationUrl.startsWith(ownedResourcePrefix))
 						|| (!integrationIcon.isEmpty() && !integrationIcon.startsWith(ownedResourcePrefix))
 						|| (!integrationIconActive.isEmpty()
 							&& !integrationIconActive.startsWith(ownedResourcePrefix)));
@@ -976,7 +998,7 @@ void GuiPluginLoader::populatePlugins()
 					}
 				}
 			}
-			if (invalidType || missingDeviceListFields || missingNavigationFields || missingIcon
+			if (invalidType || invalidNavigationPolicy || missingDeviceListFields || missingNavigationFields || missingIcon
 					|| invalidPlacement || duplicateNavigationId || resourceOutsidePlugin
 					|| invalidCapabilities || invalidCardType || missingContributionFields
 					|| invalidContributionDataSource || invalidBatterySelector || invalidDeviceSelector
@@ -986,9 +1008,10 @@ void GuiPluginLoader::populatePlugins()
 					|| invalidContributionOperation || invalidContributionTarget || invalidConnectionTarget
 					|| invalidBatteryRole
 					|| invalidBriefLayout
-					|| (!model3Contribution && integrationUrl.isEmpty())) {
+					|| (!model3Contribution && !navigationPolicy && integrationUrl.isEmpty())) {
 				QStringList reasons;
 				if (invalidType)              reasons << QStringLiteral("invalid type");
+				if (invalidNavigationPolicy)  reasons << QStringLiteral("invalid navigation policy");
 				if (missingDeviceListFields)  reasons << QStringLiteral("missing productId or title");
 				if (missingIcon)              reasons << QStringLiteral("missing icon");
 				if (missingNavigationFields)  reasons << QStringLiteral("missing page id or title");
@@ -1010,7 +1033,7 @@ void GuiPluginLoader::populatePlugins()
 				if (invalidConnectionTarget) reasons << QStringLiteral("invalid connectionTarget");
 				if (invalidBatteryRole) reasons << QStringLiteral("invalid or mismatched batteryRole");
 				if (invalidBriefLayout) reasons << QStringLiteral("invalid briefLayout policy");
-				if (!model3Contribution && integrationUrl.isEmpty()) reasons << QStringLiteral("missing url");
+				if (!model3Contribution && !navigationPolicy && integrationUrl.isEmpty()) reasons << QStringLiteral("missing url");
 				qCWarning(venusGui).noquote() << "Ignoring invalid integration at index" << j << "in plugin" << pluginName
 					<< "- type:" << integrationType
 					<< "url:" << (integrationUrl.isEmpty() ? QStringLiteral("<missing>") : integrationUrl)

@@ -11,8 +11,10 @@ ObjectModel {
 		root._pluginRevision
 		return root._composePages()
 	}
-	readonly property bool showLevelsPage: levelsPageLoader.active && !!levelsPageLoader.item
-	readonly property bool showBoatPage: boatPageLoader.active && !!boatPageLoader.item
+	readonly property bool showLevelsPage: !PartnerNavigationConfiguration.isCorePageHidden("levels")
+		&& levelsPageLoader.active && !!levelsPageLoader.item
+	readonly property bool showBoatPage: !PartnerNavigationConfiguration.isCorePageHidden("boat")
+		&& boatPageLoader.active && !!boatPageLoader.item
 	readonly property int tankCount: Global.tanks ? Global.tanks.totalTankCount : 0
 	readonly property int environmentInputCount: Global.environmentInputs ? Global.environmentInputs.model.count : 0
 
@@ -50,9 +52,9 @@ ObjectModel {
 		let result = []
 		if (showBoatPage) result.push(boatPageLoader.item)
 		result = result.concat(_pagesAt("beforeBrief"))
-		result.push(briefPage)
+		if (!PartnerNavigationConfiguration.isCorePageHidden("brief")) result.push(briefPage)
 		result = result.concat(_pagesAt("afterBrief"), _pagesAt("beforeOverview"))
-		result.push(overviewPage)
+		if (!PartnerNavigationConfiguration.isCorePageHidden("overview")) result.push(overviewPage)
 		result = result.concat(_pagesAt("afterOverview"))
 		if (showLevelsPage) result.push(levelsPageLoader.item)
 		result = result.concat(_pagesAt("beforeNotifications"))
@@ -60,6 +62,15 @@ ObjectModel {
 		result = result.concat(_pagesAt("afterNotifications"), _pagesAt("beforeSettings"))
 		result.push(settingsPage)
 		return result
+	}
+
+	function _refreshNavigationPolicy() {
+		const previousPage = root.view ? root.view.currentItem : null
+		_pluginRevision++
+		const availablePages = _composePages()
+		if (previousPage && availablePages.indexOf(previousPage) < 0 && root.view) {
+			root.view.setCurrentIndex(0)
+		}
 	}
 
 	function _refreshPluginPages() {
@@ -95,6 +106,11 @@ ObjectModel {
 	GuiPluginIntegrationModel {
 		id: navigationPageModel
 		type: GuiPluginLoader.NavigationPage
+	}
+
+	Connections {
+		target: PartnerNavigationConfiguration
+		function onHiddenCorePagesChanged() { root._refreshNavigationPolicy() }
 	}
 
 	Instantiator {

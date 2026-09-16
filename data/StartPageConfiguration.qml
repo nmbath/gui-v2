@@ -11,59 +11,60 @@ QtObject {
 
 	required property string systemSettingsUid
 
-	readonly property bool hasStartPage: _startPageNameConfig != null
+	readonly property bool hasStartPage: startPageInfo != null
 	readonly property bool autoSelect: _startPageMode.value === VenusOS.StartPage_Mode_AutoSelect
 	readonly property int startPageTimeout: _startPageTimeout.value || 0     // in seconds
-	readonly property var startPageInfo: _startPageNameConfig
+	readonly property var startPageInfo: _configurationAllowed(_startPageNameConfig)
+		? _startPageNameConfig : null
 
-	readonly property var options: [
-		{
+	readonly property var options: {
+		const result = []
+		if (!PartnerNavigationConfiguration.isCorePageHidden("boat")) result.push({
 			display: CommonWords.boat_page,
 			value: _jsonStringForType(VenusOS.StartPage_Type_Boat),
-		},
-		{
+		})
+		if (!PartnerNavigationConfiguration.isCorePageHidden("brief")) result.push({
 			display: CommonWords.brief_page,
 			value: _jsonStringForType(VenusOS.StartPage_Type_Brief_SidePanelClosed),
-		},
-		{
+		}, {
 			//: The 'Brief' page, with the side panel opened
 			//% "Brief (side panel open)"
 			display: qsTrId("startpage_option_brief_with_panel"),
 			value: _jsonStringForType(VenusOS.StartPage_Type_Brief_SidePanelOpened),
-		},
-		{
+		})
+		if (!PartnerNavigationConfiguration.isCorePageHidden("overview")) result.push({
 			//: The 'Overview' page
 			//% "Overview"
 			display: qsTrId("startpage_option_overview"),
 			value: _jsonStringForType(VenusOS.StartPage_Type_Overview),
-		},
-		{
+		})
+		if (!PartnerNavigationConfiguration.isCorePageHidden("levels")) result.push({
 			//: The 'Levels' page, with the "Tanks" section opened
 			//% "Levels (Tanks)"
 			display: qsTrId("startpage_option_levels_tanks"),
 			value: _jsonStringForType(VenusOS.StartPage_Type_Levels_Tanks),
-		},
-		{
+		}, {
 			//: The 'Levels' page, with the "Environment" section opened
 			//% "Levels (Environment)"
 			display: qsTrId("startpage_option_levels_environment"),
 			value: _jsonStringForType(VenusOS.StartPage_Type_Levels_Environment),
-		},
-		{
+		})
+		result.push({
 			display: CommonWords.notifications,
 			value: _jsonStringForType(VenusOS.StartPage_Type_Notifications),
-		},
-		{
+		})
+		if (!PartnerNavigationConfiguration.isCorePageHidden("overview")) result.push({
 			//% "Battery list"
 			display: qsTrId("startpage_option_battery_list"),
 			value: _jsonStringForType(VenusOS.StartPage_Type_BatteryList),
-		},
-		{
+		})
+		result.push({
 			//% "Device list"
 			display: qsTrId("startpage_option_device_list"),
 			value: _jsonStringForType(VenusOS.StartPage_Type_DeviceList),
-		},
-	]
+		})
+		return result
+	}
 
 	property var _startPageNameConfig
 
@@ -132,6 +133,22 @@ QtObject {
 		default:
 			console.warn("Unsupported start page type:", startPageType)
 			return ""
+		}
+	}
+
+	function _configurationAllowed(configuration) {
+		if (!configuration || !configuration.main) return false
+		switch (configuration.main.page) {
+		case "BoatPage.qml":
+			return !PartnerNavigationConfiguration.isCorePageHidden("boat")
+		case "BriefPage.qml":
+			return !PartnerNavigationConfiguration.isCorePageHidden("brief")
+		case "OverviewPage.qml":
+			return !PartnerNavigationConfiguration.isCorePageHidden("overview")
+		case "LevelsPage.qml":
+			return !PartnerNavigationConfiguration.isCorePageHidden("levels")
+		default:
+			return true
 		}
 	}
 

@@ -57,7 +57,8 @@ public:
 		BriefMetric,
 		OverviewEnergyNode,
 		OverviewBattery,
-		BriefLayout
+		BriefLayout,
+		NavigationPolicy
 	};
 	Q_ENUM(IntegrationType)
 
@@ -122,7 +123,7 @@ Each plugin can specify one or more integrations.
 Each integration is associated with a plugin,
 which is identified by the pluginName property.
 
-There are currently 5 supported types of integrations:
+Supported integration types include:
 	1) a plugin settings page
 		- causes the plugin entry in Settings/Integrations/UI Plugins
 		  to become a drill-down to the custom settings page.
@@ -142,6 +143,9 @@ There are currently 5 supported types of integrations:
 		- causes a new card to be injected into one of the
 		  existing quick action pane views (i.e. either a
 		  controls card, or a switches card).
+	10) a navigation policy
+		- hides only the allow-listed Boat, Brief, Overview, and Levels
+		  core pages while retaining Notifications and Settings.
 
 Quick access panes are supported by the status bars. Quick access pane cards
 remain reserved until their host-card rendering contract is completed.

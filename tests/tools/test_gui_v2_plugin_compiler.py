@@ -127,6 +127,28 @@ class PartnerPackManifestTest(unittest.TestCase):
                 "load": {"dataSource": "system.device.consumer.power"},
             }, {}, {}, "dataBindings")
 
+    def test_navigation_policy_compiles_only_hideable_core_pages(self):
+        policy = MODULE.validate_navigation_policy({
+            "hiddenCorePages": ["overview", "brief"],
+        }, 3)
+        self.assertEqual(policy, {
+            "type": "navigationPolicy",
+            "hiddenCorePages": ["brief", "overview"],
+        })
+        integrations = MODULE.validate_integrations("partner", [policy])
+        self.assertEqual(integrations, [policy])
+        self.assertNotIn("url", integrations[0])
+
+    def test_navigation_policy_cannot_hide_recovery_pages(self):
+        for page in ("settings", "notifications"):
+            with self.subTest(page=page), self.assertRaisesRegex(
+                    ValueError, f"cannot hide: {page}"):
+                MODULE.validate_navigation_policy({"hiddenCorePages": [page]}, 3)
+
+    def test_navigation_policy_requires_model_3(self):
+        with self.assertRaisesRegex(ValueError, 'requires "model": 3'):
+            MODULE.validate_navigation_policy({"hiddenCorePages": ["brief"]}, 2)
+
     def test_compiler_sets_reproducible_resource_timestamp(self):
         self.assertEqual(os.environ["SOURCE_DATE_EPOCH"], "946684800")
 

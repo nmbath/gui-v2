@@ -37,6 +37,7 @@ INTEGRATION_TYPES = {
     "overviewEnergyNode": 7,
     "overviewBattery": 8,
     "briefLayout": 9,
+    "navigationPolicy": 10,
 }
 NAVIGATION_PLACEMENTS = {
     "beforeBrief",
@@ -65,6 +66,7 @@ MODEL3_INTEGRATION_TYPES = {
     'overviewBattery',
     'briefLayout',
 }
+HIDEABLE_CORE_PAGES = {'boat', 'brief', 'overview', 'levels'}
 MODEL3_DATA_SOURCES = {
     'system.houseBattery.stateOfCharge': '%',
     'system.houseBattery.voltage': 'V',
@@ -342,6 +344,26 @@ def normalize_canonical_integrations(integrations):
         normalized.append(item)
     return normalized
 
+def validate_navigation_policy(value, model):
+    if value is None:
+        return None
+    if model != 3:
+        fail('navigationPolicy requires "model": 3')
+    if not isinstance(value, dict) or set(value) != {'hiddenCorePages'}:
+        fail('"navigationPolicy" must contain only hiddenCorePages')
+    hidden = value.get('hiddenCorePages')
+    if not isinstance(hidden, list) or any(not isinstance(page, str) for page in hidden):
+        fail('"navigationPolicy.hiddenCorePages" must be an array of page IDs')
+    if len(hidden) != len(set(hidden)):
+        fail('"navigationPolicy.hiddenCorePages" contains duplicates')
+    unsupported = sorted(set(hidden) - HIDEABLE_CORE_PAGES)
+    if unsupported:
+        fail('navigationPolicy cannot hide: ' + ', '.join(unsupported))
+    return {
+        'type': 'navigationPolicy',
+        'hiddenCorePages': sorted(hidden),
+    }
+
 def write_wasm_bootstrap(directory, name, canonical_branding):
     browser = canonical_branding.get('browser', {})
     logos = canonical_branding.get('logos', {})
@@ -587,7 +609,8 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
 
         compiled = dict(integration)
         compiled['type'] = integration_type
-        if integration_type not in MODEL3_INTEGRATION_TYPES:
+        if integration_type not in MODEL3_INTEGRATION_TYPES \
+                and integration_type != 'navigationPolicy':
             compiled['url'] = resource_url(name,
                 integration.get('url', integration.get('source')),
                 f'integrations[{index}].url')
@@ -646,6 +669,19 @@ def validate_integrations(name, integrations, battery_mappings=None, device_mapp
             if placement not in NAVIGATION_PLACEMENTS:
                 fail(f'invalid navigation placement: {placement}')
             compiled['placement'] = placement
+        elif integration_type == 'navigationPolicy':
+            hidden = integration.get('hiddenCorePages')
+            if not isinstance(hidden, list) or any(not isinstance(page, str) for page in hidden):
+                fail(f'integrations[{index}].hiddenCorePages must be an array of page IDs')
+            if len(hidden) != len(set(hidden)):
+                fail(f'integrations[{index}].hiddenCorePages contains duplicates')
+            unsupported = sorted(set(hidden) - HIDEABLE_CORE_PAGES)
+            if unsupported:
+                fail(f'integrations[{index}] cannot hide: ' + ', '.join(unsupported))
+            compiled = {
+                'type': 'navigationPolicy',
+                'hiddenCorePages': sorted(hidden),
+            }
         elif integration_type == 'briefLayout':
             if operation != 'add':
                 fail(f'integrations[{index}] briefLayout only supports operation add')
@@ -794,6 +830,9 @@ def load_manifest(filename):
                 for integration in manifest.get('integrations', [])):
             fail('Model 3 integrations require "model": 3')
         source_integrations = normalize_canonical_integrations(manifest.get('integrations', []))
+        navigation_policy = validate_navigation_policy(manifest.get('navigationPolicy'), model)
+        if navigation_policy:
+            source_integrations.append(navigation_policy)
         battery_mappings = validate_battery_mappings(manifest.get('batteryMappings'))
         device_mappings = validate_device_mappings(manifest.get('deviceMappings'))
         branding, canonical_branding = validate_canonical_branding(
