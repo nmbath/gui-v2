@@ -270,6 +270,119 @@ void BackendConnection::openUrl(const QString &url)
 	emscripten_run_script(ba.constData());
 }
 
+void BackendConnection::chooseExchangeFile(const QString &accept)
+{
+	const QByteArray encodedAccept = accept.toUtf8();
+	EM_ASM({
+		const input = document.createElement("input");
+		input.type = "file";
+		input.accept = UTF8ToString($0);
+		const upload = {};
+		upload.input = input;
+		upload.file = null;
+		upload.started = false;
+		upload.status = 0;
+		window.venusExchangeUpload = upload;
+		input.addEventListener("change", () => {
+			if (input.files && input.files.length > 0) {
+				upload.file = input.files[0];
+				upload.status = 1;
+			} else {
+				upload.status = -2;
+			}
+		}, { once: true });
+		input.addEventListener("cancel", () => {
+			upload.status = -2;
+		}, { once: true });
+		input.click();
+	}, encodedAccept.constData());
+}
+
+bool BackendConnection::uploadSelectedExchangeFile(const QString &claimPath)
+{
+	if (!claimPath.startsWith(QStringLiteral("/exchange/claim/"))) {
+		return false;
+	}
+
+	const QByteArray encodedPath = claimPath.toUtf8();
+	return EM_ASM_INT({
+		const upload = window.venusExchangeUpload;
+		if (!upload || !upload.file || upload.started) {
+			return 0;
+		}
+
+		const claimPath = UTF8ToString($0);
+		const claimPathPattern = new RegExp("^/exchange/claim/[A-Za-z0-9_-]{16,128}$");
+		const bearerPathPattern = new RegExp("^/exchange/[A-Za-z0-9_-]{32,128}$");
+		const uploadPathPattern = new RegExp("^/exchange/upload/[A-Za-z0-9_-]{32,128}$");
+		if (!claimPathPattern.test(claimPath)) {
+			upload.status = -1;
+			return 0;
+		}
+
+		upload.started = true;
+		upload.status = 2;
+		const fail = () => { upload.status = -1; };
+		const claim = new XMLHttpRequest();
+		claim.open("POST", claimPath);
+		claim.onload = () => {
+			let target;
+			try {
+				target = new URL(claim.responseURL);
+			} catch (error) {
+				fail();
+				return;
+			}
+			if (claim.status !== 200 || target.origin !== location.origin
+					|| !bearerPathPattern.test(target.pathname)) {
+				fail();
+				return;
+			}
+
+			const admission = new XMLHttpRequest();
+			admission.open("POST", target.pathname + "/admit");
+			admission.setRequestHeader("X-Venus-Upload-Length", String(upload.file.size));
+			admission.setRequestHeader("X-Venus-Filename", encodeURIComponent(upload.file.name));
+			admission.onload = () => {
+				let reply = {};
+				try {
+					reply = JSON.parse(admission.responseText);
+				} catch (error) {
+					fail();
+					return;
+				}
+				if (admission.status !== 201
+						|| !uploadPathPattern.test(reply.uploadUrl || "")) {
+					fail();
+					return;
+				}
+
+				const request = new XMLHttpRequest();
+				request.open("PUT", reply.uploadUrl);
+				request.setRequestHeader("X-Venus-Filename", encodeURIComponent(upload.file.name));
+				request.onload = () => {
+					upload.status = request.status === 201 ? 3 : -1;
+				};
+				request.onerror = fail;
+				request.send(upload.file);
+			};
+			admission.onerror = fail;
+			admission.send();
+		};
+		claim.onerror = fail;
+		claim.send();
+		return 1;
+	}, encodedPath.constData()) != 0;
+}
+
+int BackendConnection::exchangeFileUploadStatus() const
+{
+	return EM_ASM_INT({
+		const upload = window.venusExchangeUpload;
+		return upload ? upload.status : 0;
+	});
+}
+
 void BackendConnection::hitWatchdog()
 {
 	// 'watchdogHit' and 'guiv2initialized' are defined in index.html.
@@ -288,6 +401,9 @@ void BackendConnection::onReloadPageTimerExpired() {}
 void BackendConnection::securityProtocolChanged() {}
 void BackendConnection::reloadPage() {}
 void BackendConnection::openUrl(const QString &) {}
+void BackendConnection::chooseExchangeFile(const QString &) {}
+bool BackendConnection::uploadSelectedExchangeFile(const QString &) { return false; }
+int BackendConnection::exchangeFileUploadStatus() const { return 0; }
 
 #endif
 

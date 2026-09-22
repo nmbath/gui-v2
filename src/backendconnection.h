@@ -160,6 +160,9 @@ public:
 	Q_INVOKABLE void securityProtocolChanged();
 	Q_INVOKABLE void reloadPage();
 	Q_INVOKABLE void openUrl(const QString &url);
+	Q_INVOKABLE void chooseExchangeFile(const QString &accept = QString());
+	Q_INVOKABLE bool uploadSelectedExchangeFile(const QString &claimPath);
+	Q_INVOKABLE int exchangeFileUploadStatus() const;
 
 #if defined(VENUS_WEBASSEMBLY_BUILD)
 	Q_INVOKABLE void hitWatchdog();
