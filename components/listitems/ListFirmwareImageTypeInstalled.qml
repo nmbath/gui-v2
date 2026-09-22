@@ -8,7 +8,15 @@ import Victron.VenusOS
 
 ListText {
 	text: CommonWords.image_type
-	secondaryText: imageType.value === "large" ? CommonWords.firmware_type_large : CommonWords.firmware_type_normal
+	secondaryText: {
+		if (imageType.value === "large") {
+			return CommonWords.firmware_type_large
+		}
+		if (imageType.value === "containers") {
+			return CommonWords.firmware_type_containers
+		}
+		return CommonWords.firmware_type_normal
+	}
 	preferredVisible: largeImageSupport.valid && largeImageSupport.value === 1
 
 	VeQuickItem {

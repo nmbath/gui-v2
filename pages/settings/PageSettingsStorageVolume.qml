@@ -12,11 +12,15 @@ Page {
 
 	required property string volumePrefix
 	readonly property string storageServiceUid: BackendConnection.serviceUidForType("storage")
+	readonly property string containersServiceUid: BackendConnection.serviceUidForType("containers")
 	property bool pendingReformatAfterClose: false
 	property bool pendingReformatConfirmAfterClose: false
 	property bool pendingReturnAfterFormat: false
 	property bool pendingReturnAfterEject: false
 	property string pendingReformatFilesystem: ""
+	property bool migratingToLocalData: false
+	//% "Containers"
+	readonly property string containersConsumerName: qsTrId("pagesettingsstorage_consumer_containers")
 	//% "VRM online logging"
 	readonly property string vrmConsumerName: qsTrId("pagesettingsstorage_consumer_vrm")
 	readonly property var stateNames: [
@@ -82,6 +86,54 @@ Page {
 	// write happens inside the shared FormatConfirmDialog now.
 	VeQuickItem { id: formatAndAdoptAction; uid: root.volumePrefix + "/Admin/FormatAndAdopt" }
 
+	// Reformat destroys whatever is on this volume - if Containers is the
+	// one using it, offer to migrate its data back to /data first instead
+	// of just refusing (see the migrate-to-/data feature this pairs with).
+	VeQuickItem { id: containersVolumeId; uid: root.containersServiceUid + "/Storage/VolumeId" }
+	VeQuickItem {
+		id: containersHasExistingData
+		uid: root.containersServiceUid + "/Storage/HasExistingData"
+		onValueChanged: root.checkLocalDataMigrationProgress()
+	}
+	VeQuickItem { id: containersLocalDataFree; uid: root.containersServiceUid + "/Storage/LocalDataFreeBytes" }
+	VeQuickItem {
+		id: containersMigrateAction
+		uid: root.containersServiceUid + "/Storage/Migrate"
+		onValueChanged: root.checkLocalDataMigrationProgress()
+	}
+	VeQuickItem {
+		id: containersSelectionError
+		uid: root.containersServiceUid + "/Storage/SelectionError"
+		onValueChanged: root.checkLocalDataMigrationProgress()
+	}
+
+	function startMigrateToLocalData() {
+		root.migratingToLocalData = true
+		containersMigrateAction.setValue("/data")
+	}
+
+	function checkLocalDataMigrationProgress() {
+		if (!root.migratingToLocalData) {
+			return
+		}
+		if (containersSelectionError.value) {
+			root.migratingToLocalData = false
+			Global.showToastNotification(VenusOS.Notification_Warning, containersSelectionError.value, 8000)
+			return
+		}
+		// The trigger resets to "" and HasExistingData drops to false only
+		// once the migration has actually finished - same done-signal the
+		// CLI's own storage_migrate() polls for.
+		if (containersMigrateAction.value === "" && !containersHasExistingData.value) {
+			root.migratingToLocalData = false
+			Global.dialogLayer.open(reformatChooseFilesystemDialogComponent, {
+				"volumePrefix": root.volumePrefix,
+				"mountPoint": mountPoint.value || "",
+				"nickname": nicknameItem.value || "",
+			})
+		}
+	}
+
 	// Waits for a dialog to actually finish closing (not just accept()
 	// being called, which may still be animating) before opening the
 	// next one - chaining dialogLayer.open() calls synchronously risks
@@ -135,18 +187,13 @@ Page {
 	}
 
 	function consumerName(consumer) {
+		if (consumer === "containers") {
+			return root.containersConsumerName
+		}
 		if (consumer === "vrmlogger") {
 			return root.vrmConsumerName
 		}
 		return consumer
-	}
-
-	function formatBytes(bytes) {
-		return Utils.qtyToString(Number(bytes) || 0,
-				//% "byte"
-				qsTrId("settings_vrm_byte"),
-				//% "bytes"
-				qsTrId("settings_vrm_bytes"))
 	}
 
 	property int consumerCount: 0
@@ -191,15 +238,15 @@ Page {
 				to: capacity.value
 				//% "%1 / %2"
 				valueText: qsTrId("pagesettingsstorage_usage_value")
-						.arg(root.formatBytes(value))
-						.arg(root.formatBytes(to))
+						.arg(Containers.formatBytes(value))
+						.arg(Containers.formatBytes(to))
 				//% "%1 total, %2 free"
 				// Free here is deliberately Capacity - Used, not the real
 				// Free leaf (which excludes ext4's root-only blocks and can
 				// therefore make Total and Used look like they don't add up).
 				caption: qsTrId("pagesettingsstorage_capacity_detail")
-						.arg(root.formatBytes(capacity.value))
-						.arg(root.formatBytes(Math.max(0, capacity.value - used.value)))
+						.arg(Containers.formatBytes(capacity.value))
+						.arg(Containers.formatBytes(Math.max(0, capacity.value - used.value)))
 			}
 
 			ListText {
@@ -253,7 +300,7 @@ Page {
 										|| state.value === VenusOS.Storage_Allocation_Quiescing)
 						// preferredVisible alone does not hide a ListText
 						// outside a VisibleItemModel-driven list (same bug
-						// already fixed in other model-backed settings pages) -
+						// already fixed in PageSettingsContainerStorage.qml) -
 						// every allocation for every volume was showing here,
 						// not just this one's own.
 						visible: isThisVolume
@@ -283,29 +330,43 @@ Page {
 				// Eject required. Only a real, active consumer still blocks
 				// it here, matching the backend's own gate.
 				readonly property bool inActiveUse: root.hasActiveConsumer
+				// Containers is the one real consumer this session built a
+				// migrate-away path for - anything else in active use
+				// (vrmlogger, an unknown future consumer) still just needs
+				// an Eject first, same as before.
+				readonly property bool usedByContainers: inActiveUse
+							&& containersVolumeId.value === volumeIdItem.value
+							&& containersHasExistingData.value
+
 				//% "Reformat storage"
 				text: qsTrId("pagesettingsstorage_reformat")
 				//% "Reformat"
 				secondaryText: qsTrId("pagesettingsstorage_reformat_button")
-				readOnly: !formatAndAdoptAction.valid || inActiveUse
+				readOnly: !formatAndAdoptAction.valid
 				caption: {
 					if (!formatAndAdoptAction.valid) {
 						//% "Not supported by the installed Storage Manager"
 						return qsTrId("pagesettingsstorage_reformat_unavailable")
 					}
-					if (inActiveUse) {
-						//% "Safely eject this storage before reformatting it"
-						return qsTrId("pagesettingsstorage_reformat_in_use")
+					if (usedByContainers) {
+						//% "Containers is using this storage - choose what happens to its data"
+						return qsTrId("pagesettingsstorage_reformat_used_by_containers")
 					}
 					//% "Erases all data and creates a new filesystem"
 					return qsTrId("pagesettingsstorage_reformat_caption")
 				}
 				writeAccessLevel: VenusOS.User_AccessType_Installer
-				onClicked: Global.dialogLayer.open(reformatChooseFilesystemDialogComponent, {
-					"volumePrefix": root.volumePrefix,
-					"mountPoint": mountPoint.value || "",
-					"nickname": nicknameItem.value || "",
-				})
+				onClicked: {
+					if (usedByContainers) {
+						Global.dialogLayer.open(migrateOrWipeDialogComponent)
+					} else {
+						Global.dialogLayer.open(reformatChooseFilesystemDialogComponent, {
+							"volumePrefix": root.volumePrefix,
+								"mountPoint": mountPoint.value || "",
+							"nickname": nicknameItem.value || "",
+						})
+					}
+				}
 			}
 
 			SettingsListHeader {
@@ -338,6 +399,96 @@ Page {
 
 		EjectDialog {
 			onEjectStarted: root.pendingEject = true
+		}
+	}
+
+	Component {
+		id: migrateOrWipeDialogComponent
+
+		ModalDialog {
+			id: migrateOrWipeDialog
+
+			readonly property bool canMigrate: containersLocalDataFree.valid
+						&& containersLocalDataFree.value > used.value
+
+			//% "Containers is using this storage"
+			title: qsTrId("pagesettingsstorage_migrate_title")
+			dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_NoOptions
+
+			contentItem: ColumnLayout {
+				implicitWidth: Theme.geometry_modalDialog_width
+				spacing: Theme.geometry_modalDialog_content_spacing
+
+				Label {
+					//% "Reformatting this storage will erase Containers' data on it. Choose what happens to it first."
+					text: qsTrId("pagesettingsstorage_migrate_body")
+					wrapMode: Text.Wrap
+					Layout.fillWidth: true
+					Layout.margins: Theme.geometry_modalDialog_content_spacing
+				}
+				Label {
+					visible: !migrateOrWipeDialog.canMigrate
+					//% "Not enough free space on /data to migrate everything - only Wipe is available."
+					text: qsTrId("pagesettingsstorage_migrate_insufficient_space")
+					color: Theme.color_orange
+					wrapMode: Text.Wrap
+					Layout.fillWidth: true
+					Layout.leftMargin: Theme.geometry_modalDialog_content_spacing
+					Layout.rightMargin: Theme.geometry_modalDialog_content_spacing
+					Layout.bottomMargin: Theme.geometry_modalDialog_content_spacing
+				}
+			}
+
+			footer: FocusScope {
+				implicitHeight: Theme.geometry_modalDialog_footer_height
+				focus: true
+				Keys.onEscapePressed: migrateOrWipeDialog.reject()
+				Keys.enabled: Global.keyNavigationEnabled
+
+				SeparatorBar {
+					anchors { left: parent.left; right: parent.right; top: parent.top }
+				}
+
+				RowLayout {
+					anchors { fill: parent; topMargin: 1 }
+					spacing: 0
+
+					Button {
+						text: CommonWords.cancel
+						flat: true
+						Layout.fillWidth: true
+						Layout.fillHeight: true
+						onClicked: migrateOrWipeDialog.reject()
+					}
+					Button {
+						//% "Wipe"
+						text: qsTrId("pagesettingsstorage_migrate_wipe")
+						color: Theme.color_red
+						flat: true
+						Layout.fillWidth: true
+						Layout.fillHeight: true
+						onClicked: {
+							// Reformat's own dialog opens once this one has
+							// actually finished closing - see the
+							// Connections block above.
+							root.pendingReformatAfterClose = true
+							migrateOrWipeDialog.accept()
+						}
+					}
+					Button {
+						//% "Migrate"
+						text: qsTrId("pagesettingsstorage_migrate_migrate")
+						flat: true
+						enabled: migrateOrWipeDialog.canMigrate
+						Layout.fillWidth: true
+						Layout.fillHeight: true
+						onClicked: {
+							root.startMigrateToLocalData()
+							migrateOrWipeDialog.accept()
+						}
+					}
+				}
+			}
 		}
 	}
 

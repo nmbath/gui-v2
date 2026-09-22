@@ -37,6 +37,7 @@ T.SpinBox {
 	id: root
 
 	property alias secondaryText: secondaryLabel.text
+	property bool fillContentWidth: false
 	property int indicatorImplicitWidth: Theme.geometry_spinBox_indicator_minimumWidth
 	property int orientation: Qt.Horizontal
 	property string suffix
@@ -162,7 +163,7 @@ T.SpinBox {
 			anchors.centerIn: parent
 			implicitWidth: Math.max(inputArea.implicitWidth, secondaryLabel.implicitWidth) + 2*Theme.geometry_textField_horizontalMargin
 			implicitHeight: secondaryLabel.y + secondaryLabel.height
-			width: Math.min(implicitWidth, parent.width)
+			width: root.fillContentWidth ? parent.width : Math.min(implicitWidth, parent.width)
 			height: Math.min(implicitHeight, parent.height)
 
 			SpinBoxInputArea {

@@ -206,6 +206,29 @@ Page {
 				}
 			}
 
+			ListNavigation {
+				id: containers
+
+				//% "Containers"
+				text: qsTrId("pagesettingsintegrations_containers")
+				// Gated on venus-platform's own Services/Containers/Enabled
+				// (published whenever the image has the container
+				// packagegroup, see venus-platform's serviceExists("dbus-containers")
+				// check) rather than the dbus-containers service's own
+				// /Connected - the row (and the enable switch behind it)
+				// must stay reachable even when the service isn't running
+				// yet, since enabling it from here is what starts it.
+				// Matches Services/SignalK/Enabled's row above.
+				secondaryText: containersEnabledItem.valid && containersEnabledItem.value ? CommonWords.enabled : CommonWords.disabled
+				preferredVisible: containersEnabledItem.valid
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainers.qml", {"title": text})
+
+				VeQuickItem {
+					id: containersEnabledItem
+					uid: Global.venusPlatform.serviceUid + "/Services/Containers/Enabled"
+				}
+			}
+
 			SettingsListHeader {
 				id: osLargeFeatures
 				readonly property bool largeEnabled: signalk.preferredVisible || nodeRed.preferredVisible

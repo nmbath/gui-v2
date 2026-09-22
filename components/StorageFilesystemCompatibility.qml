@@ -16,9 +16,12 @@ import Victron.VenusOS
 ColumnLayout {
 	id: root
 
+	//% "Containers"
+	readonly property string containersConsumerName: qsTrId("pagesettingsstorage_consumer_containers")
 	//% "VRM online logging"
 	readonly property string vrmConsumerName: qsTrId("pagesettingsstorage_consumer_vrm")
 	readonly property var storageConsumers: [
+		{ serviceType: "containers", name: root.containersConsumerName },
 		{ serviceType: "logger", name: root.vrmConsumerName },
 	]
 

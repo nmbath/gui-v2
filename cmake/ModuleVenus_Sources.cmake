@@ -1,5 +1,6 @@
 set (VictronVenusOS_QML_MODULE_SINGLETON_SOURCES # All qml singletons have to be added here
     components/CommonWords.qml
+    components/Containers.qml
     components/Exchange.qml
     components/FirmwareVersion.qml
     Global.qml
@@ -443,6 +444,15 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsCGwacs.qml
     pages/settings/PageSettingsCGwacsOverview.qml
     pages/settings/PageSettingsConnectivity.qml
+    pages/settings/PageSettingsContainer.qml
+    pages/settings/PageSettingsContainerChild.qml
+    pages/settings/PageSettingsContainerResources.qml
+    pages/settings/PageSettingsContainerStorage.qml
+    pages/settings/PageSettingsContainerService.qml
+    pages/settings/PageSettingsContainerStartup.qml
+    pages/settings/PageSettingsContainerSubcontainers.qml
+    pages/settings/PageSettingsContainers.qml
+    pages/settings/PageSettingsExchange.qml
     pages/settings/PageSettingsDisplayAndAppearance.qml
     pages/settings/PageSettingsDisplayBrief.qml
     pages/settings/PageSettingsDisplayMinMax.qml
@@ -453,7 +463,6 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsDynamicEss.qml
     pages/settings/PageSettingsEebus.qml
     pages/settings/PageSettingsEebusDevice.qml
-    pages/settings/PageSettingsExchange.qml
     pages/settings/PageSettingsFirmware.qml
     pages/settings/PageSettingsFirmwareOffline.qml
     pages/settings/PageSettingsFirmwareOnline.qml

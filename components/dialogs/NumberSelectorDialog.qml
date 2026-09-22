@@ -14,6 +14,7 @@ ModalDialog {
 	property real value
 	property string suffix
 	property int decimals
+	property bool fillValueFieldWidth: false
 
 	property real from
 	property real to
@@ -96,6 +97,7 @@ ModalDialog {
 				width: parent.width
 				height: Theme.geometry_timeSelector_spinBox_height
 				editable: true
+				fillContentWidth: root.fillValueFieldWidth
 				indicatorImplicitWidth: implicitContentWidth
 						+ (2 * Theme.geometry_textField_horizontalMargin) + (2 * spinBox.spacing)
 						+ (2 * Theme.geometry_spinBox_indicator_maximumWidth)

@@ -49,7 +49,8 @@ QtObject {
 			// Item, not QtObject - QtObject has no default property, so a
 			// bare VeQuickItem child below fails to parent at all ("Cannot
 			// assign to non-existent default property"). Never shown -
-			// Instantiator doesn't parent/position its delegates visually.
+			// Instantiator doesn't parent/position its delegates visually,
+			// same as PageSettingsContainerStorage.qml's allocationRepeater.
 			id: watcher
 			readonly property string volumePrefix: model.item.itemParent().uid
 			readonly property string volumeId: model.item.value || ""

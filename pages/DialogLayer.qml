@@ -4,6 +4,7 @@
 */
 
 import QtQuick
+import QtQuick.Layouts
 import Victron.VenusOS
 
 Item {
@@ -85,4 +86,92 @@ Item {
 
 	property bool _needPageReload: Global.needPageReload
 	on_NeedPageReloadChanged: if (_needPageReload) open(_firmwareVersionRestartDialog)
+
+	// A brand-new, not-yet-adopted Storage Manager volume was just seen
+	// (data/Storage.qml, app-wide - not scoped to any particular storage
+	// settings page) - offer to manage it, or dismiss for this session.
+	Connections {
+		target: Global.storage
+		function onNewTransientVolumeDetected(volumeId, volumePrefix) {
+			root.open(root._newStorageDetectedDialog, {"volumeId": volumeId, "volumePrefix": volumePrefix})
+		}
+	}
+
+	property Component _newStorageDetectedDialog: Component {
+		ModalDialog {
+			id: newStorageDialog
+
+			required property string volumeId
+			required property string volumePrefix
+
+			//% "New storage detected"
+			title: qsTrId("dialoglayer_new_storage_title")
+			dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_NoOptions
+
+			readonly property string volumeLabel: labelItem.value || ""
+			readonly property real volumeCapacity: capacityItem.value || 0
+
+			VeQuickItem { id: labelItem; uid: newStorageDialog.volumePrefix + "/Label" }
+			VeQuickItem { id: capacityItem; uid: newStorageDialog.volumePrefix + "/Capacity" }
+			VeQuickItem { id: adoptAction; uid: newStorageDialog.volumePrefix + "/Admin/Adopt" }
+
+			contentItem: Item {
+				implicitWidth: Theme.geometry_modalDialog_width
+				implicitHeight: bodyLabel.implicitHeight + (2 * Theme.geometry_modalDialog_content_spacing)
+
+				Label {
+					id: bodyLabel
+					anchors {
+						left: parent.left
+						right: parent.right
+						verticalCenter: parent.verticalCenter
+						margins: Theme.geometry_modalDialog_content_spacing
+					}
+					//% "%1 (%2) can be managed by this device for use as extended storage."
+					text: qsTrId("dialoglayer_new_storage_body")
+							.arg(newStorageDialog.volumeLabel.length
+								 //% "Unnamed volume"
+								 ? newStorageDialog.volumeLabel : qsTrId("dialoglayer_new_storage_unnamed"))
+							.arg(Containers.formatBytes(newStorageDialog.volumeCapacity))
+					wrapMode: Text.Wrap
+				}
+			}
+
+			footer: FocusScope {
+				implicitHeight: Theme.geometry_modalDialog_footer_height
+				focus: true
+				Keys.onEscapePressed: newStorageDialog.reject()
+				Keys.enabled: Global.keyNavigationEnabled
+
+				SeparatorBar {
+					anchors { left: parent.left; right: parent.right; top: parent.top }
+				}
+
+				RowLayout {
+					anchors { fill: parent; topMargin: 1 }
+					spacing: 0
+
+					Button {
+						//% "Ignore"
+						text: qsTrId("dialoglayer_new_storage_ignore")
+						flat: true
+						Layout.fillWidth: true
+						Layout.fillHeight: true
+						onClicked: newStorageDialog.reject()
+					}
+					Button {
+						//% "Manage"
+						text: qsTrId("dialoglayer_new_storage_manage")
+						flat: true
+						Layout.fillWidth: true
+						Layout.fillHeight: true
+						onClicked: {
+							adoptAction.setValue(1)
+							newStorageDialog.accept()
+						}
+					}
+				}
+			}
+		}
+	}
 }

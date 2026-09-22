@@ -35,6 +35,10 @@ Item {
 	}
 
 	function consumerDisplayName(consumer) {
+		if (consumer === "containers") {
+			//% "Containers"
+			return qsTrId("storagevolumeconsumers_containers")
+		}
 		if (consumer === "vrmlogger") {
 			//% "VRM online logging"
 			return qsTrId("storagevolumeconsumers_vrm")

@@ -9,7 +9,9 @@ import Victron.VenusOS
 
 /*
 	Display-only "label + bar" row for a resource's current value against a
-	maximum (e.g. "Storage 620 MB / 1 GB").
+	maximum (e.g. "Memory 620 MB / 1 GB") - used for the venus-containers
+	sub-container aggregate usage summary (PageSettingsContainerSubcontainers.qml)
+	and the top-level system-resources summary (PageSettingsContainers.qml).
 
 	Not a ListSetting: this is a read-only summary row, not something the user
 	edits (compare ListResourceGauge to ListSlider, which is the editable

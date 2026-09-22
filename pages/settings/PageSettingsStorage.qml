@@ -14,6 +14,8 @@ Page {
 	readonly property string storageServiceUid: BackendConnection.serviceUidForType("storage")
 	readonly property bool storageManagerRunning: storageConnected.valid && storageConnected.value === 1
 	property var consumersByVolume: ({})
+	//% "Containers"
+	readonly property string containersConsumerName: qsTrId("pagesettingsstorage_consumer_containers")
 	//% "VRM online logging"
 	readonly property string vrmConsumerName: qsTrId("pagesettingsstorage_consumer_vrm")
 	//% "Unnamed storage"
@@ -29,7 +31,8 @@ Page {
 	// real sections without the underlying model itself needing to
 	// reorder, and without a second, separate model/pass per section -
 	// same "shadow Repeater over the full model, computed once"
-	// convention this app already uses in other model-backed settings pages.
+	// convention this app already uses (PageSettingsContainerStorage.qml's
+	// volumeInfoRepeater, data/Storage.qml's _volumeWatchers).
 	property var volumeRecords: []
 	readonly property var adoptedVolumes: root.volumeRecords.filter(function (v) {
 		return v.lifecycle === VenusOS.Storage_Lifecycle_AdoptedPersistent
@@ -144,6 +147,9 @@ Page {
 	}
 
 	function consumerName(consumer) {
+		if (consumer === "containers") {
+			return root.containersConsumerName
+		}
 		if (consumer === "vrmlogger") {
 			return root.vrmConsumerName
 		}
@@ -195,16 +201,8 @@ Page {
 
 	function adoptedUsageText(record) {
 		//% "%1 used / %2 free"
-		return qsTrId("pagesettingsstorage_adopted_usage").arg(root.formatBytes(record.used))
-				.arg(root.formatBytes(Math.max(0, record.capacity - record.used)))
-	}
-
-	function formatBytes(bytes) {
-		return Utils.qtyToString(Number(bytes) || 0,
-				//% "byte"
-				qsTrId("settings_vrm_byte"),
-				//% "bytes"
-				qsTrId("settings_vrm_bytes"))
+		return qsTrId("pagesettingsstorage_adopted_usage").arg(Containers.formatBytes(record.used))
+				.arg(Containers.formatBytes(Math.max(0, record.capacity - record.used)))
 	}
 
 	function newCaption(record) {
@@ -332,7 +330,7 @@ Page {
 	// next one - chaining dialogLayer.open() calls synchronously risks
 	// the first dialog's own closed-signal handler destroying the second
 	// dialog instead of the first. Same pattern PageSettingsStorageVolume.
-	// qml uses for all chained storage dialogs.
+	// qml and PageSettingsContainerStorage.qml already use.
 	property bool pendingReformatAfterClose: false
 	property bool pendingReformatConfirmAfterClose: false
 	property string pendingReformatVolumePrefix: ""

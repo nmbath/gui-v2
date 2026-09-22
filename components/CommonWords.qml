@@ -237,6 +237,10 @@ QtObject {
 	//% "Large"
 	readonly property string firmware_type_large: qsTrId("common_words_firmware_type_large")
 
+	//: The firmware type for images with container support
+	//% "Containers"
+	readonly property string firmware_type_containers: qsTrId("common_words_firmware_type_containers")
+
 	//% "Firmware version"
 	readonly property string firmware_version: qsTrId("common_words_firmware_version")
 

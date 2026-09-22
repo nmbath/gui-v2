@@ -1,6 +1,7 @@
 [submodule "veutil"]
 	path = src/veutil
-	url = https://github.com/victronenergy/veutil.git
+	url = https://github.com/nmbath/veutil.git
+	branch = mbath/containers
 [submodule "src/qzxing"]
 	path = src/qzxing
 	url = https://github.com/victronenergy/qzxing
