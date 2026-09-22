@@ -50,6 +50,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/EmptyPageItem.qml
     components/EnvironmentGauge.qml
     components/EnvironmentGaugePanel.qml
+    components/ExchangeAction.qml
     components/ExpandedTanksView.qml
     components/FirmwareUpdate.qml
     components/FittedQuantityLabel.qml
@@ -178,6 +179,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/controls/TextValidationField.qml
 
     components/dialogs/ColorWheelDialog.qml
+    components/dialogs/ExchangeQrDialog.qml
     components/dialogs/CurrentLimitDialog.qml
     components/dialogs/DateSelectorDialog.qml
     components/dialogs/DialogHeader_Portrait.qml
@@ -443,6 +445,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsDynamicEss.qml
     pages/settings/PageSettingsEebus.qml
     pages/settings/PageSettingsEebusDevice.qml
+    pages/settings/PageSettingsExchange.qml
     pages/settings/PageSettingsFirmware.qml
     pages/settings/PageSettingsFirmwareOffline.qml
     pages/settings/PageSettingsFirmwareOnline.qml
