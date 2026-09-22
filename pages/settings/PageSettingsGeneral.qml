@@ -101,7 +101,6 @@ Page {
 		id: nodeRedItem
 		uid: Global.venusPlatform.serviceUid + "/Services/NodeRed/Mode"
 	}
-
 	GradientListView {
 		model: VisibleItemModel {
 			SettingsListHeader {
