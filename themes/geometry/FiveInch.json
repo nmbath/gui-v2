@@ -355,6 +355,8 @@
     "geometry_colorWheelDialog_preset_button_width": 56,
     "geometry_colorWheelDialog_preset_button_radius": 6,
     "geometry_colorWheelDialog_preset_button_spacing": 40,
+    "geometry_exchangeQrDialog_contentItem_height": 344,
+    "geometry_exchangeQrDialog_qrCode_margin": 16,
 
     "geometry_generatorIconLabel_icon_width": 24,
     "geometry_generatorIconLabel_icon_margin": 4,

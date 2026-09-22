@@ -10,6 +10,8 @@
 
 #if defined(VENUS_WEBASSEMBLY_BUILD)
 #include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/val.h>
 #else
 #include "veutil/qt/ve_dbus_connection.hpp"
 #include "veutil/qt/ve_qitems_dbus.hpp"
@@ -22,6 +24,7 @@
 #include <QtCore/QJsonValue>
 #include <QtCore/QJsonArray>
 #include <QQmlContext>
+#include <QRegularExpression>
 #include <QFile>
 
 namespace Victron {
@@ -272,6 +275,27 @@ void BackendConnection::openUrl(const QString &url)
 	emscripten_run_script(ba.constData());
 }
 
+void BackendConnection::chooseExchangeFile(const QString &accept)
+{
+	// 'chooseExchangeFile' and 'uploadExchangeFile' are defined in index.html, and report
+	// their progress through jsSetExchangeUploadStatus().
+	setExchangeUploadStatus(ExchangeUploadIdle);
+	const emscripten::val choose = emscripten::val::global("chooseExchangeFile");
+	if (!choose.isUndefined()) {
+		choose(accept.toStdString());
+	}
+}
+
+bool BackendConnection::uploadSelectedExchangeFile(const QString &claimPath)
+{
+	static const QRegularExpression claimPathPattern(QStringLiteral("^/exchange/claim/[A-Za-z0-9_-]{16,128}$"));
+	if (!claimPathPattern.match(claimPath).hasMatch()) {
+		return false;
+	}
+	const emscripten::val upload = emscripten::val::global("uploadExchangeFile");
+	return !upload.isUndefined() && upload(claimPath.toStdString()).as<bool>();
+}
+
 void BackendConnection::hitWatchdog()
 {
 	// 'watchdogHit' and 'guiv2initialized' are defined in index.html.
@@ -290,6 +314,8 @@ void BackendConnection::onReloadPageTimerExpired() {}
 void BackendConnection::securityProtocolChanged() {}
 void BackendConnection::reloadPage() {}
 void BackendConnection::openUrl(const QString &) {}
+void BackendConnection::chooseExchangeFile(const QString &) {}
+bool BackendConnection::uploadSelectedExchangeFile(const QString &) { return false; }
 
 #endif
 
@@ -653,6 +679,19 @@ bool BackendConnection::isReadyLatched() const
 	return m_readyLatched;
 }
 
+BackendConnection::ExchangeUploadStatus BackendConnection::exchangeUploadStatus() const
+{
+	return m_exchangeUploadStatus;
+}
+
+void BackendConnection::setExchangeUploadStatus(ExchangeUploadStatus status)
+{
+	if (m_exchangeUploadStatus != status) {
+		m_exchangeUploadStatus = status;
+		emit exchangeUploadStatusChanged();
+	}
+}
+
 VeQItemProducer *BackendConnection::producer() const
 {
 	return m_producer;
@@ -803,3 +842,30 @@ QString BackendConnection::signalKUrl() const
 
 }
 }
+
+#if defined(VENUS_WEBASSEMBLY_BUILD)
+
+// Called from the upload functions in index.html.
+void jsSetExchangeUploadStatus(const std::string &status)
+{
+	using Connection = Victron::VenusOS::BackendConnection;
+	static const QHash<QString, Connection::ExchangeUploadStatus> statuses = {
+		{ QStringLiteral("selected"), Connection::ExchangeUploadSelected },
+		{ QStringLiteral("sending"), Connection::ExchangeUploadSending },
+		{ QStringLiteral("sent"), Connection::ExchangeUploadSent },
+		{ QStringLiteral("failed"), Connection::ExchangeUploadFailed },
+		{ QStringLiteral("canceled"), Connection::ExchangeUploadCanceled },
+	};
+	// Queued, so QML handles it in the Qt event loop rather than inside the browser's event.
+	Connection *connection = Connection::create();
+	const Connection::ExchangeUploadStatus value
+			= statuses.value(QString::fromStdString(status), Connection::ExchangeUploadIdle);
+	QMetaObject::invokeMethod(connection, [connection, value]() {
+		connection->setExchangeUploadStatus(value);
+	}, Qt::QueuedConnection);
+}
+
+EMSCRIPTEN_BINDINGS(backendconnection_bindings) {
+	emscripten::function("jsSetExchangeUploadStatus", &jsSetExchangeUploadStatus);
+}
+#endif

@@ -1095,6 +1095,19 @@ public:
 	};
 	Q_ENUM(ElectricalQuantity_Source)
 
+	enum Exchange_State {
+		Exchange_State_Idle = 0,
+		Exchange_State_Preparing = 1,
+		Exchange_State_Waiting = 2,
+		Exchange_State_Receiving = 3,
+		Exchange_State_Review = 4,
+		Exchange_State_Processing = 5,
+		Exchange_State_Complete = 7,
+		Exchange_State_Failed = 8,
+		Exchange_State_Canceled = 9
+	};
+	Q_ENUM(Exchange_State)
+
 	Q_INVOKABLE QString statusText_off() const;
 	Q_INVOKABLE QString statusText_unknown() const;
 

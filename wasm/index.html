@@ -785,6 +785,100 @@
         }
     </script>
     <script type="text/javascript">
+        // Venus Exchange file upload, started by BackendConnection::chooseExchangeFile()
+        // and uploadSelectedExchangeFile().
+        var exchangeUpload = null
+
+        function reportExchangeUpload(upload, status)
+        {
+            const mod = window._qtWasmModule
+            if (upload === exchangeUpload && mod && typeof mod.jsSetExchangeUploadStatus === 'function') {
+                mod.jsSetExchangeUploadStatus(status)
+            }
+        }
+
+        function chooseExchangeFile(accept)
+        {
+            const input = document.createElement("input")
+            input.type = "file"
+            input.accept = accept
+            const upload = { file: null, started: false }
+            exchangeUpload = upload
+            input.addEventListener("change", () => {
+                if (input.files && input.files.length > 0) {
+                    upload.file = input.files[0]
+                    reportExchangeUpload(upload, "selected")
+                } else {
+                    reportExchangeUpload(upload, "canceled")
+                }
+            }, { once: true })
+            input.addEventListener("cancel", () => reportExchangeUpload(upload, "canceled"), { once: true })
+            input.click()
+        }
+
+        // Claims the transfer, asks for admission, then sends the file.
+        function uploadExchangeFile(claimPath)
+        {
+            const upload = exchangeUpload
+            if (!upload || !upload.file || upload.started) {
+                return false
+            }
+            const bearerPathPattern = /^\/exchange\/[A-Za-z0-9_-]{32,128}$/
+            const uploadPathPattern = /^\/exchange\/upload\/[A-Za-z0-9_-]{32,128}$/
+            const fail = () => reportExchangeUpload(upload, "failed")
+            const filename = encodeURIComponent(upload.file.name)
+            upload.started = true
+            reportExchangeUpload(upload, "sending")
+
+            const claim = new XMLHttpRequest()
+            claim.open("POST", claimPath)
+            claim.onerror = fail
+            claim.onload = () => {
+                let target
+                try {
+                    target = new URL(claim.responseURL)
+                } catch (error) {
+                    fail()
+                    return
+                }
+                if (claim.status !== 200 || target.origin !== location.origin
+                        || !bearerPathPattern.test(target.pathname)) {
+                    fail()
+                    return
+                }
+
+                const admission = new XMLHttpRequest()
+                admission.open("POST", target.pathname + "/admit")
+                admission.setRequestHeader("X-Venus-Upload-Length", String(upload.file.size))
+                admission.setRequestHeader("X-Venus-Filename", filename)
+                admission.onerror = fail
+                admission.onload = () => {
+                    let reply = {}
+                    try {
+                        reply = JSON.parse(admission.responseText)
+                    } catch (error) {
+                        fail()
+                        return
+                    }
+                    if (admission.status !== 201 || !uploadPathPattern.test(reply.uploadUrl || "")) {
+                        fail()
+                        return
+                    }
+
+                    const request = new XMLHttpRequest()
+                    request.open("PUT", reply.uploadUrl)
+                    request.setRequestHeader("X-Venus-Filename", filename)
+                    request.onerror = fail
+                    request.onload = () => reportExchangeUpload(upload, request.status === 201 ? "sent" : "failed")
+                    request.send(upload.file)
+                }
+                admission.send()
+            }
+            claim.send()
+            return true
+        }
+    </script>
+    <script type="text/javascript">
         // ---- Touch input recovery guard ---------------------------------
         //
         // Workaround for a bug in the Qt WASM platform plugin: it removes a

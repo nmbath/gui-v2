@@ -40,6 +40,7 @@ class BackendConnection : public QObject
 	Q_PROPERTY(bool vrm READ isVrm WRITE setVrm NOTIFY vrmChanged FINAL)
 	Q_PROPERTY(bool ready READ isReady NOTIFY readyChanged FINAL)
 	Q_PROPERTY(bool readyLatched READ isReadyLatched NOTIFY readyLatchedChanged FINAL)
+	Q_PROPERTY(ExchangeUploadStatus exchangeUploadStatus READ exchangeUploadStatus NOTIFY exchangeUploadStatusChanged FINAL)
 
 	friend class BackendConnectionTester;
 public:
@@ -80,6 +81,16 @@ public:
 		Full = 2
 	};
 	Q_ENUM(VrmPortalMode)
+
+	enum ExchangeUploadStatus {
+		ExchangeUploadIdle,
+		ExchangeUploadSelected,
+		ExchangeUploadSending,
+		ExchangeUploadSent,
+		ExchangeUploadFailed,
+		ExchangeUploadCanceled
+	};
+	Q_ENUM(ExchangeUploadStatus)
 
 	enum MqttClientError {
 		MqttClient_NoError = QMqttClient::NoError,
@@ -165,6 +176,10 @@ public:
 	Q_INVOKABLE void securityProtocolChanged();
 	Q_INVOKABLE void reloadPage();
 	Q_INVOKABLE void openUrl(const QString &url);
+	Q_INVOKABLE void chooseExchangeFile(const QString &accept = QString());
+	Q_INVOKABLE bool uploadSelectedExchangeFile(const QString &claimPath);
+	ExchangeUploadStatus exchangeUploadStatus() const;
+	void setExchangeUploadStatus(ExchangeUploadStatus status);
 
 #if defined(VENUS_WEBASSEMBLY_BUILD)
 	Q_INVOKABLE void hitWatchdog();
@@ -183,6 +198,7 @@ Q_SIGNALS:
 	void tokenChanged();
 	void idUserChanged();
 	void vrmChanged();
+	void exchangeUploadStatusChanged();
 	void nodeRedUrlChanged();
 	void signalKUrlChanged();
 	void producerChanged();
@@ -225,6 +241,7 @@ private:
 	bool m_vrm = false;
 	bool m_ready = false;
 	bool m_readyLatched = false;
+	ExchangeUploadStatus m_exchangeUploadStatus = ExchangeUploadIdle;
 
 	State m_state = BackendConnection::State::Idle;
 	HeartbeatState m_heartbeatState = BackendConnection::HeartbeatState::HeartbeatActive;
