@@ -179,13 +179,14 @@ Page {
 			SettingsListHeader {
 				//% "Boat page"
 				text: qsTrId("settings_minmax_boat_page")
+				preferredVisible: !PartnerNavigationConfiguration.isCorePageHidden("boat")
 			}
 
 			ListRadioButtonGroup {
 				//% "Gauge Display"
 				text: qsTrId("settings_minmax_gauge_display")
 				dataItem.uid: Global.systemSettings.serviceUid + "/Settings/Gui/ElectricPropulsionUI/CenterGauge/Type" // TBC
-				preferredVisible: dataItem.valid
+				preferredVisible: !PartnerNavigationConfiguration.isCorePageHidden("boat") && dataItem.valid
 				writeAccessLevel: VenusOS.User_AccessType_User
 				optionModel: [
 					//% "Speed"
@@ -196,6 +197,7 @@ Page {
 
 			ListQuantityField {
 				id: motorDriveMaxPower
+				preferredVisible: !PartnerNavigationConfiguration.isCorePageHidden("boat")
 				text: CommonWords.maximum_power
 				dataItem.uid: Global.systemSettings.serviceUid + "/Settings/Gui/Gauges/MotorDrive/Power/Max"
 				writeAccessLevel: VenusOS.User_AccessType_User
@@ -204,6 +206,7 @@ Page {
 
 			ListQuantityField {
 				id: maxSpeed
+				preferredVisible: !PartnerNavigationConfiguration.isCorePageHidden("boat")
 				//% "Max Speed"
 				text: qsTrId("settings_minmax_max_speed")
 				dataItem.uid: Global.systemSettings.serviceUid + "/Settings/Gui/Gauges/Speed/Max"
@@ -216,6 +219,7 @@ Page {
 
 			ListQuantityField {
 				id: motorDriveMaxRpm
+				preferredVisible: !PartnerNavigationConfiguration.isCorePageHidden("boat")
 				//% "Max RPM"
 				text: qsTrId("settings_minmax_max_rpm")
 				unit: VenusOS.Units_RevolutionsPerMinute

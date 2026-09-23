@@ -21,11 +21,22 @@ ColumnLayout {
 
 	spacing: Theme.geometry_sidePanel_spacing
 
+	function _partnerSuppresses(target) {
+		for (let i = 0; i < partnerBriefMetricRepeater.count; ++i) {
+			const configuration = partnerBriefMetricRepeater.itemAt(i)?.configuration || ({})
+			if ((configuration.operation === "hide" || configuration.operation === "replace")
+					&& configuration.target === target) {
+				return true
+			}
+		}
+		return false
+	}
+
 	BriefSidePanelWidget {
 		title: CommonWords.solar
 		icon.source: "qrc:/images/solaryield.svg"
 		loadersActive: Global.solarInputs.devices.count > 0 // only show graph if there are solar inputs with history (i.e. not PV inverters)
-		visible: Global.solarInputs.inputCount > 0 // show if there are any solar inputs (PV chargers, PV inverters, etc.)
+		visible: Global.solarInputs.inputCount > 0 && !root._partnerSuppresses("solar")
 		quantityLabel.dataObject: Global.system.solar
 		graph: SolarYieldGraph {}
 
@@ -39,7 +50,7 @@ ColumnLayout {
 		title: Global.generators.model.firstObject?.name ?? ""
 		icon.source: "qrc:/images/generator.svg"
 		loadersActive: generatorInput && generatorInput.operational && Global.generators.model.firstObject
-		visible: loadersActive
+		visible: loadersActive && !root._partnerSuppresses("generator")
 		quantityLabel.sourceType: VenusOS.ElectricalQuantity_Source_AcInputOnly
 		quantityLabel.dataObject: generatorInput
 		quantityLabel.leftPadding: generatorDirectionIcon.visible ? (generatorDirectionIcon.width + Theme.geometry_acInputDirectionIcon_rightMargin) : 0
@@ -80,7 +91,7 @@ ColumnLayout {
 		quantityLabel.dataObject: nonGeneratorInput
 		quantityLabel.leftPadding: acInputDirectionIcon.visible ? (acInputDirectionIcon.width + Theme.geometry_acInputDirectionIcon_rightMargin) : 0
 		loadersActive: nonGeneratorInput && nonGeneratorInput.operational
-		visible: loadersActive
+		visible: loadersActive && !root._partnerSuppresses("acInput")
 
 		Layout.fillWidth: true
 
@@ -211,7 +222,7 @@ exported power v  0.4 |   /
 				? VenusOS.dcMeter_iconForType(Global.dcInputs.model.firstMeterType)
 				: VenusOS.dcMeter_iconForMultipleTypes()
 		loadersActive: Global.dcInputs.model.count > 0
-		visible: loadersActive
+		visible: loadersActive && !root._partnerSuppresses("dcInput")
 		quantityLabel.sourceType: VenusOS.ElectricalQuantity_Source_Dc
 		quantityLabel.dataObject: Global.dcInputs
 		graph: LoadGraph {
@@ -256,7 +267,7 @@ exported power v  0.4 |   /
 		quantityLabel.sourceType: VenusOS.ElectricalQuantity_Source_Ac
 		quantityLabel.dataObject: Global.system.load.ac
 		loadersActive: Global.system.hasAcLoads
-		visible: loadersActive
+		visible: loadersActive && !root._partnerSuppresses("acLoads")
 		graph: LoadGraph {
 			animationEnabled: root.animationEnabled
 			onNextValueRequested: addValue(acLoadGraphRange.averagePhaseCurrentAsRatio)
@@ -285,7 +296,7 @@ exported power v  0.4 |   /
 		title: qsTrId("brief_dc_loads")
 		icon.source: "qrc:/images/dcloads.svg"
 		loadersActive: Global.system.dc.hasPower
-		visible: loadersActive
+		visible: loadersActive && !root._partnerSuppresses("dcLoads")
 		quantityLabel.sourceType: VenusOS.ElectricalQuantity_Source_Dc
 		quantityLabel.dataObject: Global.system.dc
 		graph: LoadGraph {
@@ -319,6 +330,65 @@ exported power v  0.4 |   /
 				valueType: VenusOS.Gauges_ValueType_RisingPercentage
 				value: dcLoadRange.valueAsRatio
 				animationEnabled: root.animationEnabled
+			}
+		}
+	}
+
+	GuiPluginIntegrationModel {
+		id: partnerBriefMetrics
+		type: GuiPluginLoader.BriefMetric
+	}
+
+	Repeater {
+		id: partnerBriefMetricRepeater
+		model: partnerBriefMetrics.count
+
+		delegate: BriefSidePanelWidget {
+			id: partnerMetric
+			required property int index
+
+			readonly property var integration: partnerBriefMetrics.integrationAt(index)
+			property var configuration: integration.configuration
+
+			readonly property string dataSource: configuration?.dataSource || ""
+			readonly property string unit: configuration?.unit || ""
+			readonly property bool deviceContribution: !!configuration?.deviceSelector
+			readonly property string deviceServiceUid: deviceContribution
+				? PartnerSystemData.mappedDeviceServiceUid(configuration?.deviceSelector) : ""
+			readonly property bool valueAvailable: deviceContribution
+				? !!deviceServiceUid && deviceMetric.valid && isFinite(rawValue)
+				: PartnerSystemData.metricAvailable(dataSource, configuration?.batterySelector)
+			readonly property real rawValue: deviceContribution
+				? Number(deviceMetric.value)
+				: PartnerSystemData.metricValue(dataSource, configuration?.batterySelector)
+			readonly property string displayValue: valueAvailable && isFinite(rawValue)
+				? (unit === "V" ? Number(rawValue).toFixed(1) : Math.round(rawValue).toString())
+				: "--"
+
+			title: configuration?.batterySelector
+				? PartnerSystemData.batteryName(dataSource, configuration.batterySelector, integration.title)
+				: deviceContribution
+					? PartnerSystemData.mappedDeviceName(configuration.deviceSelector, integration.title)
+					: integration.title
+			icon.source: integration.icon
+			loadersActive: true
+			visible: configuration.operation !== "hide"
+			quantityLabel.visible: false
+			graph: Label {
+				text: partnerMetric.displayValue + (partnerMetric.unit ? " " + partnerMetric.unit : "")
+				color: Theme.color_font_primary
+				font.pixelSize: Theme.font_briefPage_sidePanel_quantityLabel_size
+				font.bold: true
+				horizontalAlignment: Text.AlignRight
+				verticalAlignment: Text.AlignVCenter
+			}
+
+			Layout.fillWidth: true
+
+			VeQuickItem {
+				id: deviceMetric
+				uid: partnerMetric.deviceServiceUid && partnerMetric.configuration?.measurementPath
+					? partnerMetric.deviceServiceUid + partnerMetric.configuration.measurementPath : ""
 			}
 		}
 	}

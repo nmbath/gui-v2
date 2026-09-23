@@ -4,7 +4,9 @@
 */
 
 #include "theme.h"
+#include "logging.h"
 #include <QInputMethod>
+#include <QSet>
 
 using namespace Victron::VenusOS;
 
@@ -40,6 +42,7 @@ EM_JS(int, getVisualViewportOffsetTop, (), {
 
 Theme::Theme(QObject *parent) : QObject(parent)
 {
+	g_themeInstance = this;
 #if defined(VENUS_WEBASSEMBLY_BUILD)
 	// 5"-6" Smartphones have 320 - 480 CSS independent pixel wide screens.
 	if (getScreenHeight() > getScreenWidth()) {
@@ -53,9 +56,6 @@ Theme::Theme(QObject *parent) : QObject(parent)
 	setWindowHeight(getWindowHeight());
 	setVisualViewportHeight(getVisualViewportHeight());
 	setVisualViewportOffsetTop(getVisualViewportOffsetTop());
-
-	// Assign global instance for callbacks
-	g_themeInstance = this;
 
 	// Detect current color scheme and listen for changes
 	emscripten::val mql = emscripten::val::global("window").call<emscripten::val>("matchMedia", std::string("(prefers-color-scheme: dark)"));
@@ -134,6 +134,143 @@ void Theme::setColorScheme(Victron::VenusOS::Theme::ColorScheme scheme)
 		m_colorScheme = scheme;
 		Q_EMIT colorSchemeChanged(scheme);
 		Q_EMIT colorSchemeChanged_parameterless(); // work around moc limitation.
+		Q_EMIT partnerThemeChanged();
+	}
+}
+
+bool Theme::partnerThemeActive() const
+{
+	return !m_partnerColorOverrides.isEmpty();
+}
+
+bool Theme::hasPartnerOverride(const QString &name) const
+{
+	return m_partnerColorOverrides.contains(name);
+}
+
+QColor Theme::partnerColorOverride(const QString &name, const QColor &fallback) const
+{
+	const auto token = m_partnerColorOverrides.constFind(name);
+	if (token == m_partnerColorOverrides.constEnd()) {
+		return fallback;
+	}
+	return token->value(static_cast<int>(m_colorScheme), fallback);
+}
+
+bool Theme::applyPartnerTheme(const QVariantMap &definition)
+{
+	static const QSet<QString> allowedTokens {
+		QStringLiteral("color_page_background"),
+		QStringLiteral("color_background_secondary"),
+		QStringLiteral("color_card_background"),
+		QStringLiteral("color_listItem_background"),
+		QStringLiteral("color_navigationBar_background"),
+		QStringLiteral("color_font_primary"),
+		QStringLiteral("color_font_secondary"),
+		QStringLiteral("color_listItem_secondaryText"),
+		QStringLiteral("color_button"),
+		QStringLiteral("color_button_on_background"),
+		QStringLiteral("color_blue"),
+		QStringLiteral("color_brand_accent"),
+		QStringLiteral("color_brand_accent_muted"),
+		QStringLiteral("color_droopGraph_gradient_centre"),
+		QStringLiteral("color_card_separator"),
+		QStringLiteral("color_separator"),
+		QStringLiteral("color_listItem_separator"),
+		QStringLiteral("color_modalDialog_border"),
+		QStringLiteral("color_navigationBar_button_off"),
+		QStringLiteral("color_navigationBar_button_on"),
+		QStringLiteral("color_overviewPage_widget_battery_background"),
+		QStringLiteral("color_overviewPage_widget_background"),
+		QStringLiteral("color_overviewPage_widget_border"),
+		QStringLiteral("color_overviewPage_widget_solar_graph_bar"),
+		QStringLiteral("color_radioButton_indicator_on"),
+		QStringLiteral("color_settings_breadcrumb_background_top_page"),
+		QStringLiteral("color_focus_highlight"),
+		QStringLiteral("color_splash_logo_icon"),
+		QStringLiteral("color_splash_logo_text"),
+		QStringLiteral("color_darkOk"),
+		QStringLiteral("color_ok"),
+		QStringLiteral("color_success"),
+		QStringLiteral("color_switch_groove_on"),
+		QStringLiteral("color_blackWater"),
+		QStringLiteral("color_diesel"),
+		QStringLiteral("color_freshWater"),
+		QStringLiteral("color_fuel"),
+		QStringLiteral("color_gasoline"),
+		QStringLiteral("color_hydraulicOil"),
+		QStringLiteral("color_liveWell"),
+		QStringLiteral("color_lng"),
+		QStringLiteral("color_lpg"),
+		QStringLiteral("color_oil"),
+		QStringLiteral("color_rawWater"),
+		QStringLiteral("color_wasteWater"),
+		QStringLiteral("color_toastNotification_highlight_informative"),
+		QStringLiteral("color_warning"),
+		QStringLiteral("color_critical")
+	};
+
+	QHash<QString, QHash<int, QColor> > candidate;
+	auto parseColor = [](const QVariant &value, QColor *result) -> bool {
+		if (value.metaType().id() == QMetaType::QColor) {
+			*result = value.value<QColor>();
+		} else if (value.metaType().id() == QMetaType::QString) {
+			*result = QColor(value.toString());
+		} else {
+			return false;
+		}
+		return result->isValid();
+	};
+
+	for (auto it = definition.constBegin(); it != definition.constEnd(); ++it) {
+		if (!allowedTokens.contains(it.key())) {
+			qCWarning(venusGui) << "Rejecting partner theme with unsupported token:" << it.key();
+			return false;
+		}
+
+		QHash<int, QColor> schemes;
+		if (it.value().canConvert<QVariantMap>()) {
+			const QVariantMap values = it.value().toMap();
+			for (auto schemeIt = values.constBegin(); schemeIt != values.constEnd(); ++schemeIt) {
+				const int scheme = schemeIt.key().compare(QStringLiteral("dark"), Qt::CaseInsensitive) == 0 ? Dark
+						: schemeIt.key().compare(QStringLiteral("light"), Qt::CaseInsensitive) == 0 ? Light
+						: -1;
+				QColor color;
+				if (scheme < 0 || !parseColor(schemeIt.value(), &color)) {
+					qCWarning(venusGui) << "Rejecting invalid partner theme value for" << it.key() << schemeIt.key();
+					return false;
+				}
+				schemes.insert(scheme, color);
+			}
+		} else {
+			QColor color;
+			if (!parseColor(it.value(), &color)) {
+				qCWarning(venusGui) << "Rejecting invalid partner theme value for" << it.key();
+				return false;
+			}
+			schemes.insert(Dark, color);
+			schemes.insert(Light, color);
+		}
+		if (schemes.isEmpty()) {
+			qCWarning(venusGui) << "Rejecting empty partner theme value for" << it.key();
+			return false;
+		}
+		candidate.insert(it.key(), schemes);
+	}
+
+	if (candidate == m_partnerColorOverrides) {
+		return true;
+	}
+	m_partnerColorOverrides = candidate;
+	Q_EMIT partnerThemeChanged();
+	return true;
+}
+
+void Theme::clearPartnerTheme()
+{
+	if (!m_partnerColorOverrides.isEmpty()) {
+		m_partnerColorOverrides.clear();
+		Q_EMIT partnerThemeChanged();
 	}
 }
 
