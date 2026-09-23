@@ -21,6 +21,8 @@ FocusScope {
 
 	property int topLeftButton: VenusOS.StatusBar_LeftButton_None
 	property int topRightButton: VenusOS.StatusBar_RightButton_None
+	// Replaces the normal GUI breadcrumb/status content with a compact embedded-browser toolbar.
+	property bool webNavigationBar: false
 
 	// Optional function that is called when the stack is about to pop this page. Return true if
 	// the page can be popped, or false to deny it and remain on the page.

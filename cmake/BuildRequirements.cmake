@@ -25,6 +25,10 @@ else()
     find_package(Qt6 ${REQUIRED_QT_VERSION} COMPONENTS DBus REQUIRED)
 endif()
 
+if(VENUS_GX_BUILD)
+    find_package(Qt6 ${REQUIRED_QT_VERSION} COMPONENTS WebEngineQuick REQUIRED)
+endif()
+
 # Qt > 6.5 only.
 # Enabling this policy ensures that your QML module is placed under a default import path,
 # and its types can be found without manual calls to QQmlEngine::addImportPath.

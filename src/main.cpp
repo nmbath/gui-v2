@@ -13,9 +13,11 @@
 #include "src/uitest.h"
 #include "src/frameratemodel.h"
 #include "src/screenblanker.h"
+#include "src/wasmwebviewbridge.h"
 
 #if VENUS_GX_BUILD
 #include "src/urlinterceptor.h"
+#include <QtWebEngineQuick/QtWebEngineQuick>
 #endif
 
 #if defined(VENUS_WEBASSEMBLY_BUILD)
@@ -30,6 +32,7 @@
 #include <QQuickView>
 #include <QSurfaceFormat>
 #include <QQmlComponent>
+#include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickWindow>
 #include <QCommandLineParser>
@@ -606,6 +609,13 @@ int main(int argc, char *argv[])
 	QByteArray scaleAsQByteArray(scaleAsString.c_str(), scaleAsString.length());
 	qputenv("QT_SCALE_FACTOR", scaleAsQByteArray);
 
+#if VENUS_GX_BUILD
+	// Must run before QGuiApplication exists - it sets up Chromium's
+	// sandbox/GPU process, which import QtWebEngine's own lazy plugin
+	// init is too late for once the app and its QML engine are already
+	// running (aborts with "must be called from the Qt gui thread").
+	QtWebEngineQuick::initialize();
+#endif
 	QGuiApplication app(argc, argv);
 	perfMark("QGuiApplication created");
 	QGuiApplication::setApplicationName("Venus");
@@ -617,6 +627,8 @@ int main(int argc, char *argv[])
 	bool skipSplashScreen = false;
 
 	QQmlEngine engine;
+	WasmWebViewBridge wasmWebViewBridge;
+	engine.rootContext()->setContextProperty(QStringLiteral("wasmWebViewBridge"), &wasmWebViewBridge);
 #if VENUS_GX_BUILD
 	engine.addUrlInterceptor(new Victron::VenusOS::UrlInterceptor());
 #endif

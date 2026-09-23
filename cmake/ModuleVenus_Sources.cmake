@@ -143,6 +143,9 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/VeQItemFilteredServiceModel.qml
     components/ViewGradient.qml
     components/WasmVirtualKeyboardHandler.qml
+    components/WebContentPage.qml
+    components/WebContentPageNative.qml
+    components/WebContentPageWasm.qml
     components/WifiModel.qml
     components/controls/AutoToggleButton.qml
     components/controls/Button.qml
@@ -382,6 +385,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/PageManager.qml
     pages/SettingsPage.qml
     pages/TanksTab.qml
+    pages/WebPageOpenDelegate.qml
+    pages/WebPagesPage.qml
     pages/controlcards/ESSCard.qml
     pages/controlcards/EVCSCard.qml
     pages/controlcards/GeneratorCard.qml
@@ -491,9 +496,12 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsTcpIp.qml
     pages/settings/PageSettingsVecanDevice.qml
     pages/settings/PageSettingsVecanDevices.qml
+    pages/settings/PageSettingsWebPage.qml
+    pages/settings/PageSettingsWebPages.qml
     pages/settings/PageSettingsWifi.qml
     pages/settings/PageTzInfo.qml
     pages/settings/PageVrmDeviceInstances.qml
+    pages/settings/WebPageDelegate.qml
     pages/settings/debug/HubData.qml
     pages/settings/debug/PageDebug.qml
     pages/settings/debug/PageDebugVeQItems.qml
@@ -831,6 +839,7 @@ set(VictronVenusOS_RESOURCES
     images/icon_lng_32.svg
     images/icon_lpg_32.svg
     images/icon_open_link_32.svg
+    images/icon_webpages_32.svg
     images/icon_to_grid.svg
     images/gauge_intro_5_matte_black.gif
     images/gauge_intro_5_matte_white.gif
