@@ -66,6 +66,18 @@ Page {
 				}
 			}
 
+			ListNavigation {
+				// Not qsTrId: this and the page it leads to are new and
+				// were never run through lupdate, so on a device whose
+				// translation catalogue predates them, qsTrId falls back to
+				// showing the raw id text (found live on venus-web-pages'
+				// own equivalent entry). Plain strings avoid that
+				// regardless of catalogue state; revisit once this is a
+				// real PR and lupdate has run for real.
+				text: "Partner branding"
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsPartnerBranding.qml", {"title": text})
+			}
+
 			SettingsListHeader {
 				//% "Physical I/O"
 				text: qsTrId("pagesettingsintegrations_physical_io")
