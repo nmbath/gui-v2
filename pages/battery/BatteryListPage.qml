@@ -18,5 +18,6 @@ Page {
 
 	SystemBatteryDeviceModel {
 		id: batteryModel
+		excludedServiceUids: PartnerSystemData.mappedBatteryServiceUids
 	}
 }

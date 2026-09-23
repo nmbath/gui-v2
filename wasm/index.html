@@ -24,21 +24,31 @@
     <meta name="msapplication-TileColor" content="#1f2535">
     <meta name="theme-color" content="#1f2535">
     <style>
+      :root {
+        --brand-dark-background: #000000;
+        --brand-dark-text: #FAF9F5;
+        --brand-dark-muted: #969591;
+        --brand-dark-accent: #387DC5;
+        --brand-light-background: #E6E5E1;
+        --brand-light-text: #1D1D1B;
+        --brand-light-muted: #64635F;
+        --brand-light-accent: #387DC5;
+      }
       /* Make the html body cover the entire (visual) viewport with no scroll bars. */
       html, body {
         margin: 0;
         padding: 0;
         overflow: hidden;
         height: 100%;
-        background: #000000;
-        color: #FAF9F5;
+        background: var(--brand-dark-background);
+        color: var(--brand-dark-text);
         font-family: "Roboto", sans-serif;
       }
       a,
       a:visited,
       a:hover,
       a:active {
-        color: #387DC5;
+        color: var(--brand-dark-accent);
       }
       #device-frame {
         display: none;
@@ -51,8 +61,8 @@
         height: 840px;
       }
       #wrapper-inner {
-          background: #000;
-          color: #969591;
+          background: var(--brand-dark-background);
+          color: var(--brand-dark-muted);
       }
       @media screen and (min-width: 1210px) and (min-height: 830px) {
         #device-frame {
@@ -131,15 +141,15 @@
       }
       @media (prefers-color-scheme: light) {
         html, body {
-          background: #E6E5E1;
-          color: #1D1D1B;
+          background: var(--brand-light-background);
+          color: var(--brand-light-text);
         }
         #wrapper-inner {
-          background: #E6E5E1;
-          color: #64635F;
+          background: var(--brand-light-background);
+          color: var(--brand-light-muted);
         }
         #loading-bar-text {
-          color: #64635F !important;
+          color: var(--brand-light-muted) !important;
         }
         #logo-dark {
           visibility: hidden !important;
@@ -147,18 +157,24 @@
         #logo-light {
           visibility: visible !important;
         }
+        a,
+        a:visited,
+        a:hover,
+        a:active {
+          color: var(--brand-light-accent);
+        }
       }
       /* Force dark or light color scheme */
       html[data-forced-scheme="dark"], html[data-forced-scheme="dark"] body {
-          background: #000000 !important;
-          color: #FAF9F5 !important;
+          background: var(--brand-dark-background) !important;
+          color: var(--brand-dark-text) !important;
       }
       html[data-forced-scheme="dark"] #wrapper-inner {
-          background: #000 !important;
-          color: #969591 !important;
+          background: var(--brand-dark-background) !important;
+          color: var(--brand-dark-muted) !important;
       }
       html[data-forced-scheme="dark"] #loading-bar-text {
-          color: #969591 !important;
+          color: var(--brand-dark-muted) !important;
       }
       html[data-forced-scheme="dark"] #logo-dark {
           visibility: visible !important;
@@ -166,23 +182,29 @@
       html[data-forced-scheme="dark"] #logo-light {
           visibility: hidden !important;
       }
+      html[data-forced-scheme="dark"] a {
+          color: var(--brand-dark-accent) !important;
+      }
 
       html[data-forced-scheme="light"], html[data-forced-scheme="light"] body {
-          background: #E6E5E1 !important;
-          color: #1D1D1B !important;
+          background: var(--brand-light-background) !important;
+          color: var(--brand-light-text) !important;
       }
       html[data-forced-scheme="light"] #wrapper-inner {
-          background: #E6E5E1 !important;
-          color: #64635F !important;
+          background: var(--brand-light-background) !important;
+          color: var(--brand-light-muted) !important;
       }
       html[data-forced-scheme="light"] #loading-bar-text {
-          color: #64635F !important;
+          color: var(--brand-light-muted) !important;
       }
       html[data-forced-scheme="light"] #logo-dark {
           visibility: hidden !important;
       }
       html[data-forced-scheme="light"] #logo-light {
           visibility: visible !important;
+      }
+      html[data-forced-scheme="light"] a {
+          color: var(--brand-light-accent) !important;
       }
     </style>
     <script>
@@ -235,6 +257,107 @@
             }
 
             setTimeout(check, delay, url, attempt, delay, available, unavailable);
+        }
+
+        async function fetchBootstrapBranding() {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 1000);
+            try {
+                const response = await fetch('branding.json', {cache: 'no-cache', signal: controller.signal});
+                if (!response.ok) return null;
+                const descriptor = await response.json();
+                const qmlAssets = {};
+                await Promise.all(['logoDark', 'logoLight', 'splashLogo'].map(async field => {
+                    try {
+                        const value = descriptor[field];
+                        if (typeof value !== 'string' || !value) return;
+                        const url = new URL(value, document.baseURI);
+                        if (url.origin !== window.location.origin) return;
+                        const assetResponse = await fetch(url, {cache: 'no-cache', signal: controller.signal});
+                        if (!assetResponse.ok) return;
+                        const blob = await assetResponse.blob();
+                        if (!blob.type.startsWith('image/')) return;
+                        qmlAssets[field] = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.onerror = () => reject(reader.error);
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch (error) {
+                        if (error.name !== 'AbortError') {
+                            console.warn(`Unable to preload partner ${field}:`, error);
+                        }
+                    }
+                }));
+                return {descriptor, qmlAssets};
+            } catch (error) {
+                if (error.name !== 'AbortError') console.warn('Ignoring invalid bootstrap branding:', error);
+                return null;
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        function activateBootstrapBranding(preparedBranding) {
+            if (!preparedBranding || typeof preparedBranding !== 'object') return;
+            try {
+                const branding = preparedBranding.descriptor;
+                const qmlAssets = preparedBranding.qmlAssets || {};
+                if (!branding || typeof branding !== 'object') return;
+                const safeAsset = (value) => {
+                    if (typeof value !== 'string' || !value) return null;
+                    const url = new URL(value, document.baseURI);
+                    return url.origin === window.location.origin ? url.href : null;
+                };
+                const safeColor = (value) => typeof value === 'string'
+                    && /^(#[0-9a-f]{6}|#[0-9a-f]{8})$/i.test(value) ? value : null;
+
+                if (typeof branding.title === 'string' && branding.title.trim()) {
+                    document.title = branding.title.trim();
+                }
+                const darkLogo = safeAsset(branding.logoDark);
+                const lightLogo = safeAsset(branding.logoLight);
+                const setSvgImageSource = (element, source) => {
+                    if (!element || !source) return;
+                    // WebKit may continue to prefer the SVG 1.1 xlink attribute when
+                    // both forms exist, so update both the current and legacy forms.
+                    element.setAttribute('href', source);
+                    element.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', source);
+                };
+                setSvgImageSource(document.getElementById('logo-dark'), darkLogo);
+                setSvgImageSource(document.getElementById('logo-light'), lightLogo);
+                const splashLogo = safeAsset(branding.splashLogo);
+                window.guiV2PartnerBranding = {
+                    // Data URLs avoid relying on Qt's network image loader before
+                    // the partner RCC bundle is mounted from MQTT plugin data.
+                    logoDark: qmlAssets.logoDark || darkLogo,
+                    logoLight: qmlAssets.logoLight || lightLogo,
+                    splashLogo: qmlAssets.splashLogo || splashLogo || darkLogo || lightLogo
+                };
+                const favicon = safeAsset(branding.favicon);
+                if (favicon) {
+                    document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]')
+                        .forEach(link => link.setAttribute('href', favicon));
+                }
+
+                for (const scheme of ['dark', 'light']) {
+                    const colors = branding.colors?.[scheme];
+                    if (!colors || typeof colors !== 'object') continue;
+                    for (const field of ['background', 'text', 'muted', 'accent']) {
+                        const value = safeColor(colors[field]);
+                        if (value) document.documentElement.style.setProperty(`--brand-${scheme}-${field}`, value);
+                    }
+                }
+                const forcedScheme = document.documentElement.getAttribute('data-forced-scheme');
+                const activeScheme = forcedScheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+                const activeAccent = safeColor(branding.colors?.[activeScheme]?.accent);
+                if (activeAccent) {
+                    document.getElementById('loading-bar').setAttribute('fill', activeAccent);
+                    document.getElementById('loading-bar-container').setAttribute('fill', activeAccent);
+                }
+            } catch (error) {
+                console.warn('Ignoring invalid bootstrap branding:', error);
+            }
         }
 
         // Reload the page and make sure it is available, since the webserver might start up.
@@ -514,6 +637,10 @@
 
         async function init()
         {
+            // Fetch the partner descriptor early, but retain Victron branding while
+            // downloading and compiling the Victron-supplied WASM. Partner ownership
+            // begins only once the compiled application starts connecting to the GX.
+            const bootstrapBranding = await fetchBootstrapBranding();
             const spinner = document.querySelector('#qtspinner');
             const screen = document.querySelector('#screen');
             const deviceFrame = document.querySelector('#device-frame');
@@ -677,6 +804,7 @@
                 const compileMs = tCompileEnd - tCompileStart;
                 logPerf(`Compile: ${compileMs.toFixed(1)}ms`);
 
+                activateBootstrapBranding(bootstrapBranding);
                 loadingBarText.textContent = 'Instantiating...';
 
                 let defaultMqttArg = (location.protocol === 'https:' ? 'wss://' : 'ws://') + document.location.host + '/websocket-mqtt'

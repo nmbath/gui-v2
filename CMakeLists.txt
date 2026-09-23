@@ -49,6 +49,7 @@ if (${NO_CACHEGEN})
 endif()
 
 include(cmake/ModuleVenus_Sources.cmake)
+include(cmake/ModulePartnerSdk_Sources.cmake)
 include(cmake/ModuleShaders_Sources.cmake)
 include(cmake/ModuleGauges_Sources.cmake)
 include(cmake/ModuleBoat_Sources.cmake)
@@ -61,6 +62,7 @@ include(cmake/GenerateTheme.cmake)
 include(cmake/Translations.cmake)
 
 include(cmake/ModuleVenus.cmake)
+include(cmake/ModulePartnerSdk.cmake)
 include(cmake/ModuleShaders.cmake)
 include(cmake/ModuleGauges.cmake)
 include(cmake/ModuleBoat.cmake)
@@ -77,6 +79,8 @@ if ("${GUI_V2_BUILD}" STREQUAL "ON")
     target_link_libraries(${PROJECT_NAME} PRIVATE
         VictronVenusOS
         VictronVenusOSplugin
+        VictronPartnerSdk
+        VictronPartnerSdkplugin
         VictronVenusOSShaders
         VictronVenusOSShadersplugin
         VictronGauges
@@ -101,4 +105,3 @@ endif()
 #add_dependencies(${PROJECT_NAME} dependency_graph)
 # then convert the dot file to a png:
 # $ dot -Tpng dependencies.dot -o dependencies.png
-

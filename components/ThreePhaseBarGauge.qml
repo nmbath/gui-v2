@@ -79,7 +79,7 @@ Flow {
 				CheapBarGauge {
 					foregroundColor: Theme.color_darkOk,phaseDelegate.feedingToGrid ? Theme.color_green : Theme.statusColorValue(valueStatus)
 					backgroundColor: Theme.color_darkOk,phaseDelegate.feedingToGrid ? Theme.color_darkGreen
-							: root.inOverviewWidget && valueStatus === Theme.Ok ? Theme.color_darkishBlue
+							: root.inOverviewWidget && valueStatus === Theme.Ok ? Theme.color_brand_accent_muted
 							: Theme.statusColorValue(valueStatus, true)
 					valueType: root.valueType
 					value: valueRange.valueAsRatio
@@ -93,7 +93,7 @@ Flow {
 				BarGauge {
 					foregroundColor: Theme.color_darkOk,phaseDelegate.feedingToGrid ? Theme.color_green : Theme.statusColorValue(valueStatus)
 					backgroundColor: Theme.color_darkOk,phaseDelegate.feedingToGrid ? Theme.color_darkGreen
-							: root.inOverviewWidget && valueStatus === Theme.Ok ? Theme.color_darkishBlue
+							: root.inOverviewWidget && valueStatus === Theme.Ok ? Theme.color_brand_accent_muted
 							: Theme.statusColorValue(valueStatus, true)
 					valueType: root.valueType
 					value: valueRange.valueAsRatio

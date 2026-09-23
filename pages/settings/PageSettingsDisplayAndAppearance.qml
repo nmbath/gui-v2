@@ -125,6 +125,7 @@ Page {
 			ListNavigation {
 				//% "Brief page"
 				text: qsTrId("settings_brief_page")
+				preferredVisible: !PartnerNavigationConfiguration.isCorePageHidden("brief")
 				onClicked: {
 					Global.pageManager.pushPage("/pages/settings/PageSettingsDisplayBrief.qml", {"title": text})
 				}
@@ -133,6 +134,7 @@ Page {
 			ListNavigation {
 				//% "Boat page"
 				text: qsTrId("pagesettingsgeneral_boat_page")
+				preferredVisible: !PartnerNavigationConfiguration.isCorePageHidden("boat")
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsBoatPage.qml", {"title": text})
 			}
 

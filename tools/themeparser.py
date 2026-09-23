@@ -6,6 +6,57 @@ import json
 import os
 import sys
 
+PARTNER_COLOR_TOKENS = {
+    'color_background_secondary',
+    'color_button_on_background',
+    'color_blue',
+    'color_brand_accent',
+    'color_brand_accent_muted',
+    'color_card_background',
+    'color_card_separator',
+    'color_critical',
+    'color_droopGraph_gradient_centre',
+    'color_font_secondary',
+    'color_listItem_background',
+    'color_listItem_secondaryText',
+    'color_listItem_separator',
+    'color_modalDialog_border',
+    'color_navigationBar_background',
+    'color_navigationBar_button_off',
+    'color_darkOk',
+    'color_ok',
+    'color_page_background',
+    'color_separator',
+    'color_font_primary',
+    'color_button',
+    'color_navigationBar_button_on',
+    'color_overviewPage_widget_battery_background',
+    'color_overviewPage_widget_background',
+    'color_overviewPage_widget_border',
+    'color_overviewPage_widget_solar_graph_bar',
+    'color_radioButton_indicator_on',
+    'color_settings_breadcrumb_background_top_page',
+    'color_focus_highlight',
+    'color_splash_logo_icon',
+    'color_splash_logo_text',
+    'color_success',
+    'color_switch_groove_on',
+    'color_blackWater',
+    'color_diesel',
+    'color_freshWater',
+    'color_fuel',
+    'color_gasoline',
+    'color_hydraulicOil',
+    'color_liveWell',
+    'color_lng',
+    'color_lpg',
+    'color_oil',
+    'color_rawWater',
+    'color_wasteWater',
+    'color_toastNotification_highlight_informative',
+    'color_warning',
+}
+
 HEADER_TEMPLATE = '''
 /*
 ** Copyright (C) 2023 Victron Energy B.V.
@@ -56,8 +107,8 @@ public:
 	// NOTE: won't capture, so client needs to manually capture the color change signal.
 	Q_INVOKABLE QColor statusColorValue(StatusLevel level, bool darkColor = false) const
 	{
-		const QVariant c = (level == Ok && darkColor) ? color_darkOk()
-			: (level == Ok) ? color_ok()
+		const QVariant c = (level == Ok && darkColor) ? color_brand_accent_muted()
+			: (level == Ok) ? color_brand_accent()
 			: (level == Warning && darkColor) ? color_darkWarning()
 			: (level == Warning) ? color_warning()
 			: (level == Critical && darkColor) ? color_darkCritical()
@@ -123,7 +174,9 @@ class ThemeProperty:
 
     def property_declaration(self):
         assert self.type_name, 'No values have been set for property {}'.format(self.name)
-        if self.json_info.enum_type == 'ScreenSize':
+        if self.name in PARTNER_COLOR_TOKENS:
+            notify_signal = 'partnerThemeChanged'
+        elif self.json_info.enum_type == 'ScreenSize':
             notify_signal = 'screenSizeChanged_parameterless'
         elif self.json_info.enum_type == 'ColorScheme':
             notify_signal = 'colorSchemeChanged_parameterless'
@@ -162,11 +215,13 @@ class ThemeProperty:
             except KeyError:
                 raise ValueError('JSON missing dark or light value for property "{}"'.format(self.name))
             if dark_rgba == light_rgba:
-                return self.constant_property_accessor(dark_rgba)
+                accessor = self.constant_property_accessor(dark_rgba)
             else:
-                return self.conditional_property_accessor('m_colorScheme == Theme::Dark', dark_rgba, light_rgba)
+                accessor = self.conditional_property_accessor('m_colorScheme == Theme::Dark', dark_rgba, light_rgba)
+            return self.partner_override_accessor(accessor) if self.name in PARTNER_COLOR_TOKENS else accessor
         elif not self.json_info.enum_type:
-            return self.constant_property_accessor(self.values[""])
+            accessor = self.constant_property_accessor(self.values[""])
+            return self.partner_override_accessor(accessor) if self.name in PARTNER_COLOR_TOKENS else accessor
         else:
             raise ValueError('Cannot create property_accessor for property "{}"'.format(self.name))
 
@@ -187,6 +242,13 @@ class ThemeProperty:
     {type_name} {name}() const {{
         return {value};
     }}'''.format(type_name=self.type_name, name=self.name, value=qt_value_string(self.type_name, constant_value)))
+
+    def partner_override_accessor(self, accessor):
+        marker = 'return '
+        start = accessor.index(marker) + len(marker)
+        end = accessor.index(';', start)
+        default_value = accessor[start:end]
+        return accessor[:start] + 'partnerColorOverride(QStringLiteral("{}"), {})'.format(self.name, default_value) + accessor[end:]
 
 class JsonFileInfo:
     theme_enums = {

@@ -13,7 +13,17 @@ Column {
 
 	property bool showFullDetails
 
-	readonly property bool _useTemperature: BackendConnection.portableIdInfo(centerService.value).type === "temperature"
+	readonly property bool _usePartnerBattery: PartnerBriefConfiguration.usesMappedCenterBattery
+	readonly property var _partnerCenter: PartnerBriefConfiguration.centerDetail
+	readonly property bool _useTemperature: !root._usePartnerBattery
+		&& BackendConnection.portableIdInfo(centerService.value).type === "temperature"
+	readonly property string _partnerPrefix: root._partnerCenter.dataSource
+		? root._partnerCenter.dataSource.replace(/\.stateOfCharge$/, "") : ""
+	readonly property QtObject _partnerPowerData: QtObject {
+		readonly property real power: PartnerSystemData.metricValue(
+			root._partnerPrefix + ".power", root._partnerCenter.batterySelector)
+		readonly property real current: NaN
+	}
 
 	VeQuickItem {
 		id: centerService
@@ -57,7 +67,11 @@ Column {
 			minimumPixelSize: Theme.font_briefPage_battery_title_minimumPixelSize
 			font.pixelSize: Theme.font_briefPage_battery_title_maximumPixelSize
 			color: Theme.color_font_primary
-			text: root._useTemperature ? CommonWords.temperature : CommonWords.battery
+			text: root._useTemperature ? CommonWords.temperature
+				: root._usePartnerBattery
+					? PartnerSystemData.batteryName(root._partnerCenter.dataSource,
+						root._partnerCenter.batterySelector, CommonWords.battery)
+					: CommonWords.battery
 			fontSizeMode: Text.HorizontalFit
 		}
 	}
@@ -67,7 +81,11 @@ Column {
 		anchors.horizontalCenter: parent.horizontalCenter
 		width: parent.width - (2 * Theme.geometry_briefPage_centerGauge_centerText_horizontalSpacing)
 		unit: root._useTemperature ? Global.systemSettings.temperatureUnit : VenusOS.Units_Percentage
-		value: root._useTemperature ? (temperature.value ?? NaN) : Global.system.battery.stateOfCharge
+	value: root._useTemperature ? (temperature.value ?? NaN)
+		: root._usePartnerBattery
+			? PartnerSystemData.metricValue(root._partnerCenter.dataSource,
+				root._partnerCenter.batterySelector)
+			: Global.system.battery.stateOfCharge
 		minimumPixelSize: Theme.font_briefPage_battery_percentage_minimumPixelSize
 		maximumPixelSize: Theme.font_briefPage_battery_percentage_maximumPixelSize
 	}
@@ -87,12 +105,15 @@ Column {
 					unitColor: Theme.color_briefPage_battery_unit_text_color
 					font.pixelSize: Theme.font_briefPage_battery_voltage_pixelSize
 					unit: VenusOS.Units_Volt_DC
-					value: Global.system.battery.voltage
+					value: root._usePartnerBattery
+						? PartnerSystemData.metricValue(root._partnerPrefix + ".voltage",
+							root._partnerCenter.batterySelector)
+						: Global.system.battery.voltage
 				}
 
 				ElectricalQuantityLabel {
 					sourceType: VenusOS.ElectricalQuantity_Source_Dc
-					dataObject: Global.system.battery
+					dataObject: root._usePartnerBattery ? root._partnerPowerData : Global.system.battery
 					valueColor: Theme.color_briefPage_battery_value_text_color
 					unitColor: Theme.color_briefPage_battery_unit_text_color
 					font.pixelSize: Theme.font_briefPage_battery_voltage_pixelSize
@@ -103,7 +124,8 @@ Column {
 				anchors.horizontalCenter: parent.horizontalCenter
 				font.pixelSize: Theme.font_briefPage_battery_timeToGo_pixelSize
 				color: Theme.color_briefPage_battery_value_text_color
-				text: Utils.formatBatteryTimeToGo(Global.system.battery.timeToGo, VenusOS.Battery_TimeToGo_LongFormat)
+				text: root._usePartnerBattery ? ""
+					: Utils.formatBatteryTimeToGo(Global.system.battery.timeToGo, VenusOS.Battery_TimeToGo_LongFormat)
 				visible: text.length > 0
 			}
 		}

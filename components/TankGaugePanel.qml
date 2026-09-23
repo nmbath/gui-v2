@@ -114,6 +114,7 @@ AbstractListItem {
 					valueType: root.tankProperties.valueType
 					value: root.tank ? root.tank.level / 100 : NaN
 					isGrouped: false
+					normalColor: root.tankProperties.color
 					surfaceColor: root.backgroundColor
 				}
 			}
@@ -141,6 +142,7 @@ AbstractListItem {
 							valueType: root.tankProperties.valueType
 							value: device.level / 100
 							isGrouped: true
+							normalColor: root.tankProperties.color
 							surfaceColor: root.backgroundColor
 						}
 					}

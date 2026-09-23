@@ -14,8 +14,11 @@
     "color_darkRed": "#491C1B",
     "color_darkGreen": "#223817",
 
-    "color_ok": "color_blue",
-    "color_darkOk": "color_darkBlue",
+    "color_brand_accent": "color_blue",
+    "color_brand_accent_muted": "color_darkBlue",
+    "color_success": "color_green",
+    "color_ok": "color_brand_accent",
+    "color_darkOk": "color_brand_accent_muted",
     "color_warning": "color_orange",
     "color_darkWarning": "color_darkOrange",
     "color_critical": "color_red",
@@ -28,6 +31,9 @@
 
     "color_background_primary": "color_black",
     "color_background_secondary": "color_gray1",
+    "color_card_background": "color_background_secondary",
+    "color_separator": "color_card_separator",
+    "color_navigationBar_background": "color_black",
     "color_background_disabled": "color_gray2",
 
     "color_focus_highlight": "color_green",
@@ -94,6 +100,14 @@
 
     "color_splash_logo_icon": "color_white",
     "color_splash_logo_text": "color_white",
+    "color_splash_victron_background": "color_black",
+    "color_splash_victron_progress_background": "color_darkBlue",
+    "color_splash_victron_progress_foreground": "color_blue",
+    "color_splash_victron_text": "color_gray5",
+    "color_splash_victron_warning": "color_orange",
+    "color_splash_victron_critical": "color_red",
+    "color_splash_victron_logo_icon": "color_white",
+    "color_splash_victron_logo_text": "color_white",
 
     "color_switch_groove_disabled": "color_gray4",
     "color_switch_groove_off": "transparent",

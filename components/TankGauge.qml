@@ -12,6 +12,14 @@ ClippingBarGauge {
 
 	property bool isGrouped: false
 	property bool expanded
+	property color normalColor: Theme.color_brand_accent
+
+	foregroundColor: valueStatus === Theme.Ok
+			? normalColor
+			: Theme.statusColorValue(valueStatus)
+	backgroundColor: valueStatus === Theme.Ok
+			? Qt.tint(surfaceColor, Qt.rgba(normalColor.r, normalColor.g, normalColor.b, 0.32))
+			: Theme.statusColorValue(valueStatus, true)
 
 	radius: Theme.geometry_levelsPage_tankGauge_radius
 	surfaceColor: Theme.color_levelsPage_gauge_separatorBarColor

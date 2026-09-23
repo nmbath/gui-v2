@@ -13,7 +13,7 @@ FocusScope {
 	required property bool animationEnabled
 
 	property var _leftWidgets: []
-	readonly property var _centerWidgets: [inverterChargerWidget, batteryWidget]
+	property var _centerWidgets: [inverterChargerWidget, batteryWidget]
 	property var _rightWidgets: []
 
 	property Item _lastFocusedWidget
@@ -63,9 +63,11 @@ FocusScope {
 		}
 		_resetLeftWidgets()
 		_resetRightWidgets()
+		_resetCenterWidgets()
 
 		// Set the widget sizes
 		_resetWidgetSizes(_leftWidgets)
+		_resetCenterWidgetSizes()
 		_resetWidgetSizes(_rightWidgets)
 
 		// Set the widget positions
@@ -82,6 +84,54 @@ FocusScope {
 		resetWidgetKeyNavigation(_leftWidgets, _centerWidgets)
 		resetWidgetKeyNavigation(_centerWidgets, _rightWidgets)
 		resetWidgetKeyNavigation(_rightWidgets)
+	}
+
+	function _partnerSuppresses(target) {
+		for (let i = 0; i < partnerEnergyNodes.count; ++i) {
+			const configuration = partnerEnergyNodeRepeater.itemAt(i)?.configuration || ({})
+			if ((configuration.operation === "hide" || configuration.operation === "replace")
+					&& configuration.target === target) {
+				return true
+			}
+		}
+		return false
+	}
+
+	function _partnerNodeVisible(widget, role) {
+		return widget && widget.configuration.role === role
+				&& widget.configuration.operation !== "hide"
+				&& (widget.configuration.demoOnly !== true || PartnerSystemData.demoMode)
+	}
+
+	function _resetCenterWidgets() {
+		let widgets = [inverterChargerWidget, batteryWidget]
+		for (let i = 0; i < partnerBatteryRepeater.count; ++i) {
+			const widget = partnerBatteryRepeater.itemAt(i)
+			if (widget && widget.configuration.operation !== "hide") {
+				widgets.push(widget)
+			}
+		}
+		_centerWidgets = widgets
+	}
+
+	// The house battery contains substantially more detail than a secondary battery.
+	// Keep it at L size, reduce the inverter/charger to M when a secondary battery is
+	// present, and render each additional battery as a compact, single-value row. On an
+	// 800x480 display M + L + XS plus two gaps fits the available height exactly. This
+	// deliberately differs from the equal-size algorithm used for sources and loads.
+	function _resetCenterWidgetSizes() {
+		inverterChargerWidget.size = partnerBatteries.count > 0
+			? VenusOS.OverviewWidget_Size_M
+			: VenusOS.OverviewWidget_Size_L
+		batteryWidget.size = VenusOS.OverviewWidget_Size_L
+		for (let i = 0; i < partnerBatteryRepeater.count; ++i) {
+			const widget = partnerBatteryRepeater.itemAt(i)
+			if (widget) {
+				widget.size = widget.configuration.operation === "hide"
+					? VenusOS.OverviewWidget_Size_Zero
+					: VenusOS.OverviewWidget_Size_XS
+			}
+		}
 	}
 
 	function _resetWidgetSizes(widgets) {
@@ -314,7 +364,7 @@ FocusScope {
 		}
 
 		// Add solar widget
-		if (layoutConditions.showSolar) {
+		if (layoutConditions.showSolar && !_partnerSuppresses("solar")) {
 			widgetCandidates.splice(_leftWidgetInsertionIndex(VenusOS.OverviewWidget_Type_Solar, widgetCandidates),
 					0, _createWidget(VenusOS.OverviewWidget_Type_Solar))
 		}
@@ -343,6 +393,13 @@ FocusScope {
 				widgetCandidates.splice(_leftWidgetInsertionIndex(widgetType, widgetCandidates), 0, widget)
 			}
 		}
+		for (i = 0; i < partnerEnergyNodeRepeater.count; ++i) {
+			widget = partnerEnergyNodeRepeater.itemAt(i)
+			if (_partnerNodeVisible(widget, "source")) {
+				widgetCandidates.push(widget)
+			}
+		}
+		_leftWidgets = widgetCandidates
 	}
 
 	function _leftWidgetInsertionIndex(widgetType, candidateArray) {
@@ -357,7 +414,7 @@ FocusScope {
 
 	function _resetRightWidgets() {
 		let widgets = []
-		if (layoutConditions.showAcLoads) {
+		if (layoutConditions.showAcLoads && !_partnerSuppresses("acLoads")) {
 			widgets.push(acLoadsWidget)
 		}
 		if (Global.evChargers.model.count > 0) {
@@ -368,8 +425,14 @@ FocusScope {
 		} else {
 			essentialLoadsWidget.size = VenusOS.OverviewWidget_Size_Zero
 		}
-		if (layoutConditions.showDcLoads) {
+		if (layoutConditions.showDcLoads && !_partnerSuppresses("dcLoads")) {
 			widgets.push(_createWidget(VenusOS.OverviewWidget_Type_DcLoads))
+		}
+		for (let i = 0; i < partnerEnergyNodeRepeater.count; ++i) {
+			const widget = partnerEnergyNodeRepeater.itemAt(i)
+			if (_partnerNodeVisible(widget, "load")) {
+				widgets.push(widget)
+			}
 		}
 		_rightWidgets = widgets
 	}
@@ -458,6 +521,91 @@ FocusScope {
 			}
 		}
 		return null
+	}
+
+	GuiPluginIntegrationModel {
+		id: partnerEnergyNodes
+		type: GuiPluginLoader.OverviewEnergyNode
+	}
+
+	Repeater {
+		id: partnerEnergyNodeRepeater
+		model: partnerEnergyNodes.count
+
+		delegate: PartnerOverviewWidget {
+			id: partnerNode
+			required property int index
+
+			readonly property var integration: partnerEnergyNodes.integrationAt(index)
+			configuration: integration.configuration
+			title: integration.title
+			iconSource: integration.icon
+			size: VenusOS.OverviewWidget_Size_Zero
+			expanded: root._expandLayout
+			animateGeometry: root._animateGeometry
+			animationEnabled: root.animationEnabled
+			connectors: [ partnerConnector ]
+
+			WidgetConnectorAnchor {
+				location: partnerNode.configuration.role === "source"
+					? VenusOS.WidgetConnector_Location_Right
+					: VenusOS.WidgetConnector_Location_Left
+				visible: partnerConnector.visible
+			}
+
+			WidgetConnector {
+				id: partnerConnector
+				parent: root
+				startWidget: partnerNode.configuration.role === "source"
+					? partnerNode
+					: (partnerNode.configuration.connectionTarget === "inverterCharger" ? inverterChargerWidget : batteryWidget)
+				startLocation: partnerNode.configuration.role === "source"
+					? VenusOS.WidgetConnector_Location_Right
+					: VenusOS.WidgetConnector_Location_Right
+				endWidget: partnerNode.configuration.role === "source"
+					? (partnerNode.configuration.connectionTarget === "inverterCharger" ? inverterChargerWidget : batteryWidget)
+					: partnerNode
+				endLocation: VenusOS.WidgetConnector_Location_Left
+				expanded: root._expandLayout
+				frameAnimation: overviewPageRootAnimation
+				animateGeometry: root._animateGeometry
+				animationEnabled: root.animationEnabled
+				animationMode: root.isCurrentPage && partnerNode.valueAvailable
+						&& Math.abs(partnerNode.flowPower) > Theme.geometry_overviewPage_connector_animationPowerThreshold
+					? VenusOS.WidgetConnector_AnimationMode_StartToEnd
+					: VenusOS.WidgetConnector_AnimationMode_NotAnimated
+			}
+		}
+
+		onItemAdded: (index, item) => Qt.callLater(root._resetWidgets)
+		onItemRemoved: (index, item) => Qt.callLater(root._resetWidgets)
+	}
+
+	GuiPluginIntegrationModel {
+		id: partnerBatteries
+		type: GuiPluginLoader.OverviewBattery
+	}
+
+	Repeater {
+		id: partnerBatteryRepeater
+		model: partnerBatteries.count
+
+		delegate: PartnerOverviewWidget {
+			id: partnerBattery
+			required property int index
+
+			readonly property var integration: partnerBatteries.integrationAt(index)
+			configuration: integration.configuration
+			title: integration.title
+			iconSource: integration.icon
+			size: VenusOS.OverviewWidget_Size_Zero
+			expanded: root._expandLayout
+			animateGeometry: root._animateGeometry
+			animationEnabled: root.animationEnabled
+		}
+
+		onItemAdded: (index, item) => Qt.callLater(root._resetWidgets)
+		onItemRemoved: (index, item) => Qt.callLater(root._resetWidgets)
 	}
 
 	focus: true

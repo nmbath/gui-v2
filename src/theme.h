@@ -10,6 +10,9 @@
 #include <QScreen>
 #include <QObject>
 #include <QSizeF>
+#include <QColor>
+#include <QHash>
+#include <QVariantMap>
 #include <qqmlintegration.h>
 
 #include "enums.h"
@@ -31,6 +34,7 @@ class Theme : public QObject
 	Q_PROPERTY(bool adjustingGeometry READ adjustingGeometry NOTIFY adjustingGeometryChanged FINAL)
 	Q_PROPERTY(int visualViewportBottom READ visualViewportBottom NOTIFY visualViewportBottomChanged FINAL)
 	Q_PROPERTY(bool virtualKeyboardOpened READ virtualKeyboardOpened NOTIFY virtualKeyboardOpenedChanged FINAL)
+	Q_PROPERTY(bool partnerThemeActive READ partnerThemeActive NOTIFY partnerThemeChanged FINAL)
 
 public:
 	enum ScreenSize {
@@ -90,6 +94,10 @@ public:
 
 	Q_INVOKABLE Victron::VenusOS::Theme::StatusLevel getValueStatus(qreal value, Victron::VenusOS::Enums::Gauges_ValueType valueType) const;
 	Q_INVOKABLE bool objectHasQObjectParent(QObject *obj) const;
+	Q_INVOKABLE bool hasPartnerOverride(const QString &name) const;
+	Q_INVOKABLE bool applyPartnerTheme(const QVariantMap &definition);
+	Q_INVOKABLE void clearPartnerTheme();
+	bool partnerThemeActive() const;
 
 	bool adjustingGeometry() const;
 	bool virtualKeyboardOpened() const;
@@ -119,8 +127,10 @@ Q_SIGNALS:
 	void adjustingGeometryChanged();
 	void visualViewportBottomChanged();
 	void virtualKeyboardOpenedChanged();
+	void partnerThemeChanged();
 
 protected:
+	QColor partnerColorOverride(const QString &name, const QColor &fallback) const;
 	void setAdjustingGeometry(bool adjusting);
 	void updateViewportAndKeyboardProperties();
 
@@ -136,6 +146,7 @@ protected:
 	int m_visualViewportOffsetTop = 0;
 	bool m_adjustingGeometry = false;
 	bool m_virtualKeyboardOpened = false;
+	QHash<QString, QHash<int, QColor> > m_partnerColorOverrides;
 };
 
 }

@@ -1,0 +1,21 @@
+{
+  "id": "acme-marine",
+  "displayName": "Acme Marine",
+  "splashLogo": "assets/logo.svg",
+  "logoDark": "assets/logo.svg",
+  "logoLight": "assets/logo.svg",
+  "attribution": "Example partner pack for GUIv2 development",
+  "colors": {
+    "color_page_background": {
+      "dark": "#071A2B",
+      "light": "#F2F6F8"
+    },
+    "color_font_primary": {
+      "dark": "#F4F7F9",
+      "light": "#102536"
+    },
+    "color_button": "#C9972E",
+    "color_navigationBar_button_on": "#C9972E",
+    "color_focus_highlight": "#C9972E"
+  }
+}

@@ -10,6 +10,8 @@ import QtQuick.Effects as Effects
 
 T.ProgressBar {
 	id: root
+	property color backgroundColor: Theme.color_darkOk
+	property color foregroundColor: Theme.color_ok
 
 	implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset,
 			implicitContentWidth + leftPadding + rightPadding)
@@ -20,7 +22,7 @@ T.ProgressBar {
 		implicitHeight: Theme.geometry_progressBar_height
 		implicitWidth: Theme.geometry_progressBar_height
 		radius: Theme.geometry_progressBar_radius
-		color: Theme.color_darkOk
+		color: root.backgroundColor
 	}
 
 	contentItem: Item {
@@ -47,7 +49,7 @@ T.ProgressBar {
 			Rectangle {
 				id: highlightRect
 				readonly property bool isMirrored: root.position !== root.visualPosition
-				color: Theme.color_ok
+				color: root.foregroundColor
 				height: container.height
 				width: root.indeterminate ? (container.width/3) : (container.width * root.position)
 				x: root.indeterminate
@@ -78,4 +80,3 @@ T.ProgressBar {
 		}
 	}
 }
-

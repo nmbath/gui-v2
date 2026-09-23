@@ -134,12 +134,27 @@ Page {
 	}
 
 	GradientListView {
+		header: SettingsColumn {
+			width: parent.width
+			visible: PartnerBriefConfiguration.active
+
+			ListText {
+				text: PartnerBriefConfiguration.locked
+					? qsTr("Brief layout") : qsTr("Brief layout defaults")
+				secondaryText: PartnerBriefConfiguration.locked
+					? qsTr("Managed by %1").arg(PartnerBriefConfiguration.ownerName)
+					: qsTr("Provided by %1 until you customise it").arg(PartnerBriefConfiguration.ownerName)
+			}
+		}
 		model: Theme.geometry_briefPage_centerGauge_maximumGaugeCount
 		delegate: ListNavigation {
 			id: levelDelegate
 
 			required property int index
-			readonly property var modelData: Global.systemSettings.briefView.centralGauges[index]
+			readonly property var effectiveGauges: PartnerBriefConfiguration.effectiveGauges(
+				Global.systemSettings.briefView.centralGauges)
+			readonly property var modelData: effectiveGauges[index]
+			enabled: !PartnerBriefConfiguration.locked
 			readonly property int centerGaugeType: modelData?.centerGaugeType ?? -1
 			readonly property var centerGaugeValue: modelData?.value ?? ""
 
@@ -214,6 +229,8 @@ Page {
 
 		footer: SettingsColumn {
 			width: parent.width
+			enabled: !PartnerBriefConfiguration.locked
+			opacity: enabled ? 1.0 : 0.5
 
 			ListRadioButtonGroup {
 				//% "Tank details"

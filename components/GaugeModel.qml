@@ -38,7 +38,8 @@ ListModel {
 	// Rebuild the gauge model, based on the preferred gauges and the tanks available.
 	function _reset() {
 		let useDefaultGauges = false
-		let gauges = Global.systemSettings.briefView.centralGauges
+		let gauges = PartnerBriefConfiguration.effectiveGauges(
+			Global.systemSettings.briefView.centralGauges)
 		if (gauges.length === 0) {
 			gauges = _loadDefaultGauges()
 			useDefaultGauges = true
@@ -271,6 +272,14 @@ ListModel {
 		target: Global.systemSettings.briefView
 
 		function onCentralGaugesChanged() {
+			Qt.callLater(root._reset)
+		}
+	}
+
+	property Connections _partnerBriefConfigurationConn: Connections {
+		target: PartnerBriefConfiguration
+
+		function onConfigurationChanged() {
 			Qt.callLater(root._reset)
 		}
 	}

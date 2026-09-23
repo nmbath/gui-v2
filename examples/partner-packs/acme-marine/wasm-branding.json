@@ -1,0 +1,9 @@
+{
+  "title": "Acme Marine GX",
+  "logoDark": "acme-marine/assets/logo.svg",
+  "logoLight": "acme-marine/assets/logo.svg",
+  "colors": {
+    "dark": { "background": "#071A2B", "text": "#F4F7F9", "muted": "#A8B6C0", "accent": "#C9972E" },
+    "light": { "background": "#F2F6F8", "text": "#102536", "muted": "#526977", "accent": "#9C6E14" }
+  }
+}
