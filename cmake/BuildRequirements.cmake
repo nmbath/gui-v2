@@ -25,6 +25,19 @@ else()
     find_package(Qt6 ${REQUIRED_QT_VERSION} COMPONENTS DBus REQUIRED)
 endif()
 
+if(VENUS_GX_BUILD)
+    # Qt WebEngine is not included in the Venus GX SDKs. Keep it optional so
+    # the native GUI can still be built; web-page management remains
+    # available even when the embedded native web view is not.
+    find_package(Qt6WebEngineQuick ${REQUIRED_QT_VERSION} QUIET)
+    if(TARGET Qt6::WebEngineQuick)
+        set(VENUS_QT_WEBENGINE_BUILD ON)
+        add_compile_definitions(VENUS_QT_WEBENGINE_BUILD)
+    else()
+        message(STATUS "Qt WebEngineQuick is unavailable; disabling the native embedded web view")
+    endif()
+endif()
+
 # Qt > 6.5 only.
 # Enabling this policy ensures that your QML module is placed under a default import path,
 # and its types can be found without manual calls to QQmlEngine::addImportPath.
@@ -38,4 +51,3 @@ qt_standard_project_setup(REQUIRES ${REQUIRED_QT_VERSION}
     I18N_SOURCE_LANGUAGE en # optional - this is the default
     I18N_TRANSLATED_LANGUAGES ${TS_CODES}
 )
-

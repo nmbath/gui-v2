@@ -15,6 +15,7 @@ FocusScope {
 
 	readonly property color backgroundColor: !!currentPage ? currentPage.backgroundColor : Theme.color_page_background
 	readonly property bool cardsActive: cardsLoader.viewActive
+	readonly property bool webPagesActive: cardsLoader.viewActive && cardsLoader.viewType === "web-pages"
 	readonly property Page currentPage: cardsActive && cardsLoader.status === Loader.Ready && cardsLoader.item ? cardsLoader.item
 			: (pageStack.currentPage ?? swipeView?.currentItem ?? null)
 	readonly property alias cardsLoader: cardsLoader
@@ -428,8 +429,11 @@ FocusScope {
 	CardViewLoader {
 		id: cardsLoader
 
-		function show(viewComponent) {
+		property string viewType
+
+		function show(viewComponent, type) {
 			sourceComponent = viewComponent
+			viewType = type || ""
 			viewActive = true
 		}
 
@@ -469,6 +473,11 @@ FocusScope {
 			id: auxCardsComponent
 			AuxCardsPage {}
 		}
+
+		Component {
+			id: webPagesComponent
+			WebPagesPage {}
+		}
 	}
 
 	StatusBar {
@@ -479,8 +488,9 @@ FocusScope {
 		opacity: 0.0
 		pageStack: root._pageStack
 
-		onControlCardsActivated: cardsLoader.show(controlCardsComponent)
-		onAuxCardsActivated: cardsLoader.show(auxCardsComponent)
+		onControlCardsActivated: cardsLoader.show(controlCardsComponent, "controls")
+		onAuxCardsActivated: cardsLoader.show(auxCardsComponent, "aux")
+		onWebPagesActivated: cardsLoader.show(webPagesComponent, "web-pages")
 		onCardsDeactivated: cardsLoader.hide()
 		onSidePanelToggled: root.currentPage.toggleSidePanel()
 

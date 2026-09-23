@@ -16,7 +16,13 @@
 #include "src/uitestutils.h"
 #include "src/frameratemodel.h"
 #include "src/screenblanker.h"
+#include "src/wasmwebviewbridge.h"
+
 #include "src/urlinterceptor.h"
+
+#if defined(VENUS_QT_WEBENGINE_BUILD)
+#include <QtWebEngineQuick/QtWebEngineQuick>
+#endif
 
 #if defined(VENUS_WEBASSEMBLY_BUILD)
 #include <emscripten/html5.h>
@@ -30,6 +36,7 @@
 #include <QQuickView>
 #include <QSurfaceFormat>
 #include <QQmlComponent>
+#include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickWindow>
 #include <QCommandLineParser>
@@ -615,6 +622,13 @@ int main(int argc, char *argv[])
 	QByteArray scaleAsQByteArray(scaleAsString.c_str(), scaleAsString.length());
 	qputenv("QT_SCALE_FACTOR", scaleAsQByteArray);
 
+#if defined(VENUS_QT_WEBENGINE_BUILD)
+	// Must run before QGuiApplication exists - it sets up Chromium's
+	// sandbox/GPU process, which import QtWebEngine's own lazy plugin
+	// init is too late for once the app and its QML engine are already
+	// running (aborts with "must be called from the Qt gui thread").
+	QtWebEngineQuick::initialize();
+#endif
 	QGuiApplication app(argc, argv);
 	perfMark("QGuiApplication created");
 	QGuiApplication::setApplicationName("Venus");
@@ -626,6 +640,9 @@ int main(int argc, char *argv[])
 	bool skipSplashScreen = false;
 
 	QQmlEngine engine;
+	WasmWebViewBridge wasmWebViewBridge;
+	engine.rootContext()->setContextProperty(QStringLiteral("wasmWebViewBridge"), &wasmWebViewBridge);
+
 	// If QML files are installed alongside the executable, load them from the
 	// filesystem instead of from compiled-in resources. This is always the case
 	// for GX builds, and also for desktop builds installed with an install prefix.

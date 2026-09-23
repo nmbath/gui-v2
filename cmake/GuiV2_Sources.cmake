@@ -4,6 +4,8 @@ set(GUIV2_QML_SOURCES
 
 set(GUIV2_CPP_SOURCES
     src/main.cpp
+    src/wasmwebviewbridge.cpp
+    src/wasmwebviewbridge.h
 )
 
 set_source_files_properties(
