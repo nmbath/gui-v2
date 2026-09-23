@@ -74,7 +74,9 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 
 		StatusBarButton {
 			visible: root.webNavigationActive
-			enabled: visible && (Global.mainView.currentPage?.canGoBack ?? false)
+			// The cross-origin iframe reports its history asynchronously. Keep
+			// the control active; the bridge safely ignores an unavailable action.
+			enabled: visible
 			icon.source: "qrc:/images/icon_back_32.svg"
 			Layout.alignment: Qt.AlignVCenter
 			transform: Translate { y: -Theme.geometry_statusBar_spacing / 2 }
@@ -83,7 +85,7 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 
 		StatusBarButton {
 			visible: root.webNavigationActive
-			enabled: visible && (Global.mainView.currentPage?.canGoForward ?? false)
+			enabled: visible
 			icon.source: "qrc:/images/icon_back_32.svg"
 			rotation: 180
 			Layout.alignment: Qt.AlignVCenter
