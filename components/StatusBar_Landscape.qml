@@ -243,7 +243,10 @@ FocusScope {
 			verticalCenterOffset: -Theme.geometry_statusBar_spacing / 2
 		}
 		visible: root.webNavigationActive
-		enabled: visible && (Global.mainView.currentPage?.canGoBack ?? false)
+		// Keep this control clickable even if the asynchronous iframe history
+		// state has not reached QML yet. The injected bridge safely ignores a
+		// back request when the iframe has no earlier entry.
+		enabled: visible
 		icon.source: "qrc:/images/icon_back_32.svg"
 		onClicked: Global.mainView.currentPage?.goBack()
 	}
@@ -257,7 +260,9 @@ FocusScope {
 			verticalCenterOffset: -Theme.geometry_statusBar_spacing / 2
 		}
 		visible: root.webNavigationActive
-		enabled: visible && (Global.mainView.currentPage?.canGoForward ?? false)
+		// See webHistoryBackButton: availability is enforced by the iframe
+		// bridge, avoiding a stale QML state from swallowing the click.
+		enabled: visible
 		icon.source: "qrc:/images/icon_back_32.svg"
 		rotation: 180
 		onClicked: Global.mainView.currentPage?.goForward()
