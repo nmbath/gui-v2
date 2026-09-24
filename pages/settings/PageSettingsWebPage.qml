@@ -18,6 +18,21 @@ Page {
 	required property string pageTitle
 
 	readonly property string webPagesServiceUid: BackendConnection.serviceUidForType("webpages")
+	// Absent/invalid Origin is treated as manual, matching
+	// WebPageDelegate.qml's own fail-open convention.
+	readonly property bool isManual: !originItem.valid || originItem.value === "manual"
+	// A VRM Remote Console session is still Qt.platform.os === "wasm", but
+	// must be gated on Visibility/Vrm, not Visibility/Wasm - see
+	// BackendConnection.vrm's own docs (true iff the session's data
+	// connection targets VRM's own MQTT broker, only possible in a wasm
+	// build). The underlying proxy port is unaffected: VRM-relayed
+	// sessions still use wasmProxyPort, the same WASM proxy - only which
+	// Visibility flag gates access differs.
+	readonly property bool surfaceVisible: Qt.platform.os !== "wasm"
+			? localVisibilityItem.valid && localVisibilityItem.value === 1
+			: BackendConnection.vrm
+				? vrmVisibilityItem.valid && vrmVisibilityItem.value === 1
+				: wasmVisibilityItem.valid && wasmVisibilityItem.value === 1
 	readonly property string visibilitySummary: {
 		const locations = []
 		if (localVisibilityItem.valid && localVisibilityItem.value === 1) {
@@ -76,6 +91,10 @@ Page {
 		id: removeItem
 		uid: root.webPagesServiceUid + "/WebPages/Remove"
 	}
+	VeQuickItem {
+		id: originItem
+		uid: root.pagePrefix + "/Origin"
+	}
 
 	GradientListView {
 		model: VisibleItemModel {
@@ -115,10 +134,10 @@ Page {
 
 				ListNavigation {
 					text: "Open"
-					enabled: availableItem.valid && availableItem.value === 1
+					enabled: availableItem.valid && availableItem.value === 1 && root.surfaceVisible
 							&& (Qt.platform.os === "wasm"
-								? wasmVisibilityItem.value === 1 && wasmProxyPortItem.value > 0
-								: localVisibilityItem.value === 1 && localProxyPortItem.value > 0)
+								? wasmProxyPortItem.value > 0
+								: localProxyPortItem.value > 0)
 					// Pushed by file path, not a locally-declared Component -
 					// see WebContentPage.qml's own header and
 					// PageSettingsWebPages.qml's git history for why a
@@ -140,8 +159,8 @@ Page {
 					// is a different kind of control) is not how this app
 					// styles a destructive list-row action.
 					text: "Remove this web page"
-					secondaryText: "Remove"
-					enabled: removeItem.valid && root.pageId.length > 0
+					secondaryText: root.isManual ? "Remove" : "Added automatically — can't be removed here"
+					enabled: removeItem.valid && root.pageId.length > 0 && root.isManual
 					writeAccessLevel: VenusOS.User_AccessType_User
 					onClicked: Global.dialogLayer.open(removeConfirmComponent)
 
