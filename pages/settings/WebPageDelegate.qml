@@ -18,6 +18,10 @@ ListNavigation {
 	required property string pagePrefix // .../WebPages/<id>
 	required property string pageTitle
 	readonly property string pageId: idItem.valid ? idItem.value : ""
+	// Absent/invalid Origin is treated as manual, so nothing already-
+	// removable becomes stuck non-removable (e.g. before a venus-web-pages
+	// daemon that publishes this field has been deployed).
+	readonly property bool isManual: !originItem.valid || originItem.value === "manual"
 
 	text: root.pageTitle
 	// Not qsTrId - see PageSettingsIntegrations.qml's "Web pages" entry for why.
@@ -41,5 +45,9 @@ ListNavigation {
 	VeQuickItem {
 		id: idItem
 		uid: root.pagePrefix + "/Id"
+	}
+	VeQuickItem {
+		id: originItem
+		uid: root.pagePrefix + "/Origin"
 	}
 }

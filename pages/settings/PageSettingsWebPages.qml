@@ -3,19 +3,23 @@
 ** See LICENSE.txt for license information.
 */
 
-// Manage manually-added web pages (see
-// VenusOS_GUIv2_Web_Content_and_Container_Proxy_Design and
-// venus-private#707): add one via venus-exchange's real upload flow, list
-// the ones already added, tap one for detail + remove. Pages registered by
-// device drivers (Fronius/SMA/ABB) or services (Node-RED, Signal K) are not
-// managed here - this is specifically the manual set, per explicit
-// correction. Browsing/opening *all* available pages (manual and
-// driver-registered) is the separate top-left status bar button, which
-// pushes straight into a page rather than this management view.
+// Manage web pages (see VenusOS_GUIv2_Web_Content_and_Container_Proxy_Design
+// and venus-private#707): add one manually via venus-exchange's real upload
+// flow, and list every registered page - manually-added and automatically-
+// registered (e.g. by venus-containers) alike - in two separate sections.
+// Only the manually-added section supports Add/Remove: a page's Origin
+// (venus-web-pages' own field, "manual" vs a capability's own name)
+// determines which section it appears in and whether Remove is available -
+// see WebPageDelegate.qml's isManual and PageSettingsWebPage.qml's own
+// Remove gating. Browsing/opening *all* available pages (regardless of
+// origin) is the separate top-left status bar button, which pushes straight
+// into a page rather than this management view.
 //
 // Add uses the generic ExchangeAction workflow supplied by the parent
 // mbath/exchange branch. Remove remains the simple writable D-Bus trigger
-// exposed by venus-web-pages.
+// exposed by venus-web-pages, which itself refuses to remove a non-manual
+// page through that trigger - this UI's own hiding/disabling is real
+// enforcement, not the only enforcement.
 //
 // Backed by com.victronenergy.webpages, provided by the separate
 // venus-web-pages daemon - see docs/web-page-descriptor.md in the
@@ -31,6 +35,30 @@ Page {
 	title: "Web pages"
 
 	readonly property string webPagesServiceUid: BackendConnection.serviceUidForType("webpages")
+	property int manualCount: 0
+	property int automaticCount: 0
+
+	function recomputeManualCount() {
+		let count = 0
+		for (let i = 0; i < manualPagesRepeater.count; ++i) {
+			const row = manualPagesRepeater.itemAt(i)
+			if (row && row.isManual) {
+				count++
+			}
+		}
+		root.manualCount = count
+	}
+
+	function recomputeAutomaticCount() {
+		let count = 0
+		for (let i = 0; i < automaticPagesRepeater.count; ++i) {
+			const row = automaticPagesRepeater.itemAt(i)
+			if (row && !row.isManual) {
+				count++
+			}
+		}
+		root.automaticCount = count
+	}
 
 	ExchangeAction {
 		id: webPageRegisterAction
@@ -94,20 +122,58 @@ Page {
 
 			ListInfoLabel {
 				text: "No web pages are registered yet."
-				preferredVisible: pageTitlesRepeater.count === 0
+				preferredVisible: pageTitles.count === 0
 			}
 
 			SettingsColumn {
 				width: parent ? parent.width : 0
 
+				PrimaryListLabel {
+					text: "Manually added"
+					preferredVisible: root.manualCount > 0
+				}
+
 				Repeater {
-					id: pageTitlesRepeater
+					id: manualPagesRepeater
 					model: pageTitles
+					// Covers rows appearing/disappearing - each row's own
+					// onIsManualChanged (below) covers a row's origin
+					// becoming known/changing after it already exists.
+					onCountChanged: root.recomputeManualCount()
 					delegate: WebPageDelegate {
 						required property VeQItem item // item for the "Title" subpath
 
 						pagePrefix: item.itemParent().uid
 						pageTitle: item.value || ""
+						preferredVisible: isManual
+
+						onIsManualChanged: root.recomputeManualCount()
+						Component.onCompleted: root.recomputeManualCount()
+					}
+				}
+			}
+
+			SettingsColumn {
+				width: parent ? parent.width : 0
+
+				PrimaryListLabel {
+					text: "Added automatically"
+					preferredVisible: root.automaticCount > 0
+				}
+
+				Repeater {
+					id: automaticPagesRepeater
+					model: pageTitles
+					onCountChanged: root.recomputeAutomaticCount()
+					delegate: WebPageDelegate {
+						required property VeQItem item // item for the "Title" subpath
+
+						pagePrefix: item.itemParent().uid
+						pageTitle: item.value || ""
+						preferredVisible: !isManual
+
+						onIsManualChanged: root.recomputeAutomaticCount()
+						Component.onCompleted: root.recomputeAutomaticCount()
 					}
 				}
 			}
