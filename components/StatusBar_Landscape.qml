@@ -384,6 +384,53 @@ FocusScope {
 		height: parent.height
 		anchors.right: parent.right
 
+		// Background work is commonly started from a Settings page. Keep this
+		// in the always-visible right-hand controls rather than connectivityRow,
+		// which is deliberately hidden while Settings breadcrumbs are shown.
+		StatusBarButton {
+			id: activityButton
+			property QtObject activityDialog
+
+			visible: !root.webNavigationActive && (Global.backgroundActivity?.busy ?? false)
+			enabled: visible
+			// Long-running work must remain visible after normal controls fade
+			// when the display becomes inactive (same exception as notifications).
+			opacity: 1.0
+			// Keep the rotating control square and centred. Asymmetric clickable
+			// insets rotate with the whole button and make the glyph orbit off-centre.
+			icon.width: Theme.geometry_icon_size_medium * 0.75
+			icon.height: Theme.geometry_icon_size_medium * 0.75
+			// No dedicated "background activity" icon exists yet - reuses
+			// the generic refresh glyph, with continuous rotation as the
+			// "something is happening" cue a static icon can't give alone.
+			icon.source: "qrc:/images/icon_refresh_32.svg"
+
+			RotationAnimation on rotation {
+				running: activityButton.visible && Global.animationEnabled
+				loops: Animation.Infinite
+				from: 0
+				to: 360
+				duration: 1500
+			}
+
+			KeyNavigation.left: alarmButton
+			KeyNavigation.right: rightButton
+
+			onClicked: {
+				if (activityDialog) {
+					activityDialog.close()
+				} else {
+					activityDialog = Global.dialogLayer.open(backgroundActivityDialogComponent)
+				}
+			}
+
+			Component {
+				id: backgroundActivityDialogComponent
+
+				BackgroundActivityDialog {}
+			}
+		}
+
 		StatusBarButton {
 			id: rightButton
 
@@ -404,7 +451,7 @@ FocusScope {
 							 : buttonType === VenusOS.StatusBar_RightButton_Refresh
 							   ? "qrc:/images/icon_refresh_32.svg"
 							   : ""
-			KeyNavigation.left: alarmButton
+			KeyNavigation.left: activityButton.visible ? activityButton : alarmButton
 			KeyNavigation.right: sleepButton
 
 			onClicked: root.sidePanelToggled()
@@ -445,7 +492,7 @@ FocusScope {
 		enabled: Global.keyNavigationEnabled
 		function onActiveFocusItemChanged() {
 			if (Global.main.activeFocusItem === root) {
-				for (const button of [leftButton, auxButton, webPagesButton, breadcrumbs, notificationButton, alarmButton, rightButton, sleepButton]) {
+				for (const button of [leftButton, auxButton, webPagesButton, breadcrumbs, notificationButton, alarmButton, activityButton, rightButton, sleepButton]) {
 					if (button.enabled) {
 						button.focus = true
 						break

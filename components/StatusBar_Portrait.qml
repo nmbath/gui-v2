@@ -94,11 +94,57 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 		}
 
 		StatusBarButton {
+			id: activityButton
+			property QtObject activityDialog
+
+			// Background work is commonly started from a Settings page, so keep
+			// the indicator visible alongside the breadcrumbs while it runs.
+			visible: !root.webNavigationActive && (Global.backgroundActivity?.busy ?? false)
+			enabled: visible
+			// Long-running work must remain visible after normal controls fade
+			// when the display becomes inactive (same exception as notifications).
+			opacity: 1.0
+			// Keep the rotating control square and centred. Asymmetric clickable
+			// insets rotate with the whole button and make the glyph orbit off-centre.
+			icon.width: Theme.geometry_icon_size_medium * 0.75
+			icon.height: Theme.geometry_icon_size_medium * 0.75
+			// No dedicated "background activity" icon exists yet - reuses
+			// the generic refresh glyph, with continuous rotation as the
+			// "something is happening" cue a static icon can't give alone.
+			icon.source: "qrc:/images/icon_refresh_32.svg"
+
+			RotationAnimation on rotation {
+				running: activityButton.visible && Global.animationEnabled
+				loops: Animation.Infinite
+				from: 0
+				to: 360
+				duration: 1500
+			}
+
+			Layout.alignment: Qt.AlignTop
+			KeyNavigation.right: notificationButton
+
+			onClicked: {
+				if (activityDialog) {
+					activityDialog.close()
+				} else {
+					activityDialog = Global.dialogLayer.open(backgroundActivityDialogComponent)
+				}
+			}
+
+			Component {
+				id: backgroundActivityDialogComponent
+
+				BackgroundActivityDialog {}
+			}
+		}
+
+		StatusBarButton {
 			id: notificationButton
 
 			enabled: Global.notifications?.statusBarNotificationIconVisible ?? false
 			visible: !breadcrumbs.visible && !root.webNavigationActive && enabled
-			leftInset: Theme.geometry_statusBar_spacing
+			leftInset: Theme.geometry_statusBar_spacing / 2
 			rightInset: Theme.geometry_statusBar_spacing / 2
 			bottomInset: Theme.geometry_statusBar_spacing
 			color: Global.notifications?.statusBarNotificationIconColor ?? "transparent"
