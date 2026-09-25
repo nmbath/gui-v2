@@ -14,6 +14,7 @@ Page {
 	readonly property int stateFailed: 8
 	readonly property int stateCancelled: 9
 
+	property string failureTitle
 	property string subjectLabel
 	property string summaryLabel
 	property string confirmActionText
@@ -155,8 +156,13 @@ Page {
 
 			PrimaryListLabel {
 				//% "Exchange failed"
-				text: errorText.value || qsTrId("exchangeaction_exchange_failed")
+				text: root.failureTitle || qsTrId("exchangeaction_exchange_failed")
 				preferredVisible: state.value === root.stateFailed
+			}
+
+			SecondaryListLabel {
+				text: Exchange.errorSummaryText(errorCode.value, errorText.value)
+				preferredVisible: state.value === root.stateFailed && text.length > 0
 			}
 
 			ListButton {

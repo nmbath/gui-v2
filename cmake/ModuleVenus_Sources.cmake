@@ -1,5 +1,6 @@
 set (VictronVenusOS_QML_MODULE_SINGLETON_SOURCES # All qml singletons have to be added here
     components/CommonWords.qml
+    components/Exchange.qml
     components/FirmwareVersion.qml
     Global.qml
 )
