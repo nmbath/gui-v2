@@ -113,7 +113,9 @@ QtObject {
 	// 4 Mounting, 5 Switching, 6 Resuming, 7 Failed.
 	readonly property bool migrationInProgress: migrationState.value > 0 && migrationState.value < 7
 
-	VeQuickItem { id: migrationState; uid: root.containersServiceUid + "/Storage/Migration/State" }
-	VeQuickItem { id: migrationItemsDone; uid: root.containersServiceUid + "/Storage/Migration/ItemsDone" }
-	VeQuickItem { id: migrationItemsTotal; uid: root.containersServiceUid + "/Storage/Migration/ItemsTotal" }
+	// Named properties, not bare children - QtObject has no default
+	// property (see the Instantiator delegate comment above).
+	readonly property VeQuickItem migrationState: VeQuickItem { uid: root.containersServiceUid + "/Storage/Migration/State" }
+	readonly property VeQuickItem migrationItemsDone: VeQuickItem { uid: root.containersServiceUid + "/Storage/Migration/ItemsDone" }
+	readonly property VeQuickItem migrationItemsTotal: VeQuickItem { uid: root.containersServiceUid + "/Storage/Migration/ItemsTotal" }
 }
