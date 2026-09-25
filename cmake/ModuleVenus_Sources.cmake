@@ -3,6 +3,9 @@ set (VictronVenusOS_QML_MODULE_SINGLETON_SOURCES # All qml singletons have to be
     components/Containers.qml
     components/Exchange.qml
     components/FirmwareVersion.qml
+    components/PartnerBriefConfiguration.qml
+    components/PartnerNavigationConfiguration.qml
+    components/PartnerSystemData.qml
     Global.qml
 )
 set_source_files_properties(${VictronVenusOS_QML_MODULE_SINGLETON_SOURCES} PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -327,6 +330,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/widgets/EvcsWidget.qml
     components/widgets/InverterChargerWidget.qml
     components/widgets/OverviewWidget.qml
+    components/widgets/PartnerOverviewWidget.qml
     components/widgets/OverviewElectricalQuantityLabel.qml
     components/widgets/SolarYieldWidget.qml
     components/widgets/WidgetConnector.qml
@@ -501,6 +505,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsModbusTcpServices.qml
     pages/settings/PageSettingsMqttDevices.qml
     pages/settings/PageSettingsNodeRed.qml
+    pages/settings/PageSettingsPartnerBranding.qml
     pages/settings/PageSettingsRelay.qml
     pages/settings/PageSettingsRelayTempSensors.qml
     pages/settings/PageSettingsRootfsSelect.qml
@@ -716,6 +721,8 @@ list(APPEND VictronVenusOS_CPP_SOURCES
     src/filteredservicemodel.cpp
     src/guiplugins.h
     src/guiplugins.cpp
+    src/partnerbrand.cpp
+    src/partnerbrand.h
     src/runtimedevicemodel.h
     src/runtimedevicemodel.cpp
     src/theme.h

@@ -11,8 +11,70 @@ Rectangle {
 	id: root
 
 	readonly property bool allPagesLoaded: Global.allPagesLoaded
+	readonly property bool lightScheme: Theme.colorScheme === Theme.Light
+	readonly property url runtimeSchemeLogo: lightScheme ? PartnerBrand.logoLight : PartnerBrand.logoDark
+	readonly property url bootstrapSchemeLogo: lightScheme
+		? PartnerBrand.bootstrapLogoLight : PartnerBrand.bootstrapLogoDark
+	readonly property url partnerSplashLogo: partnerSplashPhase
+		? (PartnerBrand.active
+			? (runtimeSchemeLogo.toString().length > 0 ? runtimeSchemeLogo : PartnerBrand.splashLogo)
+			: (bootstrapSchemeLogo.toString().length > 0 ? bootstrapSchemeLogo : PartnerBrand.bootstrapSplashLogo))
+		: ""
+	readonly property bool partnerSplashActive: partnerSplashLogo.toString().length > 0
+	readonly property color splashBackgroundColor: partnerSplashPhase
+		? Theme.color_page_background : Theme.color_splash_victron_background
+	readonly property color splashProgressBackgroundColor: partnerSplashPhase
+		? Theme.color_darkOk : Theme.color_splash_victron_progress_background
+	readonly property color splashProgressForegroundColor: partnerSplashPhase
+		? Theme.color_ok : Theme.color_splash_victron_progress_foreground
+	readonly property color splashTextColor: partnerSplashPhase
+		? Theme.color_font_secondary : Theme.color_splash_victron_text
+	readonly property color splashWarningColor: partnerSplashPhase
+		? Theme.color_warning : Theme.color_splash_victron_warning
+	readonly property color splashCriticalColor: partnerSplashPhase
+		? Theme.color_critical : Theme.color_splash_victron_critical
+	property bool partnerSplashPhase: Qt.platform.os === "wasm"
+	property bool partnerMinimumDisplayElapsed: Qt.platform.os === "wasm"
 
-	color: Theme.color_page_background
+	function updateNativePartnerSplashPhase() {
+		if (Qt.platform.os === "wasm") {
+			partnerSplashPhase = true
+			return
+		}
+		partnerSplashPhase = false
+		partnerMinimumDisplayElapsed = true
+		nativePartnerSplashDelay.stop()
+		partnerMinimumDisplayTimer.stop()
+		if (PartnerBrand.active) {
+			nativePartnerSplashDelay.start()
+		}
+	}
+
+	Component.onCompleted: updateNativePartnerSplashPhase()
+
+	Connections {
+		target: PartnerBrand
+		function onChanged() { root.updateNativePartnerSplashPhase() }
+	}
+
+	Timer {
+		id: nativePartnerSplashDelay
+		interval: 1500
+		onTriggered: {
+			root.partnerSplashPhase = true
+			root.partnerMinimumDisplayElapsed = false
+			partnerMinimumDisplayTimer.start()
+			console.info("SplashView: switching from Victron to partner splash")
+		}
+	}
+
+	Timer {
+		id: partnerMinimumDisplayTimer
+		interval: 2500
+		onTriggered: root.partnerMinimumDisplayElapsed = true
+	}
+
+	color: splashBackgroundColor
 	visible: UiConfig.splashScreenVisible
 
 	onAllPagesLoadedChanged: {
@@ -57,6 +119,7 @@ Rectangle {
 		}
 
 		playing: false
+		visible: !root.partnerSplashActive
 		onPlayingChanged: {
 			if (playing) {
 				console.info("SplashView: playing gauge gif animation")
@@ -89,8 +152,10 @@ Rectangle {
 			verticalCenterOffset: Theme.geometry_splashView_logo_verticalCenterOffset
 			horizontalCenterOffset: Theme.geometry_splashView_logo_horizontalCenterOffset
 		}
+		visible: !root.partnerSplashActive
 		source: "qrc:/images/splash-logo-icon.svg"
-		color: Theme.color_splash_logo_icon
+		color: root.partnerSplashPhase
+			? Theme.color_splash_logo_icon : Theme.color_splash_victron_logo_icon
 		width: Theme.geometry_splashScreen_logo_width
 		height: Theme.geometry_splashScreen_logo_height
 		sourceSize: Qt.size(width, height)
@@ -112,8 +177,10 @@ Rectangle {
 			verticalCenterOffset: Theme.geometry_splashView_logo_verticalCenterOffset
 			horizontalCenterOffset: Theme.geometry_splashView_logo_horizontalCenterOffset
 		}
+		visible: !root.partnerSplashActive
 		source: "qrc:/images/splash-logo-text.svg"
-		color: Theme.color_splash_logo_text
+		color: root.partnerSplashPhase
+			? Theme.color_splash_logo_text : Theme.color_splash_victron_logo_text
 		width: Theme.geometry_splashScreen_logo_width
 		height: Theme.geometry_splashScreen_logo_height
 		sourceSize: Qt.size(width, height)
@@ -144,16 +211,36 @@ Rectangle {
 		}
 	}
 
+	Image {
+		id: partnerLogo
+
+		anchors.fill: logoText
+		visible: root.partnerSplashActive
+		opacity: logoText.opacity
+		source: root.partnerSplashLogo
+		sourceSize: Qt.size(width, height)
+		fillMode: Image.PreserveAspectFit
+		mipmap: true
+	}
+
 	SequentialAnimation {
 		id: initialFadeAnimation
 
-		running: Global.dataManagerLoaded && !welcomeLoader.active && Global.allPagesLoaded && UiConfig.showSplashAnimation
+		running: Global.dataManagerLoaded
+			&& !welcomeLoader.active
+			&& Global.allPagesLoaded
+			&& UiConfig.showSplashAnimation
+			&& (!root.partnerSplashActive || root.partnerMinimumDisplayElapsed)
 		onRunningChanged: {
 			if (running) {
 				console.info("SplashView: application content pages have loaded, running initial fade animation")
 			} else {
 				console.info("SplashView: finished running initial fade animation")
-				logoTextFadeOutAnim.running = true
+				if (root.partnerSplashActive) {
+					fadeOutAnim.start()
+				} else {
+					logoTextFadeOutAnim.running = true
+				}
 			}
 		}
 
@@ -187,6 +274,8 @@ Rectangle {
 		}
 		width: Math.min(Theme.geometry_splashView_progressBar_width, parent.width - 2 * Theme.geometry_page_content_horizontalMargin)
 		indeterminate: visible && BackendConnection.state !== BackendConnection.Failed
+		backgroundColor: root.splashProgressBackgroundColor
+		foregroundColor: root.splashProgressForegroundColor
 		opacity: 1.0
 		Behavior on opacity {
 			OpacityAnimator {
@@ -243,8 +332,8 @@ Rectangle {
 				color: (errorStateTimer.errorIsPersistent
 						|| mqttErrorLabel.visible
 						|| (BackendConnection.vrm && BackendConnection.heartbeatState === BackendConnection.HeartbeatInactive))
-					? Theme.color_critical
-					: Theme.color_warning
+					? root.splashCriticalColor
+					: root.splashWarningColor
 			}
 
 			// Upon waking up a WASM tab, the websocket may have been dropped,
@@ -272,7 +361,7 @@ Rectangle {
 			horizontalAlignment: Text.AlignHCenter
 			height: implicitHeight + Theme.geometry_splashView_progressText_spacing
 			font.pixelSize: Theme.font_splashView_progressText_size
-			color: Theme.color_font_secondary
+			color: root.splashTextColor
 			wrapMode: Text.Wrap
 			text: "[" + BackendConnection.state + "] "
 				  //% "Unable to connect"
@@ -305,7 +394,7 @@ Rectangle {
 			width: parent.width
 			horizontalAlignment: Text.AlignHCenter
 			font.pixelSize: Theme.font_splashView_progressText_size
-			color: Theme.color_font_secondary
+			color: root.splashTextColor
 			wrapMode: Text.Wrap
 			text: (BackendConnection.mqttClientError !== BackendConnection.MqttClient_NoError
 				  ? "[" + BackendConnection.mqttClientError + "] " : "")
@@ -337,7 +426,7 @@ Rectangle {
 			width: parent.width
 			horizontalAlignment: Text.AlignHCenter
 			font.pixelSize: Theme.font_splashView_progressText_size
-			color: Theme.color_font_secondary
+			color: root.splashTextColor
 			wrapMode: Text.Wrap
 			text: "[" + BackendConnection.heartbeatState + "] "
 				+ (BackendConnection.heartbeatState === BackendConnection.HeartbeatMissing

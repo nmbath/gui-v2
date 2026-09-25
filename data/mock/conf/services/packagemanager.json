@@ -1,0 +1,10 @@
+{
+    "com.victronenergy.packagemanager": {
+        "/Connected": 1,
+        "/Packages/acme_marine/Id": "acme-marine",
+        "/Packages/acme_marine/Type": "gui-v2-partner-package",
+        "/Packages/acme_marine/Name": "Acme Marine Console",
+        "/Packages/acme_marine/Version": "1.0.0",
+        "/Packages/acme_marine/Remove": 0
+    }
+}

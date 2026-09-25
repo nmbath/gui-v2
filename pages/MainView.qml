@@ -19,6 +19,8 @@ FocusScope {
 	readonly property Page currentPage: cardsActive && cardsLoader.status === Loader.Ready && cardsLoader.item ? cardsLoader.item
 			: (pageStack.currentPage ?? swipeView?.currentItem ?? null)
 	readonly property alias cardsLoader: cardsLoader
+	readonly property alias controlCardsComponent: _controlCardsComponent
+	readonly property alias auxCardsComponent: _auxCardsComponent
 
 	readonly property bool notificationButtonsEnabled: (currentPage?.url?.endsWith("NotificationsPage.qml") ?? false)
 			&& (Global.notifications?.silenceAlarmVisible ?? false)
@@ -245,7 +247,9 @@ FocusScope {
 
 			y: root.height + 4  // nudge below the visible area for wasm
 			width: parent.width
-			backgroundColor: root.backgroundColor
+			backgroundColor: Theme.partnerThemeActive
+				? Theme.color_navigationBar_background
+				: root.backgroundColor
 			opacity: 0
 			pages: swipePageModel.pages
 			moreButton: visiblePageCount < pages.length ? moreButtonComponent : null
@@ -465,12 +469,12 @@ FocusScope {
 		KeyNavigation.up: statusBar
 
 		Component {
-			id: controlCardsComponent
+			id: _controlCardsComponent
 			ControlCardsPage {}
 		}
 
 		Component {
-			id: auxCardsComponent
+			id: _auxCardsComponent
 			AuxCardsPage {}
 		}
 
