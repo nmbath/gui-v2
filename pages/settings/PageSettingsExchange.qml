@@ -15,6 +15,7 @@ Page {
 	readonly property int stateCancelled: 9
 
 	property string subjectLabel
+	property string summaryLabel
 	property string confirmActionText
 	property string confirmTitle
 	property string confirmDescription
@@ -118,8 +119,17 @@ Page {
 				//% "File"
 				text: qsTrId("exchangeaction_file")
 				secondaryText: filename.value || ""
-				caption: summary.value || ""
+				caption: root.summaryLabel.length === 0 ? summary.value || "" : ""
 				preferredVisible: state.value === root.stateReview
+			}
+
+			ListText {
+				text: root.summaryLabel
+				secondaryText: summary.value || ""
+				preferredVisible: state.value === root.stateReview
+						&& root.summaryLabel.length > 0
+						&& summary.valid
+						&& summary.value
 			}
 
 			ListButton {
