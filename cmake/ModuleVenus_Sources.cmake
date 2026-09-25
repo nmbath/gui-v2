@@ -23,6 +23,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/ArcGauge.qml
     components/ArcGaugeQuantityRow.qml
     components/AsymmetricRoundedRectangle.qml
+    components/BackgroundActivity.qml
     components/BarGauge.qml
     components/BarGaugeBase.qml
     components/BaseListView.qml
@@ -182,6 +183,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/controls/ToggleButtonRow.qml
     components/controls/TextValidationField.qml
 
+    components/dialogs/BackgroundActivityDialog.qml
     components/dialogs/ColorWheelDialog.qml
     components/dialogs/ExchangeQrDialog.qml
     components/dialogs/CurrentLimitDialog.qml

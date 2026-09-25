@@ -165,4 +165,15 @@ FocusScope {
 			mainView.pageManager.ensureInteractive()
 		}
 	}
+
+	// New global-singleton wiring (instantiate + assign to a Global.* property,
+	// same pattern as FirmwareUpdate/DialogLayer/NotificationLayer above) goes
+	// last, appended here - parallel feature branches that each add their own
+	// singleton at "wherever felt natural" keep colliding on the same
+	// insertion point (found live: this and mbath/web-pages' independent
+	// PressEffect wiring both landed right after MainView). A single stable,
+	// append-only spot at the end avoids that.
+	BackgroundActivity {
+		id: backgroundActivity
+	}
 }

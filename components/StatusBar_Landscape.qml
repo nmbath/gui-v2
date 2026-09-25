@@ -218,7 +218,7 @@ FocusScope {
 			opacity: enabled ? 1.0 : 0.0 //  Override fading icon on unit inactivity
 			visible: mobileIcon.valid
 
-			KeyNavigation.right: notificationButton
+			KeyNavigation.right: activityButton
 
 			onClicked: Global.mainView.goToConnectivityPage("mobile")
 
@@ -226,6 +226,38 @@ FocusScope {
 				id: mobileIcon
 				height: Theme.geometry_status_bar_gsmModem_icon_height
 				anchors.centerIn: parent
+			}
+		}
+
+		// Inside the Row (not a manually-anchored sibling like
+		// notificationButton/alarmButton below) so its space collapses
+		// automatically when not busy, same as mobileButton above.
+		StatusBarButton {
+			id: activityButton
+
+			visible: Global.backgroundActivity?.busy ?? false
+			enabled: visible
+			// No dedicated "background activity" icon exists yet - reuses
+			// the generic refresh glyph, with continuous rotation as the
+			// "something is happening" cue a static icon can't give alone.
+			icon.source: "qrc:/images/icon_refresh_32.svg"
+
+			RotationAnimation on rotation {
+				running: activityButton.visible && Global.animationEnabled
+				loops: Animation.Infinite
+				from: 0
+				to: 360
+				duration: 1500
+			}
+
+			KeyNavigation.right: notificationButton
+
+			onClicked: Global.dialogLayer.open(backgroundActivityDialogComponent)
+
+			Component {
+				id: backgroundActivityDialogComponent
+
+				BackgroundActivityDialog {}
 			}
 		}
 	}

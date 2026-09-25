@@ -69,11 +69,44 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 		}
 
 		StatusBarButton {
+			id: activityButton
+
+			visible: !breadcrumbs.visible && (Global.backgroundActivity?.busy ?? false)
+			enabled: visible
+			leftInset: Theme.geometry_statusBar_spacing
+			rightInset: Theme.geometry_statusBar_spacing / 2
+			bottomInset: Theme.geometry_statusBar_spacing
+			// No dedicated "background activity" icon exists yet - reuses
+			// the generic refresh glyph, with continuous rotation as the
+			// "something is happening" cue a static icon can't give alone.
+			icon.source: "qrc:/images/icon_refresh_32.svg"
+
+			RotationAnimation on rotation {
+				running: activityButton.visible && Global.animationEnabled
+				loops: Animation.Infinite
+				from: 0
+				to: 360
+				duration: 1500
+			}
+
+			Layout.alignment: Qt.AlignTop
+			KeyNavigation.right: notificationButton
+
+			onClicked: Global.dialogLayer.open(backgroundActivityDialogComponent)
+
+			Component {
+				id: backgroundActivityDialogComponent
+
+				BackgroundActivityDialog {}
+			}
+		}
+
+		StatusBarButton {
 			id: notificationButton
 
 			enabled: Global.notifications?.statusBarNotificationIconVisible ?? false
 			visible: !breadcrumbs.visible && enabled
-			leftInset: Theme.geometry_statusBar_spacing
+			leftInset: Theme.geometry_statusBar_spacing / 2
 			rightInset: Theme.geometry_statusBar_spacing / 2
 			bottomInset: Theme.geometry_statusBar_spacing
 			color: Global.notifications?.statusBarNotificationIconColor ?? "transparent"
