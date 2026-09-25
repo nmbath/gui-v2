@@ -151,6 +151,10 @@ QtObject {
 		case 27: return qsTrId("containers_error_runtime_api_unavailable")
 		//% "Port conflict"
 		case 28: return qsTrId("containers_error_port_conflict")
+		//% "Container storage unavailable"
+		case 29: return qsTrId("containers_error_storage_unavailable")
+		//% "Moving container storage"
+		case 30: return qsTrId("containers_error_storage_migrating")
 		default: return ""
 		}
 	}
@@ -260,6 +264,15 @@ QtObject {
 			return qsTrId("containers_creating_elapsed").arg(elapsedSeconds)
 		}
 		return ""
+	}
+
+	// Shared by PageSettingsContainerStorage.qml's own row and
+	// ContainersActivity.qml's background-activity summary - itemsDone/Total
+	// are containers/identities being copied (reconciler.py's migrate_storage),
+	// not bytes, so this is a coarse item count, not a percentage.
+	function migrationProgressText(itemsDone, itemsTotal) {
+		//% "Migrating storage (%1/%2)…"
+		return qsTrId("containers_migrating").arg(itemsDone || 0).arg(itemsTotal || 0)
 	}
 
 	readonly property var _restartPolicyOptions: [
