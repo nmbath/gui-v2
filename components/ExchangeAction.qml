@@ -22,6 +22,7 @@ Item {
 	property string actionDbusKey: actionId.replace(/-/g, "_")
 	property string reviewPageTitle
 	property string subjectLabel
+	property string summaryLabel
 	property string confirmActionText
 	property string confirmTitle
 	property string confirmDescription
@@ -194,6 +195,7 @@ Item {
 		return {
 			title: root.reviewPageTitle,
 			subjectLabel: root.subjectLabel,
+			summaryLabel: root.summaryLabel,
 			confirmActionText: root.confirmActionText,
 			confirmTitle: root.confirmTitle,
 			confirmDescription: root.confirmDescription,
