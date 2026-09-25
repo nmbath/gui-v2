@@ -65,6 +65,7 @@ Page {
 
 		actionId: "web-page-register"
 		reviewPageTitle: "Add web page"
+		failureTitle: "Web page could not be added"
 		subjectLabel: "Web page"
 		summaryLabel: "Destination"
 		confirmActionText: "Add this web page"
