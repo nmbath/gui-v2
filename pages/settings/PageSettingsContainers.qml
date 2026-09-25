@@ -53,6 +53,8 @@ Page {
 		id: containerImportAction
 		actionId: "container-import"
 		reviewPageTitle: qsTrId("pagesettingscontainers_add_from_file")
+		//% "Container could not be imported"
+		failureTitle: qsTrId("pagesettingscontainerimport_failed")
 		//% "Container"
 		subjectLabel: qsTrId("pagesettingscontainerimport_container")
 		//% "Add this container"
