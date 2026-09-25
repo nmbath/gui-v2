@@ -53,12 +53,8 @@ Page {
 	VeQuickItem { id: state; uid: root.volumePrefix + "/State" }
 	VeQuickItem { id: lifecycle; uid: root.volumePrefix + "/Lifecycle" }
 	VeQuickItem { id: capacity; uid: root.volumePrefix + "/Capacity" }
-	// Not Capacity - Free: that counts ext4's root-only blocks as "used".
-	// Used matches `df`'s own
-	// accounting instead - see inventory.py's _volume_used_bytes. The
-	// real Free leaf isn't read on this page at all - see the capacity
-	// gauge's caption below for why.
 	VeQuickItem { id: used; uid: root.volumePrefix + "/Used" }
+	VeQuickItem { id: free; uid: root.volumePrefix + "/Free" }
 	VeQuickItem { id: mountPoint; uid: root.volumePrefix + "/MountPoint" }
 	// Set only once this page's own Eject dialog has actually been
 	// confirmed - guards against popping the page on page load if this
@@ -241,12 +237,9 @@ Page {
 						.arg(Containers.formatBytes(value))
 						.arg(Containers.formatBytes(to))
 				//% "%1 total, %2 free"
-				// Free here is deliberately Capacity - Used, not the real
-				// Free leaf (which excludes ext4's root-only blocks and can
-				// therefore make Total and Used look like they don't add up).
 				caption: qsTrId("pagesettingsstorage_capacity_detail")
 						.arg(Containers.formatBytes(capacity.value))
-						.arg(Containers.formatBytes(Math.max(0, capacity.value - used.value)))
+						.arg(Containers.formatBytes(free.value))
 			}
 
 			ListText {

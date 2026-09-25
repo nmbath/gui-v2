@@ -202,7 +202,7 @@ Page {
 	function adoptedUsageText(record) {
 		//% "%1 used / %2 free"
 		return qsTrId("pagesettingsstorage_adopted_usage").arg(Containers.formatBytes(record.used))
-				.arg(Containers.formatBytes(Math.max(0, record.capacity - record.used)))
+				.arg(Containers.formatBytes(record.free))
 	}
 
 	function newCaption(record) {
@@ -235,8 +235,8 @@ Page {
 				"lifecycle": row.lifecycleValue,
 				"state": row.stateValue,
 				"claimedBy": row.claimedBy,
-				"capacity": row.capacityValue,
 				"used": row.usedValue,
+				"free": row.freeValue,
 				"mountPoint": row.mountPointValue,
 				"deviceId": row.deviceIdValue,
 				"filesystem": row.filesystemValue,
@@ -282,8 +282,8 @@ Page {
 			readonly property int lifecycleValue: lifecycleItem.value || 0
 			readonly property int stateValue: stateItem.value || 0
 			readonly property string claimedBy: claimedByItem.value || ""
-			readonly property real capacityValue: capacityItem.value || 0
 			readonly property real usedValue: usedItem.value || 0
+			readonly property real freeValue: freeItem.value || 0
 			readonly property string mountPointValue: mountPointItem.value || ""
 			readonly property string deviceIdValue: deviceIdItem.value || ""
 			readonly property string filesystemValue: filesystemItem.value || ""
@@ -303,8 +303,8 @@ Page {
 			onLifecycleValueChanged: root.recomputeVolumes()
 			onStateValueChanged: root.recomputeVolumes()
 			onClaimedByChanged: root.recomputeVolumes()
-			onCapacityValueChanged: root.recomputeVolumes()
 			onUsedValueChanged: root.recomputeVolumes()
+			onFreeValueChanged: root.recomputeVolumes()
 			onMountPointValueChanged: root.recomputeVolumes()
 			onDeviceIdValueChanged: root.recomputeVolumes()
 			onFilesystemValueChanged: root.recomputeVolumes()
@@ -316,8 +316,8 @@ Page {
 			VeQuickItem { id: stateItem; uid: volumeInfoRow.prefix + "/State" }
 			VeQuickItem { id: lifecycleItem; uid: volumeInfoRow.prefix + "/Lifecycle" }
 			VeQuickItem { id: claimedByItem; uid: volumeInfoRow.prefix + "/ClaimedBy" }
-			VeQuickItem { id: capacityItem; uid: volumeInfoRow.prefix + "/Capacity" }
 			VeQuickItem { id: usedItem; uid: volumeInfoRow.prefix + "/Used" }
+			VeQuickItem { id: freeItem; uid: volumeInfoRow.prefix + "/Free" }
 			VeQuickItem { id: mountPointItem; uid: volumeInfoRow.prefix + "/MountPoint" }
 			VeQuickItem { id: deviceIdItem; uid: volumeInfoRow.prefix + "/DeviceId" }
 			VeQuickItem { id: filesystemItem; uid: volumeInfoRow.prefix + "/Filesystem" }
