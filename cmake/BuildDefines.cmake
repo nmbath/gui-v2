@@ -8,7 +8,16 @@ else()
     include(GNUInstallDirs)
 endif()
 
-if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
+# Upstream detects a native "desktop" build by comparing the target processor
+# to the build host's own processor. That heuristic breaks under Yocto when
+# cross-compiling for a target whose CMAKE_SYSTEM_PROCESSOR happens to match
+# the build host's (e.g. building for aarch64 targets from an aarch64 build
+# host): it is misclassified as a desktop build, VENUS_GX_BUILD never gets
+# set, and the install() rules in cmake/GuiV2.cmake are silently skipped,
+# producing an empty package. CMAKE_CROSSCOMPILING is set correctly by
+# Yocto's toolchain file regardless of processor-name collisions, so use that
+# instead.
+if (NOT CMAKE_CROSSCOMPILING)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

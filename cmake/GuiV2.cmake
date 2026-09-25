@@ -94,3 +94,9 @@ else()
         Qt6::DBus
     )
 endif()
+
+if(VENUS_GX_BUILD)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        Qt6::WebEngineQuick
+    )
+endif()

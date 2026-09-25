@@ -66,6 +66,19 @@ Page {
 				}
 			}
 
+			ListNavigation {
+				// Not qsTrId: this and the pages it leads to are new
+				// (venus-private#707) and were never run through lupdate, so
+				// on a device whose translation catalogue predates them,
+				// qsTrId falls back to showing the raw id text - found live
+				// on raspberrypi4-64 (192.168.1.120): the "Remove" button
+				// literally read "settings_web_page_remove" on screen. Plain
+				// strings avoid that regardless of catalogue state; revisit
+				// once this is a real PR and lupdate has run for real.
+				text: "Web pages"
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsWebPages.qml", {"title": text})
+			}
+
 			SettingsListHeader {
 				//% "Physical I/O"
 				text: qsTrId("pagesettingsintegrations_physical_io")
