@@ -64,9 +64,11 @@ Page {
 
 	// /Storage/Migration/State values (enums.py's StorageMigrationState) -
 	// plain ints rather than a new C++ enum, since this GUI change can't be
-	// build-verified from here: 0 Idle, 1 Stopping, 2 CopyingRuntime,
-	// 3 CopyingVolumes, 4 Verifying, 5 Switching, 6 Deleting, 7 Resuming,
-	// 8 Failed.
+	// build-verified from here: 0 Idle, 1 Stopping, 2 Copying, 3 Verifying,
+	// 4 Mounting, 5 Switching, 6 Resuming, 7 Failed. The old volume is
+	// never deleted at the end (see reconciler.py's migrate_storage()) -
+	// it's left as a purgeable orphan instead, picked up by the Orphaned
+	// Volumes list below like any other Leave.
 	readonly property bool migrationInProgress: migrationState.value > 0 && migrationState.value < 7
 
 	VeQuickItem {
@@ -125,10 +127,10 @@ Page {
 			if (value === 0) { // StorageMigrationState.IDLE - genuinely done, containers restarted.
 				root.migrateRequested = false
 				root.requestedVolumeId = ""
-				//% "Storage changed - containers are running on the new volume."
+				//% "Storage changed - containers are running on the new volume. The old volume's data is kept until you purge it from the Orphaned Volumes list."
 				Global.showToastNotification(VenusOS.Notification_Info, qsTrId("pagesettingscontainerstorage_migrate_complete"), 6000)
 				Global.pageManager.popPage(root)
-			} else if (value === 8) { // StorageMigrationState.FAILED - selectionError's own watcher shows the toast.
+			} else if (value === 7) { // StorageMigrationState.FAILED - selectionError's own watcher shows the toast.
 				root.migrateRequested = false
 			}
 		}
