@@ -14,16 +14,16 @@ import Victron.VenusOS
 	Composed from a fixed list of providers, each exposing the same shape -
 	`busy` and `items` (an array of { label, detail, onActivate }) - the same
 	static-composition pattern data/DataManager.qml already uses for its own
-	list of data singletons. No providers yet - the first (venus-containers'
-	image pulls and storage migration) is added in ContainersActivity.qml.
-	Adding a future provider is then a one-line addition to `providers`
-	below; nothing else in this file, or in the status bar/dialog that read
-	it, needs to change.
+	list of data singletons. Adding a future provider is a one-line addition
+	to `providers` below; nothing else in this file, or in the status
+	bar/dialog that read it, needs to change.
 */
 QtObject {
 	id: root
 
-	readonly property var providers: []
+	readonly property ContainersActivity containersActivity: ContainersActivity {}
+
+	readonly property var providers: [root.containersActivity]
 
 	readonly property bool busy: root.providers.some(function(provider) { return provider.busy })
 

@@ -39,6 +39,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/ColorSelector.qml
     components/ColorWheelModeButton.qml
     components/ConsoleTerminal.qml
+    components/ContainersActivity.qml
     components/ControlCard.qml
     components/CpuMonitor.qml
     components/DateSelector.qml

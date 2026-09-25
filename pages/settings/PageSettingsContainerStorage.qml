@@ -256,11 +256,6 @@ Page {
 		}
 	}
 
-	function migrationProgressText() {
-		//% "Migrating storage (%1/%2)…"
-		return qsTrId("pagesettingscontainerstorage_migrating").arg(migrationItemsDone.value || 0).arg(migrationItemsTotal.value || 0)
-	}
-
 	// The existing migrate/select decision tree, unchanged in substance -
 	// just factored out so it can run either directly (nothing found on
 	// scan) or after the found-containers dialog is dismissed. Uses
@@ -618,7 +613,7 @@ Page {
 				}
 				if (root.requestedVolumeId === volumeId) {
 					if (root.migrationInProgress) {
-						return root.migrationProgressText()
+						return Containers.migrationProgressText(migrationItemsDone.value, migrationItemsTotal.value)
 					}
 					//% "Selecting…"
 					return qsTrId("pagesettingscontainerstorage_selecting")
