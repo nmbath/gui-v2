@@ -44,6 +44,7 @@ Page {
 
 		actionId: "partner-branding-install"
 		reviewPageTitle: "Add partner branding"
+		failureTitle: "Customisation package could not be installed"
 		subjectLabel: "Partner branding"
 		confirmActionText: "Add this partner branding"
 		confirmTitle: "Add partner branding?"
