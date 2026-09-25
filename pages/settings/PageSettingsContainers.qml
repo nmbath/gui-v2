@@ -91,7 +91,7 @@ Page {
 	property string hostDiskSourcePrefix
 	property string selectedStorageLabel
 	property real selectedStorageUsed
-	property real selectedStorageCapacity
+	property real selectedStorageFree
 	property bool selectedStorageHasSelection
 
 	VeQItemSortTableModel {
@@ -109,21 +109,21 @@ Page {
 	function recomputeSelectedStorage() {
 		let label = ""
 		let used = 0
-		let capacity = 0
+		let free = 0
 		let hasSelection = false
 		for (let i = 0; i < storageVolumeRepeater.count; ++i) {
 			const row = storageVolumeRepeater.itemAt(i)
 			if (row && row.volumeId === selectedStorage.value) {
 				label = row.volumeNickname || row.volumeLabel
 				used = row.used
-				capacity = row.capacity
+				free = row.free
 				hasSelection = true
 				break
 			}
 		}
 		root.selectedStorageLabel = label
 		root.selectedStorageUsed = used
-		root.selectedStorageCapacity = capacity
+		root.selectedStorageFree = free
 		root.selectedStorageHasSelection = hasSelection
 	}
 
@@ -139,26 +139,20 @@ Page {
 			readonly property string volumeId: model.item.value || ""
 			readonly property string volumeLabel: labelItem.value || ""
 			readonly property string volumeNickname: nicknameItem.value || ""
-			// Not Capacity - Free: that counts the filesystem's
-			// root-only block margin as "used" (ext4 defaults to 5%).
-			// Used matches `df`'s own accounting instead. "Free" shown to
-			// the user below is Capacity - Used (display-only, keeps this
-			// consistent with the general Storage pages for the same
-			// volume), not the real Free leaf.
 			readonly property real used: usedItem.value || 0
-			readonly property real capacity: capacityItem.value || 0
+			readonly property real free: freeItem.value || 0
 
 			onVolumeIdChanged: root.recomputeSelectedStorage()
 			onVolumeLabelChanged: root.recomputeSelectedStorage()
 			onVolumeNicknameChanged: root.recomputeSelectedStorage()
 			onUsedChanged: root.recomputeSelectedStorage()
-			onCapacityChanged: root.recomputeSelectedStorage()
+			onFreeChanged: root.recomputeSelectedStorage()
 			Component.onCompleted: root.recomputeSelectedStorage()
 
 			VeQuickItem { id: labelItem; uid: storageVolumeRow.prefix + "/Label" }
 			VeQuickItem { id: nicknameItem; uid: storageVolumeRow.prefix + "/Nickname" }
 			VeQuickItem { id: usedItem; uid: storageVolumeRow.prefix + "/Used" }
-			VeQuickItem { id: capacityItem; uid: storageVolumeRow.prefix + "/Capacity" }
+			VeQuickItem { id: freeItem; uid: storageVolumeRow.prefix + "/Free" }
 		}
 		onCountChanged: root.recomputeSelectedStorage()
 	}
@@ -513,7 +507,7 @@ Page {
 					//% "%1 used / %2 free"
 					return qsTrId("pagesettingscontainerstorage_usage")
 							.arg(Containers.formatBytes(root.selectedStorageUsed))
-							.arg(Containers.formatBytes(Math.max(0, root.selectedStorageCapacity - root.selectedStorageUsed)))
+							.arg(Containers.formatBytes(root.selectedStorageFree))
 				}
 				preferredVisible: enabledSwitch.checked && selectedStorage.valid
 				onClicked: Global.pageManager.pushPage(

@@ -279,8 +279,8 @@ Page {
 		if (volumeId === "/data") {
 			freeBytes = localDataFreeBytes.value
 		} else {
-			const info = root.volumeInfoById[volumeId] || { used: 0, capacity: 0 }
-			freeBytes = Math.max(0, info.capacity - info.used)
+			const info = root.volumeInfoById[volumeId] || { free: 0 }
+			freeBytes = info.free
 		}
 		if (usedBytes.value <= freeBytes) {
 			Global.dialogLayer.open(confirmMigrateDialogComponent)
@@ -391,7 +391,7 @@ Page {
 				result[row.volumeId] = {
 					"name": row.volumeNickname || row.volumeLabel,
 					"used": row.used,
-					"capacity": row.capacity,
+					"free": row.free,
 				}
 			}
 		}
@@ -417,10 +417,9 @@ Page {
 			return ""
 		}
 		const name = info.name || qsTrId("pagesettingscontainerstorage_unnamed_volume")
-		const free = Math.max(0, info.capacity - info.used)
 		//% "Currently using %1: %2 used / %3 free"
 		return qsTrId("pagesettingscontainerstorage_current_usage")
-				.arg(name).arg(Containers.formatBytes(info.used)).arg(Containers.formatBytes(free))
+				.arg(name).arg(Containers.formatBytes(info.used)).arg(Containers.formatBytes(info.free))
 	}
 
 	Repeater {
@@ -436,17 +435,17 @@ Page {
 			readonly property string volumeLabel: volumeLabelItem.value || ""
 			readonly property string volumeNickname: volumeNicknameItem.value || ""
 			readonly property real used: volumeUsedItem.value || 0
-			readonly property real capacity: volumeCapacityItem.value || 0
+			readonly property real free: volumeFreeItem.value || 0
 
 			onVolumeIdChanged: root.recomputeVolumeInfo()
 			onUsedChanged: root.recomputeVolumeInfo()
-			onCapacityChanged: root.recomputeVolumeInfo()
+			onFreeChanged: root.recomputeVolumeInfo()
 			Component.onCompleted: root.recomputeVolumeInfo()
 
 			VeQuickItem { id: volumeLabelItem; uid: volumeInfoRow.prefix + "/Label" }
 			VeQuickItem { id: volumeNicknameItem; uid: volumeInfoRow.prefix + "/Nickname" }
 			VeQuickItem { id: volumeUsedItem; uid: volumeInfoRow.prefix + "/Used" }
-			VeQuickItem { id: volumeCapacityItem; uid: volumeInfoRow.prefix + "/Capacity" }
+			VeQuickItem { id: volumeFreeItem; uid: volumeInfoRow.prefix + "/Free" }
 		}
 		onCountChanged: root.recomputeVolumeInfo()
 	}
@@ -597,14 +596,10 @@ Page {
 			// an allocation) - keep this list in sync with that one.
 			readonly property bool supportedFilesystem: filesystem.value === "ext4"
 			readonly property string usageText: {
-				// Free here is Capacity - Used, not the real Free leaf
-				// (which excludes the filesystem's root-only block
-				// margin) - keeps this consistent with the general
-				// Storage pages for the same volume.
 				//% "%1 used / %2 free"
 				return qsTrId("pagesettingscontainerstorage_usage")
 						.arg(Containers.formatBytes(used.value))
-						.arg(Containers.formatBytes(Math.max(0, capacity.value - used.value)))
+						.arg(Containers.formatBytes(free.value))
 			}
 
 			preferredVisible: lifecycle.value === VenusOS.Storage_Lifecycle_AdoptedPersistent
@@ -648,8 +643,8 @@ Page {
 			VeQuickItem { id: label; uid: volumeDelegate.volumeUid + "/Label" }
 			VeQuickItem { id: nickname; uid: volumeDelegate.volumeUid + "/Nickname" }
 			VeQuickItem { id: filesystem; uid: volumeDelegate.volumeUid + "/Filesystem" }
-			VeQuickItem { id: capacity; uid: volumeDelegate.volumeUid + "/Capacity" }
 			VeQuickItem { id: used; uid: volumeDelegate.volumeUid + "/Used" }
+			VeQuickItem { id: free; uid: volumeDelegate.volumeUid + "/Free" }
 			VeQuickItem { id: lifecycle; uid: volumeDelegate.volumeUid + "/Lifecycle" }
 			VeQuickItem { id: state; uid: volumeDelegate.volumeUid + "/State" }
 		}
