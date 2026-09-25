@@ -21,6 +21,7 @@ Item {
 	property string actionId
 	property string actionDbusKey: actionId.replace(/-/g, "_")
 	property string reviewPageTitle
+	property string failureTitle
 	property string subjectLabel
 	property string summaryLabel
 	property string confirmActionText
@@ -180,20 +181,23 @@ Item {
 		if (!root.failureToastPending) {
 			return
 		}
-		const message = errorText.value
-		if (!message && !useFallback) {
+		const detail = errorText.value
+		if (!detail && !useFallback) {
 			return
 		}
 		root.failureToastPending = false
 		failureToastTimer.stop()
+		const reason = Exchange.errorSummaryText(errorCode.value, detail)
 		//% "Exchange failed"
+		const title = root.failureTitle || qsTrId("exchangeaction_exchange_failed")
 		Global.showToastNotification(VenusOS.Notification_Warning,
-				message || qsTrId("exchangeaction_exchange_failed"), 5000)
+				reason ? title + "\n" + reason : title, 5000)
 	}
 
 	function reviewPageProperties() {
 		return {
 			title: root.reviewPageTitle,
+			failureTitle: root.failureTitle,
 			subjectLabel: root.subjectLabel,
 			summaryLabel: root.summaryLabel,
 			confirmActionText: root.confirmActionText,
@@ -253,6 +257,7 @@ Item {
 	}
 	VeQuickItem { id: transferReady; uid: root.exchangeServiceUid + "/Transfer/Ready" }
 	VeQuickItem { id: capabilityRef; uid: root.exchangeServiceUid + "/Transfer/CapabilityRef" }
+	VeQuickItem { id: errorCode; uid: root.exchangeServiceUid + "/ErrorCode" }
 	VeQuickItem {
 		id: errorText
 		uid: root.exchangeServiceUid + "/Error"
