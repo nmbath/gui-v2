@@ -47,11 +47,13 @@ Page {
 		failureTitle: "Customisation package could not be installed"
 		subjectLabel: "Partner branding"
 		confirmActionText: "Add this partner branding"
+		cancelActionText: "Cancel installation"
 		confirmTitle: "Add partner branding?"
 		confirmDescription: "The validated package for '%1' will be installed on this GX device."
 		processingText: "Adding partner branding"
 		completionText: "The partner branding was added successfully."
 		completionToast: "Partner branding added"
+		uploadingText: "Uploading partner branding package…"
 		scanInstruction: "Scan this QR code to upload a partner branding package."
 		fileAccept: ".vgp"
 	}
