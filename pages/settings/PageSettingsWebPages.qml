@@ -69,11 +69,13 @@ Page {
 		subjectLabel: "Web page"
 		summaryLabel: "Destination"
 		confirmActionText: "Add this web page"
+		cancelActionText: "Cancel registration"
 		confirmTitle: "Add web page?"
 		confirmDescription: "Add '%1' to this GX device?"
 		processingText: "Adding web page"
 		completionText: "The web page was added successfully."
 		completionToast: "Web page added"
+		uploadingText: "Uploading web page descriptor…"
 		scanInstruction: "Scan this QR code to upload a web page descriptor."
 		fileAccept: ".json,application/json"
 	}
