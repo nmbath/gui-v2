@@ -59,6 +59,8 @@ Page {
 		subjectLabel: qsTrId("pagesettingscontainerimport_container")
 		//% "Add this container"
 		confirmActionText: qsTrId("pagesettingscontainerimport_confirm")
+		//% "Cancel import"
+		cancelActionText: qsTrId("pagesettingscontainerimport_cancel")
 		//% "Add container?"
 		confirmTitle: qsTrId("pagesettingscontainerimport_confirm_title")
 		//% "The validated definition for ‘%1’ will be added to this GX device."
@@ -69,6 +71,8 @@ Page {
 		completionText: qsTrId("pagesettingscontainerimport_complete")
 		//% "Container added"
 		completionToast: qsTrId("pagesettingscontainerimport_added")
+		//% "Uploading container definition…"
+		uploadingText: qsTrId("pagesettingscontainers_uploading")
 		//% "Scan this QR code to upload a container definition."
 		scanInstruction: qsTrId("pagesettingscontainerimport_scan_instruction")
 		fileAccept: ".json,application/json"
