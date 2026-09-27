@@ -46,6 +46,7 @@ Item {
 	property bool cancelPending
 	property bool uploadFailureNotified
 	property bool failureToastPending
+	property bool restartPending
 	property string pendingStartRequestId
 	property string pendingControlRequestId
 
@@ -73,7 +74,7 @@ Item {
 		if (!root.available) {
 			return
 		}
-		if (state.value === root.stateReview) {
+		if (state.value === root.stateReview && !root.reviewExpired()) {
 			root.openReviewPage()
 			return
 		}
@@ -87,7 +88,17 @@ Item {
 		root.uploadFailureNotified = false
 		root.failureToastPending = false
 		BackendConnection.chooseExchangeFile(root.fileAccept)
-		root.maybeStart()
+		root.restartPending = state.value === root.stateReview
+		if (root.restartPending) {
+			root.cancelPending = true
+			root.cancelSession()
+		} else {
+			root.maybeStart()
+		}
+	}
+
+	function reviewExpired() {
+		return !transferExpires.valid || transferExpires.value <= Date.now() / 1000
 	}
 
 	function maybeStart() {
@@ -175,7 +186,13 @@ Item {
 			root.active = false
 			root.openReviewPage()
 		} else if (state.value === root.stateCancelled) {
-			root.active = false
+			if (root.restartPending) {
+				root.restartPending = false
+				root.cancelPending = false
+				root.maybeStart()
+			} else {
+				root.active = false
+			}
 		} else if (state.value === root.stateFailed) {
 			root.active = false
 			root.failureToastPending = true
@@ -264,6 +281,7 @@ Item {
 	}
 	VeQuickItem { id: transferReady; uid: root.exchangeServiceUid + "/Transfer/Ready" }
 	VeQuickItem { id: capabilityRef; uid: root.exchangeServiceUid + "/Transfer/CapabilityRef" }
+	VeQuickItem { id: transferExpires; uid: root.exchangeServiceUid + "/Transfer/Expires" }
 	VeQuickItem { id: errorCode; uid: root.exchangeServiceUid + "/ErrorCode" }
 	VeQuickItem {
 		id: errorText
