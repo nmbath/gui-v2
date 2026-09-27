@@ -18,6 +18,7 @@ Page {
 	property string subjectLabel
 	property string summaryLabel
 	property string confirmActionText
+	property string cancelActionText
 	property string confirmTitle
 	property string confirmDescription
 	property string processingText
@@ -25,6 +26,9 @@ Page {
 	property string completionToast
 
 	readonly property string exchangeServiceUid: BackendConnection.serviceUidForType("exchange")
+	readonly property int secondsRemaining: transferExpires.valid && transferExpires.value > 0
+			? Math.max(0, Math.ceil(transferExpires.value - nowSeconds)) : 0
+	property real nowSeconds: Date.now() / 1000
 	property string pendingControlRequestId
 	property bool completionPending
 	property bool cancellationPending
@@ -74,6 +78,13 @@ Page {
 		}
 	}
 
+	Timer {
+		interval: 1000
+		repeat: true
+		running: root.secondsRemaining > 0
+		onTriggered: root.nowSeconds = Date.now() / 1000
+	}
+
 	VeQuickItem { id: controlRequest; uid: root.exchangeServiceUid + "/ControlRequest" }
 	VeQuickItem { id: controlReply; uid: root.exchangeServiceUid + "/ControlReply" }
 	VeQuickItem { id: controlSequence; uid: root.exchangeServiceUid + "/ControlSequence"; onValueChanged: root.processControlReply() }
@@ -101,9 +112,18 @@ Page {
 	VeQuickItem { id: canConfirm; uid: root.exchangeServiceUid + "/CanConfirm" }
 	VeQuickItem { id: canCancel; uid: root.exchangeServiceUid + "/CanCancel" }
 	VeQuickItem { id: filename; uid: root.exchangeServiceUid + "/Transfer/Filename" }
+	VeQuickItem { id: transferExpires; uid: root.exchangeServiceUid + "/Transfer/Expires" }
 
 	GradientListView {
 		model: VisibleItemModel {
+			ListText {
+				//% "Time remaining"
+				text: qsTrId("exchangeaction_time_remaining")
+				//% "%1 seconds"
+				secondaryText: qsTrId("exchangeaction_seconds").arg(root.secondsRemaining)
+				preferredVisible: root.secondsRemaining > 0
+			}
+
 			SettingsListHeader {
 				//% "Review"
 				text: qsTrId("exchangeaction_review")
@@ -167,7 +187,7 @@ Page {
 
 			ListButton {
 				//% "Cancel"
-				text: qsTrId("exchangeaction_cancel")
+				text: root.cancelActionText || qsTrId("exchangeaction_cancel")
 				secondaryText: CommonWords.cancel
 				writeAccessLevel: VenusOS.User_AccessType_User
 				preferredVisible: canCancel.value === 1

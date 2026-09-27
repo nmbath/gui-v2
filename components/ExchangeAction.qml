@@ -25,11 +25,13 @@ Item {
 	property string subjectLabel
 	property string summaryLabel
 	property string confirmActionText
+	property string cancelActionText
 	property string confirmTitle
 	property string confirmDescription
 	property string processingText
 	property string completionText
 	property string completionToast
+	property string uploadingText
 	property string scanInstruction
 	property string fileAccept
 
@@ -154,7 +156,11 @@ Item {
 			return
 		}
 		if (uploadStatus === 1 && transferReady.value === 1 && root.claimPath.length > 0) {
-			BackendConnection.uploadSelectedExchangeFile(root.claimPath)
+			if (BackendConnection.uploadSelectedExchangeFile(root.claimPath)
+					&& root.uploadingText.length > 0) {
+				Global.showToastNotification(VenusOS.Notification_Info,
+						root.uploadingText, 3000)
+			}
 		}
 		if (root.cancelPending) {
 			root.cancelSession()
@@ -201,6 +207,7 @@ Item {
 			subjectLabel: root.subjectLabel,
 			summaryLabel: root.summaryLabel,
 			confirmActionText: root.confirmActionText,
+			cancelActionText: root.cancelActionText,
 			confirmTitle: root.confirmTitle,
 			confirmDescription: root.confirmDescription,
 			processingText: root.processingText,
