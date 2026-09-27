@@ -118,7 +118,7 @@ Page {
 		model: VisibleItemModel {
 			ListText {
 				//% "Time remaining"
-				text: qsTrId("exchangeaction_time_remaining")
+				text: qsTrId("exchangeaction_review_time_remaining")
 				//% "%1 seconds"
 				secondaryText: qsTrId("exchangeaction_seconds").arg(root.secondsRemaining)
 				preferredVisible: root.secondsRemaining > 0
