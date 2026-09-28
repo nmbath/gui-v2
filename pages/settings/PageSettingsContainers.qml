@@ -57,7 +57,7 @@ Page {
 	// never appears in the /Volumes tree storageVolumeRepeater scans below,
 	// so it needs its own usage leaves and its own display text.
 	readonly property bool selectedStorageIsLocalData: selectedStorage.value === "/data"
-	VeQuickItem { id: localDataUsedBytes; uid: root.containersServiceUid + "/Storage/UsedBytes" }
+	VeQuickItem { id: containerStorageUsedBytes; uid: root.containersServiceUid + "/Storage/UsedBytes" }
 	VeQuickItem { id: localDataFreeBytes; uid: root.containersServiceUid + "/Storage/LocalDataFreeBytes" }
 
 	ExchangeAction {
@@ -105,7 +105,6 @@ Page {
 	property int activeContainerCount: 0
 	property int runningContainerCount: 0
 	property int deletedContainerCount: 0
-	property string hostDiskSourcePrefix
 	property string selectedStorageLabel
 	property real selectedStorageUsed
 	property real selectedStorageFree
@@ -200,7 +199,6 @@ Page {
 		let activeContainers = 0
 		let runningContainers = 0
 		let deletedContainers = 0
-		let diskSourcePrefix = ""
 		for (let i = 0; i < containerRepeater.count; ++i) {
 			const row = containerRepeater.itemAt(i)
 			if (!row) {
@@ -213,9 +211,6 @@ Page {
 			activeContainers++
 			if (row.isRunning) {
 				runningContainers++
-			}
-			if (!diskSourcePrefix) {
-				diskSourcePrefix = row.containerPrefix
 			}
 			if (row.memoryLimitBytes <= 0) {
 				unlimitedMemory++
@@ -237,7 +232,6 @@ Page {
 		root.activeContainerCount = activeContainers
 		root.runningContainerCount = runningContainers
 		root.deletedContainerCount = deletedContainers
-		root.hostDiskSourcePrefix = diskSourcePrefix
 	}
 
 	function assignedMemoryText() {
@@ -271,21 +265,23 @@ Page {
 		filterFlags: VeQItemSortTableModel.FilterOffline
 	}
 
-	// Host disk figures describe the storage backing the container service,
-	// rather than any one container. The backend currently publishes the same
-	// host sample beneath each application tree, so use the first active tree
-	// as the source and present it once at this parent level.
-	VeQuickItem {
-		id: diskHostTotal
-		uid: root.hostDiskSourcePrefix ? root.hostDiskSourcePrefix + "/DiskUsage/HostTotalBytes" : ""
+	function containerStorageFreeBytes() {
+		if (root.selectedStorageIsLocalData) {
+			return localDataFreeBytes.value
+		}
+		return root.selectedStorageHasSelection ? root.selectedStorageFree : 0
 	}
-	VeQuickItem {
-		id: diskHostUsed
-		uid: root.hostDiskSourcePrefix ? root.hostDiskSourcePrefix + "/DiskUsage/HostUsedBytes" : ""
-	}
-	VeQuickItem {
-		id: diskUpdatedAt
-		uid: root.hostDiskSourcePrefix ? root.hostDiskSourcePrefix + "/DiskUsage/UpdatedAt" : ""
+
+	function containerStorageUsageText() {
+		const freeAvailable = root.selectedStorageIsLocalData
+				? localDataFreeBytes.valid : root.selectedStorageHasSelection
+		if (!containerStorageUsedBytes.valid || !freeAvailable) {
+			return "--"
+		}
+		//% "%1 / %2"
+		return qsTrId("pagesettingscontainers_system_disk_compact")
+				.arg(Containers.formatBytes(containerStorageUsedBytes.value))
+				.arg(Containers.formatBytes(root.containerStorageFreeBytes()))
 	}
 
 	GradientListView {
@@ -416,12 +412,7 @@ Page {
 							}
 
 							SecondaryListLabel {
-								//% "%1 / %2"
-								text: diskUpdatedAt.value
-										? qsTrId("pagesettingscontainers_system_disk_compact")
-												.arg(Containers.formatBytes(diskHostUsed.value))
-												.arg(Containers.formatBytes(diskHostTotal.value))
-										: "--"
+								text: root.containerStorageUsageText()
 								Layout.alignment: Qt.AlignHCenter
 							}
 						}
@@ -519,7 +510,7 @@ Page {
 					if (root.selectedStorageIsLocalData) {
 						//% "%1 used / %2 free"
 						return qsTrId("pagesettingscontainerstorage_usage")
-								.arg(Containers.formatBytes(localDataUsedBytes.value))
+								.arg(Containers.formatBytes(containerStorageUsedBytes.value))
 								.arg(Containers.formatBytes(localDataFreeBytes.value))
 					}
 					if (!selectedStorage.value || !root.selectedStorageHasSelection) {

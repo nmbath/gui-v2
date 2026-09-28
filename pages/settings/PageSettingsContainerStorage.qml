@@ -88,6 +88,7 @@ Page {
 				purgeOrphanAction.setValue(root.pendingPurgeVolumeId)
 				root.pendingPurgeVolumeId = ""
 			}
+			root.recomputeVolumeInfo()
 		}
 	}
 
@@ -111,6 +112,11 @@ Page {
 	// proactively, before ever starting a migration (not just reactively
 	// after the backend's own preflight rejects it).
 	VeQuickItem { id: usedBytes; uid: root.containersServiceUid + "/Storage/UsedBytes" }
+	// Host-wide filesystem usage for internal /data, independent of which
+	// container volume is currently selected. This matches Storage Manager's
+	// /Volumes/<N>/Used figure shown for external candidates; UsedBytes is the
+	// current container dataset size and is only used for migration admission.
+	VeQuickItem { id: localDataUsedBytes; uid: root.containersServiceUid + "/Storage/LocalDataUsedBytes" }
 	// "/data" (allocation.py's LOCAL_DATA_VOLUME_ID) is this device's own
 	// internal storage, not a Storage Manager volume - it never appears in
 	// the /Volumes tree the rest of this page scans, so its free space
@@ -135,6 +141,8 @@ Page {
 			}
 		}
 	}
+	VeQuickItem { id: migrationSourceVolume; uid: root.containersServiceUid + "/Storage/Migration/SourceVolumeId" }
+	VeQuickItem { id: migrationDestinationVolume; uid: root.containersServiceUid + "/Storage/Migration/DestinationVolumeId" }
 	VeQuickItem { id: migrationItemsDone; uid: root.containersServiceUid + "/Storage/Migration/ItemsDone" }
 	VeQuickItem { id: migrationItemsTotal; uid: root.containersServiceUid + "/Storage/Migration/ItemsTotal" }
 
@@ -379,9 +387,11 @@ Page {
 	// off-screen delegates aren't guaranteed to exist) so the currently
 	// selected volume's info is always available for the header summary.
 	property var volumeInfoById: ({})
+	property int availableStorageCount: 0
 
 	function recomputeVolumeInfo() {
 		let result = {}
+		let availableCount = root.currentVolumeId === "/data" ? 0 : 1
 		for (let i = 0; i < volumeInfoRepeater.count; ++i) {
 			const row = volumeInfoRepeater.itemAt(i)
 			if (row && row.volumeId) {
@@ -389,34 +399,81 @@ Page {
 					"name": row.volumeNickname || row.volumeLabel,
 					"used": row.used,
 					"free": row.free,
+					"capacity": row.capacity,
+				}
+				if (row.volumeId !== root.currentVolumeId
+						&& row.lifecycleValue === VenusOS.Storage_Lifecycle_AdoptedPersistent
+						&& (row.stateValue === VenusOS.Storage_VolumeState_Available
+							|| row.stateValue === VenusOS.Storage_VolumeState_Active)
+						&& row.filesystemValue === "ext4") {
+					availableCount++
 				}
 			}
 		}
 		root.volumeInfoById = result
+		root.availableStorageCount = availableCount
 	}
 
 	readonly property var currentVolumeInfo: root.volumeInfoById[root.currentVolumeId]
 
-	function currentUsageSummaryText() {
+	function volumeDisplayName(volumeId) {
+		if (volumeId === "/data") {
+			return qsTrId("pagesettingscontainers_container_storage_internal")
+		}
+		const info = root.volumeInfoById[volumeId]
+		return info?.name || volumeId
+	}
+
+	function translatedOrFallback(id, fallback) {
+		const translated = qsTrId(id)
+		return translated === id ? fallback : translated
+	}
+
+	function currentStorageNameText() {
+		if (root.migrationInProgress) {
+			const sourceId = migrationSourceVolume.value || root.currentVolumeId
+			const destinationId = migrationDestinationVolume.value || root.requestedVolumeId
+			if (sourceId && destinationId) {
+				//% "Migrating %1 to %2"
+				return root.translatedOrFallback(
+						"pagesettingscontainerstorage_migrating_between",
+						qsTr("Migrating %1 to %2"))
+						.arg(root.volumeDisplayName(sourceId))
+						.arg(root.volumeDisplayName(destinationId))
+			}
+			//% "Migrating container storage"
+			return root.translatedOrFallback(
+					"pagesettingscontainerstorage_migrating", qsTr("Migrating container storage"))
+		}
 		if (!root.currentVolumeId) {
 			//% "Not currently using any managed storage"
 			return qsTrId("pagesettingscontainerstorage_no_current_volume")
 		}
-		if (root.currentVolumeId === "/data") {
-			//% "Internal storage"
-			const name = qsTrId("pagesettingscontainers_container_storage_internal")
-			//% "Currently using %1: %2 used / %3 free"
-			return qsTrId("pagesettingscontainerstorage_current_usage")
-					.arg(name).arg(Containers.formatBytes(usedBytes.value)).arg(Containers.formatBytes(localDataFreeBytes.value))
+		const name = root.currentVolumeId === "/data"
+				//% "Internal storage"
+				? qsTrId("pagesettingscontainers_container_storage_internal")
+				: (root.currentVolumeInfo?.name || qsTrId("pagesettingscontainerstorage_unnamed_volume"))
+		return name
+	}
+
+	function currentUsageSummaryText() {
+		if (root.migrationInProgress) {
+			return Containers.migrationProgressText(migrationItemsDone.value, migrationItemsTotal.value)
 		}
-		const info = root.currentVolumeInfo
-		if (!info) {
+		if (!root.currentVolumeId) {
 			return ""
 		}
-		const name = info.name || qsTrId("pagesettingscontainerstorage_unnamed_volume")
-		//% "Currently using %1: %2 used / %3 free"
-		return qsTrId("pagesettingscontainerstorage_current_usage")
-				.arg(name).arg(Containers.formatBytes(info.used)).arg(Containers.formatBytes(info.free))
+		const filesystemUsed = root.currentVolumeId === "/data"
+				? localDataUsedBytes.value : root.currentVolumeInfo?.used
+		const filesystemFree = root.currentVolumeId === "/data"
+				? localDataFreeBytes.value : root.currentVolumeInfo?.free
+		//% "Containers %1 / Total used %2 / Free %3"
+		return root.translatedOrFallback(
+				"pagesettingscontainerstorage_current_usage_breakdown",
+				qsTr("Containers %1 / Total used %2 / Free %3"))
+				.arg(Containers.formatBytes(usedBytes.value))
+				.arg(Containers.formatBytes(filesystemUsed))
+				.arg(Containers.formatBytes(filesystemFree))
 	}
 
 	Repeater {
@@ -433,16 +490,30 @@ Page {
 			readonly property string volumeNickname: volumeNicknameItem.value || ""
 			readonly property real used: volumeUsedItem.value || 0
 			readonly property real free: volumeFreeItem.value || 0
+			readonly property real capacity: volumeCapacityItem.value || 0
+			readonly property int lifecycleValue: volumeLifecycleItem.value || 0
+			readonly property int stateValue: volumeStateItem.value || 0
+			readonly property string filesystemValue: volumeFilesystemItem.value || ""
 
 			onVolumeIdChanged: root.recomputeVolumeInfo()
+			onVolumeLabelChanged: root.recomputeVolumeInfo()
+			onVolumeNicknameChanged: root.recomputeVolumeInfo()
 			onUsedChanged: root.recomputeVolumeInfo()
 			onFreeChanged: root.recomputeVolumeInfo()
+			onCapacityChanged: root.recomputeVolumeInfo()
+			onLifecycleValueChanged: root.recomputeVolumeInfo()
+			onStateValueChanged: root.recomputeVolumeInfo()
+			onFilesystemValueChanged: root.recomputeVolumeInfo()
 			Component.onCompleted: root.recomputeVolumeInfo()
 
 			VeQuickItem { id: volumeLabelItem; uid: volumeInfoRow.prefix + "/Label" }
 			VeQuickItem { id: volumeNicknameItem; uid: volumeInfoRow.prefix + "/Nickname" }
 			VeQuickItem { id: volumeUsedItem; uid: volumeInfoRow.prefix + "/Used" }
 			VeQuickItem { id: volumeFreeItem; uid: volumeInfoRow.prefix + "/Free" }
+			VeQuickItem { id: volumeCapacityItem; uid: volumeInfoRow.prefix + "/Capacity" }
+			VeQuickItem { id: volumeLifecycleItem; uid: volumeInfoRow.prefix + "/Lifecycle" }
+			VeQuickItem { id: volumeStateItem; uid: volumeInfoRow.prefix + "/State" }
+			VeQuickItem { id: volumeFilesystemItem; uid: volumeInfoRow.prefix + "/Filesystem" }
 		}
 		onCountChanged: root.recomputeVolumeInfo()
 	}
@@ -478,12 +549,26 @@ Page {
 			width: parent.width
 
 			SettingsListHeader {
-				//% "Current storage"
-				text: qsTrId("pagesettingscontainerstorage_current_storage_header")
+				text: root.migrationInProgress
+						//% "Storage migration"
+						? root.translatedOrFallback(
+								"pagesettingscontainerstorage_migration_header", qsTr("Storage migration"))
+						//% "Current storage"
+						: qsTrId("pagesettingscontainerstorage_current_storage_header")
 			}
 
 			ListText {
-				text: root.currentUsageSummaryText()
+				text: root.currentStorageNameText()
+				secondaryText: root.currentUsageSummaryText()
+				preferredVisible: root.currentVolumeId !== ""
+			}
+
+			SettingsListHeader {
+				//% "Available storage"
+				text: root.translatedOrFallback(
+						"pagesettingscontainerstorage_available_storage_header",
+						qsTr("Available storage"))
+				visible: !root.migrationInProgress && root.availableStorageCount > 0
 			}
 
 			// "/data" (allocation.py's LOCAL_DATA_VOLUME_ID) never appears in
@@ -496,10 +581,12 @@ Page {
 				text: qsTrId("pagesettingscontainers_container_storage_internal")
 				//% "%1 used / %2 free"
 				secondaryText: qsTrId("pagesettingscontainerstorage_usage")
-						.arg(Containers.formatBytes(usedBytes.value))
+						.arg(Containers.formatBytes(localDataUsedBytes.value))
 						.arg(Containers.formatBytes(localDataFreeBytes.value))
 				checked: root.currentVolumeId === "/data"
+				preferredVisible: !root.migrationInProgress && root.currentVolumeId !== "/data"
 				writeAccessLevel: VenusOS.User_AccessType_User
+				enabled: !root.migrationInProgress
 				onClicked: {
 					if (checked) {
 						Global.pageManager.popPage(root)
@@ -507,13 +594,6 @@ Page {
 					}
 					root.proceedWithVolumeSelection("/data")
 				}
-			}
-
-			PrimaryListLabel {
-				horizontalAlignment: Text.AlignHCenter
-				preferredVisible: listView.count === 0
-				//% "No eligible storage volumes found"
-				text: qsTrId("pagesettingscontainerstorage_no_volumes")
 			}
 
 			SettingsListHeader {
@@ -526,7 +606,7 @@ Page {
 				// (which does bind its own visible/height). A real visible:
 				// binding is required here to actually hide it - Column skips
 				// invisible children when laying out siblings, same effect.
-				visible: root.foundVolumeIds.length > 0
+				visible: !root.migrationInProgress && root.foundVolumeIds.length > 0
 			}
 
 			Repeater {
@@ -535,12 +615,13 @@ Page {
 				delegate: ListButton {
 					required property string modelData
 
-					text: modelData
+					text: root.volumeDisplayName(modelData)
 					//% "Dismiss"
 					secondaryText: qsTrId("pagesettingscontainerstorage_found_volumes_dismiss")
 					//% "Used by this device before - select it below to use it again"
 					caption: qsTrId("pagesettingscontainerstorage_found_volumes_caption")
 					writeAccessLevel: VenusOS.User_AccessType_User
+					enabled: !root.migrationInProgress
 					onClicked: dismissFoundVolumeAction.setValue(modelData)
 				}
 			}
@@ -550,7 +631,7 @@ Page {
 				text: qsTrId("pagesettingscontainerstorage_orphaned_header")
 				// See "Found storage" header above - preferredVisible alone
 				// does not hide this outside a VisibleItemModel-driven list.
-				visible: root.orphanedVolumeIds.length > 0
+				visible: !root.migrationInProgress && root.orphanedVolumeIds.length > 0
 			}
 
 			Repeater {
@@ -559,12 +640,13 @@ Page {
 				delegate: ListButton {
 					required property string modelData
 
-					text: modelData
+					text: root.volumeDisplayName(modelData)
 					//% "Purge"
 					secondaryText: qsTrId("pagesettingscontainerstorage_orphan_purge")
 					//% "Left behind by an earlier storage change - not used by any container"
 					caption: qsTrId("pagesettingscontainerstorage_orphan_caption")
 					writeAccessLevel: VenusOS.User_AccessType_Installer
+					enabled: !root.migrationInProgress
 					onClicked: {
 						root.pendingSelectVolumeId = modelData
 						Global.dialogLayer.open(purgeOrphanDialogComponent)
@@ -599,10 +681,12 @@ Page {
 						.arg(Containers.formatBytes(free.value))
 			}
 
-			preferredVisible: lifecycle.value === VenusOS.Storage_Lifecycle_AdoptedPersistent
+			preferredVisible: !root.migrationInProgress
+						   && lifecycle.value === VenusOS.Storage_Lifecycle_AdoptedPersistent
 						   && (state.value === VenusOS.Storage_VolumeState_Available
 							   || state.value === VenusOS.Storage_VolumeState_Active)
 						   && supportedFilesystem
+						   && volumeId !== root.currentVolumeId
 			//% "Unnamed volume"
 			text: nickname.value || label.value || qsTrId("pagesettingscontainerstorage_unnamed_volume")
 			caption: root.usedByText(volumeId)
