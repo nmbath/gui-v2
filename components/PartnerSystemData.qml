@@ -185,7 +185,7 @@ QtObject {
 	property var _batteries: []
 	property var _additionalBattery: null
 	readonly property VeQuickItem _batteriesItem: VeQuickItem {
-		uid: Global.system.serviceUid + "/Batteries"
+		uid: Global.system?.serviceUid ? Global.system.serviceUid + "/Batteries" : ""
 		onValueChanged: {
 			root._batteries = valid ? value : []
 			root._additionalBattery = valid ? root.firstAdditionalBattery(value) : null
@@ -253,11 +253,12 @@ QtObject {
 	}
 
 	readonly property VeQuickItem _relay1State: VeQuickItem {
-		uid: Global.system.serviceUid + "/Relay/0/State"
+		uid: Global.system?.serviceUid ? Global.system.serviceUid + "/Relay/0/State" : ""
 	}
 
 	readonly property VeQuickItem _demoMode: VeQuickItem {
-		uid: Global.systemSettings.serviceUid + "/Settings/Gui/DemoMode"
+		uid: Global.systemSettings?.serviceUid
+			? Global.systemSettings.serviceUid + "/Settings/Gui/DemoMode" : ""
 	}
 
 	readonly property QtObject relays: QtObject {
