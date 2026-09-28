@@ -61,6 +61,15 @@ QtObject {
 	}
 
 	function waitingProgress(dependency, retryInSeconds) {
+		if (dependency === "StartupDelay") {
+			if (retryInSeconds > 0) {
+				//% "Starts in %1s"
+				return root.translatedText("containersactivity_scheduled_start_countdown",
+						"Starts in %1s").arg(retryInSeconds)
+			}
+			//% "Scheduled to start"
+			return root.translatedText("containersactivity_scheduled_start_ready", "Scheduled to start")
+		}
 		let dependencyText = dependency
 		switch (dependency) {
 		case "DbusProxy":

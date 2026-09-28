@@ -216,6 +216,14 @@ QtObject {
 	// Xs"). RetryIn is authoritative and server-computed; this only
 	// formats it, never calculates it (docs/dbus-api.md).
 	function waitingForDependencyText(dependency, retryInSeconds) {
+		if (dependency === "StartupDelay") {
+			if (retryInSeconds > 0) {
+				//% "Starts in %1s"
+				return qsTrId("containers_scheduled_start_countdown").arg(retryInSeconds)
+			}
+			//% "Scheduled to start"
+			return qsTrId("containers_scheduled_start_ready")
+		}
 		if (!dependency) {
 			//% "Waiting to start"
 			return qsTrId("containers_waiting_for_dependency_caption_unknown")

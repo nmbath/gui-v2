@@ -48,6 +48,11 @@ Page {
 				//% "Start after dbus-containers starts"
 				caption: qsTrId("pagesettingscontainerstartup_start_automatically_caption")
 				dataItem.uid: startOnBoot.uid
+				// venus-containers publishes this leaf as a D-Bus boolean. ListSwitch defaults
+				// to strict numeric 1/0 comparisons, which makes true look unchecked and an
+				// attempted toggle merely write 1 (true) again.
+				valueTrue: true
+				valueFalse: false
 			}
 
 			ListSlider {
@@ -62,7 +67,6 @@ Page {
 				from: 0
 				to: 120
 				stepSize: 1
-				// Wire type for StartOnBoot is Int32, not a genuine boolean.
 				preferredVisible: !!startOnBoot.value
 			}
 

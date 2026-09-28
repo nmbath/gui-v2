@@ -55,6 +55,10 @@ Page {
 	VeQuickItem { id: storageSelectionError; uid: root.containersServiceUid + "/Storage/SelectionError" }
 	VeQuickItem { id: serviceState; uid: root.containersServiceUid + "/State" }
 	VeQuickItem { id: serviceErrorCode; uid: root.containersServiceUid + "/ErrorCode" }
+	// State=Initialising (0) is published before definitions and storage have
+	// finished loading. The Exchange endpoint may already be reachable then,
+	// but an import cannot safely be registered yet.
+	readonly property bool containerServiceInitialised: serviceState.valid && Number(serviceState.value) !== 0
 	VeQuickItem { id: migrationState; uid: root.containersServiceUid + "/Storage/Migration/State" }
 	readonly property bool storageMigrationInProgress: migrationState.value > 0 && migrationState.value < 7
 	readonly property bool storageMissing: serviceErrorCode.value === 29 && !root.storageMigrationInProgress
@@ -473,11 +477,16 @@ Page {
 				text: qsTrId("pagesettingscontainers_add_from_file")
 				//% "Add"
 				secondaryText: qsTrId("pagesettingscontainers_add")
-				preferredVisible: enabledSwitch.checked
+				preferredVisible: enabledSwitch.checked && root.containerServiceInitialised
 						&& (containerImportAction.available || root.storageMissing)
 				writeAccessLevel: VenusOS.User_AccessType_User
-				readOnly: root.storageMissing || root.storageMigrationInProgress
-				onClicked: containerImportAction.start()
+				readOnly: !root.containerServiceInitialised
+						|| root.storageMissing || root.storageMigrationInProgress
+				onClicked: {
+					if (root.containerServiceInitialised) {
+						containerImportAction.start()
+					}
+				}
 			}
 
 			PrimaryListLabel {
