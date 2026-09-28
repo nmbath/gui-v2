@@ -17,10 +17,19 @@ Page {
 	id: root
 
 	readonly property string containersServiceUid: BackendConnection.serviceUidForType("containers")
+	readonly property string storageMigrationText: {
+		const id = "pagesettingscontainers_service_migrating_storage"
+		//% "Migrating container storage"
+		const translated = qsTrId("pagesettingscontainers_service_migrating_storage")
+		return translated === id ? qsTr("Migrating container storage") : translated
+	}
 
 	VeQuickItem { id: serviceState; uid: root.containersServiceUid + "/State" }
 	VeQuickItem { id: errorCode; uid: root.containersServiceUid + "/ErrorCode" }
 	VeQuickItem { id: errorText; uid: root.containersServiceUid + "/Error" }
+	VeQuickItem { id: migrationState; uid: root.containersServiceUid + "/Storage/Migration/State" }
+	readonly property bool storageMigrationInProgress: migrationState.value > 0 && migrationState.value < 7
+	readonly property bool storageMissing: errorCode.value === 29 && !root.storageMigrationInProgress
 	VeQuickItem { id: containerCount; uid: root.containersServiceUid + "/ContainerCount" }
 	VeQuickItem { id: runningCount; uid: root.containersServiceUid + "/RunningCount" }
 	VeQuickItem { id: backendName; uid: root.containersServiceUid + "/Backend/Name" }
@@ -33,6 +42,34 @@ Page {
 
 	GradientListView {
 		model: VisibleItemModel {
+			SettingsColumn {
+				width: parent ? parent.width : 0
+				preferredVisible: root.storageMissing
+
+				SettingsListHeader {
+					//% "Missing storage"
+					text: qsTrId("pagesettingscontainerservice_missing_storage")
+				}
+
+				PrimaryListLabel {
+					//% "The selected container storage is unavailable. Reconnect it or choose another storage location."
+					text: qsTrId("pagesettingscontainerservice_missing_storage_description")
+				}
+
+				ListNavigation {
+					//% "Choose container storage"
+					text: qsTrId("pagesettingscontainerservice_choose_storage")
+					onClicked: {
+						// Replace this intermediate details page with the existing
+						// storage picker, so leaving the picker returns directly to
+						// the main Containers page.
+						Global.pageManager.popPage(undefined, PageStack.Immediate)
+						Qt.callLater(Global.pageManager.pushPage,
+								"/pages/settings/PageSettingsContainerStorage.qml", {"title": text})
+					}
+				}
+			}
+
 			SettingsListHeader {
 				//% "Status"
 				text: qsTrId("pagesettingscontainerservice_status")
@@ -41,13 +78,18 @@ Page {
 			ListText {
 				//% "Service state"
 				text: qsTrId("pagesettingscontainerservice_state")
-				secondaryText: Containers.serviceStateToText(serviceState.value)
+				secondaryText: root.storageMigrationInProgress
+						? root.storageMigrationText
+						: Containers.serviceStateToText(serviceState.value)
+				secondaryTextColor: root.storageMigrationInProgress
+						? Theme.color_warning : Theme.color_listItem_secondaryText
 			}
 
 			PrimaryListLabel {
 				//% "Error: %1"
 				text: qsTrId("pagesettingscontainerservice_error").arg(errorText.value)
-				preferredVisible: errorCode.value !== 0 && !!errorText.value
+				preferredVisible: !root.storageMigrationInProgress
+						&& errorCode.value !== 0 && !!errorText.value
 			}
 
 			ListText {

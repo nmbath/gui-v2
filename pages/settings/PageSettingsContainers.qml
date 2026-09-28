@@ -22,6 +22,12 @@ Page {
 	id: root
 
 	readonly property string containersServiceUid: BackendConnection.serviceUidForType("containers")
+	readonly property string storageMigrationText: {
+		const id = "pagesettingscontainers_service_migrating_storage"
+		//% "Migrating container storage"
+		const translated = qsTrId("pagesettingscontainers_service_migrating_storage")
+		return translated === id ? qsTr("Migrating container storage") : translated
+	}
 
 	// docs/dbus-api.md: MaxMemoryLimitBytes/MaxCpuLimit are the host ceiling
 	// (RAM minus a fixed OS/Venus reserve; host core count) - the same bound
@@ -41,6 +47,11 @@ Page {
 	VeQuickItem { id: allocatedCpu; uid: root.containersServiceUid + "/System/AllocatedCpuLimit" }
 	VeQuickItem { id: selectedStorage; uid: root.containersServiceUid + "/Storage/VolumeId" }
 	VeQuickItem { id: storageSelectionError; uid: root.containersServiceUid + "/Storage/SelectionError" }
+	VeQuickItem { id: serviceState; uid: root.containersServiceUid + "/State" }
+	VeQuickItem { id: serviceErrorCode; uid: root.containersServiceUid + "/ErrorCode" }
+	VeQuickItem { id: migrationState; uid: root.containersServiceUid + "/Storage/Migration/State" }
+	readonly property bool storageMigrationInProgress: migrationState.value > 0 && migrationState.value < 7
+	readonly property bool storageMissing: serviceErrorCode.value === 29 && !root.storageMigrationInProgress
 	// "/data" is the sentinel for "this device's own internal storage, not
 	// a Storage Manager volume" (allocation.py's LOCAL_DATA_VOLUME_ID) - it
 	// never appears in the /Volumes tree storageVolumeRepeater scans below,
@@ -448,14 +459,16 @@ Page {
 			ListNavigation {
 				//% "Container service"
 				text: qsTrId("pagesettingscontainers_container_service")
-				secondaryText: Containers.serviceStateToText(serviceState.value)
+				secondaryText: root.storageMigrationInProgress
+						? root.storageMigrationText
+						: root.storageMissing
+						//% "Error: Missing Storage"
+						? qsTrId("pagesettingscontainers_service_error_missing_storage")
+						: Containers.serviceStateToText(serviceState.value)
+				secondaryTextColor: root.storageMigrationInProgress
+						? Theme.color_warning : Theme.color_listItem_secondaryText
 				preferredVisible: enabledSwitch.checked
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainerService.qml", {"title": text})
-
-				VeQuickItem {
-					id: serviceState
-					uid: root.containersServiceUid + "/State"
-				}
 			}
 
 			ListButton {
@@ -463,8 +476,10 @@ Page {
 				text: qsTrId("pagesettingscontainers_add_from_file")
 				//% "Add"
 				secondaryText: qsTrId("pagesettingscontainers_add")
-				preferredVisible: enabledSwitch.checked && containerImportAction.available
+				preferredVisible: enabledSwitch.checked
+						&& (containerImportAction.available || root.storageMissing)
 				writeAccessLevel: VenusOS.User_AccessType_User
+				readOnly: root.storageMissing || root.storageMigrationInProgress
 				onClicked: containerImportAction.start()
 			}
 
