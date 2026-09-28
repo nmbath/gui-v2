@@ -29,16 +29,16 @@ import Victron.VenusOS
 	container's children collectively, for either ownership mode (runtime or
 	managed) through the one unified path, entirely separate from the
 	parent's own Resources above. No CpuWeight equivalent exists for the
-	aggregate case. Writing one of these three R/W leaves calls
-	update_runtime_resources or update_children_resources (reconciler.py,
-	whichever the container's actual mode is - both raise for the other
-	mode, so a write here always reaches the one that actually applies),
-	which persists and applies live but never recreates the parent.
+	aggregate case. GUI edits are held locally until Apply is selected, then
+	written to the Resources/Apply path as one JSON patch. The backend routes
+	an aggregate patch to update_runtime_resources or
+	update_children_resources (reconciler.py), according to the container's
+	actual mode, so one group of edits produces one persistent backend update.
 
 	Memory/CPU maximum range from 0 (which already means "unlimited" per the
 	schema, see below) to the host ceiling published at the containers service's
 	top-level /System/MaxMemoryLimitBytes and /System/MaxCpuLimit. Memory uses a
-	preset number picker and CPU uses a slider; setting either to 0 produces the
+	preset number pickers; setting either to 0 produces the
 	same wire value backend/podman.py already treats as unlimited. The same bound
 	applies to both own-container and aggregate: a child's
 	aggregate envelope lives in its own separate cgroup (RUNTIME_API_CGROUP_
@@ -56,8 +56,84 @@ Page {
 	property bool isAggregate: false
 	readonly property bool liveUsageValid: state.value === 4
 
+	tryPop: (toPage) => {
+		if (root.applying) {
+			//% "Wait for the resource changes to finish applying."
+			Global.showToastNotification(VenusOS.Notification_Info,
+					qsTrId("pagesettingscontainerresources_apply_in_progress"))
+			return false
+		}
+		if (!root.draftDirty) {
+			return true
+		}
+		Global.dialogLayer.open(discardChangesDialogComponent, { toPage: toPage })
+		return false
+	}
+
 	readonly property int memoryStepMib: 1
 	readonly property var memoryPresetMib: [256, 512, 768, 1024, 1536, 2048]
+	property bool draftInitialized: false
+	property real draftMemoryLimit: 0
+	property real draftCpuLimit: 0
+	property int draftCpuWeight: 100
+	property int draftPidsLimit: 0
+	property bool applySubmitted: false
+	readonly property bool applying: resourceApply.valid && !!resourceApply.value
+	readonly property bool draftDirty: draftInitialized && (
+			!sameValue(draftMemoryLimit, memoryLimit.value)
+			|| !sameValue(draftCpuLimit, cpuLimit.value)
+			|| (!isAggregate && !sameValue(draftCpuWeight, cpuWeight.value))
+			|| !sameValue(draftPidsLimit, pidsLimit.value))
+
+	function sameValue(a, b) {
+		return Math.abs(Number(a) - Number(b)) < 0.000001
+	}
+
+	function syncDraftFromBackend(force) {
+		if ((!force && root.draftDirty) || !memoryLimit.valid || !cpuLimit.valid
+				|| !pidsLimit.valid || (!root.isAggregate && !cpuWeight.valid)) {
+			return
+		}
+		root.draftMemoryLimit = Number(memoryLimit.value)
+		root.draftCpuLimit = Number(cpuLimit.value)
+		root.draftCpuWeight = root.isAggregate ? 100 : Number(cpuWeight.value)
+		root.draftPidsLimit = Number(pidsLimit.value)
+		root.draftInitialized = true
+	}
+
+	function resourcePatch() {
+		const patch = {}
+		if (!root.sameValue(root.draftMemoryLimit, memoryLimit.value)) {
+			patch.memoryLimitBytes = root.draftMemoryLimit
+		}
+		if (!root.sameValue(root.draftCpuLimit, cpuLimit.value)) {
+			patch.cpuLimit = root.draftCpuLimit
+		}
+		if (!root.isAggregate && !root.sameValue(root.draftCpuWeight, cpuWeight.value)) {
+			patch.cpuWeight = root.draftCpuWeight
+		}
+		if (!root.sameValue(root.draftPidsLimit, pidsLimit.value)) {
+			patch.pidsLimit = root.draftPidsLimit
+		}
+		return patch
+	}
+
+	function applyDraft() {
+		const patch = root.resourcePatch()
+		if (!Object.keys(patch).length || root.applying) {
+			return
+		}
+		root.applySubmitted = true
+		resourceApply.setValue(JSON.stringify(patch))
+	}
+
+	function cpuPresets(maximum) {
+		return [0, 0.5, 1, 1.5, 2, 3, 4, 6, 8].filter(function(value) {
+			return value <= maximum
+		}).map(function(value) {
+			return { value: value, display: value === 0 ? "0" : String(value), enabled: true }
+		})
+	}
 
 	function memoryPresets(maximumMib) {
 		const options = [{
@@ -84,12 +160,43 @@ Page {
 	readonly property string containersServiceUid: BackendConnection.serviceUidForType("containers")
 
 	VeQuickItem { id: memoryUsage; uid: root.resourcePrefix + "/" + root.memoryUsageLeaf }
-	VeQuickItem { id: memoryLimit; uid: root.resourcePrefix + "/" + root.memoryLimitLeaf }
+	VeQuickItem {
+		id: memoryLimit
+		uid: root.resourcePrefix + "/" + root.memoryLimitLeaf
+		onValueChanged: root.syncDraftFromBackend(false)
+		onValidChanged: root.syncDraftFromBackend(false)
+	}
 	VeQuickItem { id: cpuUsage; uid: root.resourcePrefix + "/CpuUsage" }
-	VeQuickItem { id: cpuLimit; uid: root.resourcePrefix + "/CpuLimit" }
-	VeQuickItem { id: cpuWeight; uid: root.resourcePrefix + "/CpuWeight" }
+	VeQuickItem {
+		id: cpuLimit
+		uid: root.resourcePrefix + "/CpuLimit"
+		onValueChanged: root.syncDraftFromBackend(false)
+		onValidChanged: root.syncDraftFromBackend(false)
+	}
+	VeQuickItem {
+		id: cpuWeight
+		uid: root.resourcePrefix + "/CpuWeight"
+		onValueChanged: root.syncDraftFromBackend(false)
+		onValidChanged: root.syncDraftFromBackend(false)
+	}
 	VeQuickItem { id: pids; uid: root.resourcePrefix + "/" + root.pidsUsageLeaf }
-	VeQuickItem { id: pidsLimit; uid: root.resourcePrefix + "/PidsLimit" }
+	VeQuickItem {
+		id: pidsLimit
+		uid: root.resourcePrefix + "/PidsLimit"
+		onValueChanged: root.syncDraftFromBackend(false)
+		onValidChanged: root.syncDraftFromBackend(false)
+	}
+	VeQuickItem {
+		id: resourceApply
+		uid: root.resourcePrefix + "/Apply"
+		onValueChanged: {
+			if (!value && root.applySubmitted) {
+				root.applySubmitted = false
+				Qt.callLater(root.syncDraftFromBackend, true)
+			}
+		}
+	}
+	VeQuickItem { id: resourceApplyError; uid: root.resourcePrefix + "/ApplyError" }
 	VeQuickItem { id: state; uid: root.containerPrefix + "/State" }
 
 	// Top-level, not per-container - the same host ceiling bounds every
@@ -154,29 +261,32 @@ Page {
 				// covers every writable container-memory selection point.
 				//% "Memory maximum"
 				text: qsTrId("pagesettingscontainerresources_memory_limit")
-				secondaryText: memoryLimit.valid ? Containers.memoryLimitToText(memoryLimit.value) : "--"
+				secondaryText: root.draftInitialized
+						? Containers.memoryLimitToText(root.draftMemoryLimit) : "--"
 				//% "0 = unlimited"
 				caption: qsTrId("pagesettingscontainerresources_memory_limit_caption")
 				preferredVisible: systemMaxMemory.valid && systemMaxMemory.value > 0
-				interactive: memoryLimit.valid
+				interactive: root.draftInitialized && resourceApply.valid && !root.applying
 				onClicked: Global.dialogLayer.open(memorySelectorComponent, {
-					value: Containers.bytesToMebibytes(memoryLimit.value)
+					value: Containers.bytesToMebibytes(root.draftMemoryLimit)
 				})
 			}
 
-			ListSlider {
-				//% "CPU maximum: %1"
-				text: qsTrId("pagesettingscontainerresources_cpu_limit_slider").arg(Containers.cpuLimitToText(cpuLimit.value))
+			ListButton {
+				//% "CPU maximum"
+				text: qsTrId("pagesettingscontainerresources_cpu_limit")
+				secondaryText: root.draftInitialized
+						? Containers.cpuLimitToText(root.draftCpuLimit) : "--"
 				//% "0 = unlimited"
 				caption: qsTrId("pagesettingscontainerresources_cpu_limit_caption")
 				preferredVisible: systemMaxCpu.valid && systemMaxCpu.value > 0
-				dataItem.uid: cpuLimit.uid
-				from: 0
-				to: systemMaxCpu.value
-				stepSize: 0.5
+				interactive: root.draftInitialized && resourceApply.valid && !root.applying
+				onClicked: Global.dialogLayer.open(cpuSelectorComponent, {
+					value: root.draftCpuLimit
+				})
 			}
 
-			ListSpinBox {
+			ListButton {
 				//% "CPU priority"
 				text: qsTrId("pagesettingscontainerresources_cpu_weight")
 				// No aggregate equivalent (docs/dbus-api.md note 3) - the
@@ -184,27 +294,62 @@ Page {
 				// runtime service and all its children, not a per-runtime
 				// knob exposed here.
 				preferredVisible: !root.isAggregate
-				dataItem.uid: cpuWeight.uid
-				from: 1
-				to: 1000
-				stepSize: 10
+				secondaryText: root.draftInitialized ? root.draftCpuWeight : "--"
+				interactive: root.draftInitialized && resourceApply.valid && !root.applying
+				onClicked: Global.dialogLayer.open(cpuWeightSelectorComponent, {
+					value: root.draftCpuWeight
+				})
 			}
 
-			ListSpinBox {
+			ListButton {
 				//% "Process maximum"
 				text: qsTrId("pagesettingscontainerresources_pids_limit")
+				secondaryText: root.draftInitialized
+						? (root.draftPidsLimit === 0
+								//% "Unlimited"
+								? qsTrId("pagesettingscontainerresources_unlimited")
+								: root.draftPidsLimit) : "--"
 				//% "0 = unlimited"
 				caption: qsTrId("pagesettingscontainerresources_pids_limit_caption")
-				dataItem.uid: pidsLimit.uid
-				from: 0
-				to: 4096
-				stepSize: 16
+				interactive: root.draftInitialized && resourceApply.valid && !root.applying
+				onClicked: Global.dialogLayer.open(pidsSelectorComponent, {
+					value: root.draftPidsLimit
+				})
 			}
 
 			ListInfoLabel {
-				//% "Changes apply live and do not recreate the parent container."
-				text: qsTrId("pagesettingscontainerresources_aggregate_limits_note")
-				preferredVisible: root.isAggregate
+				//% "Changes are staged here and applied together."
+				text: qsTrId("pagesettingscontainerresources_staged_note")
+			}
+
+			PrimaryListLabel {
+				//% "Resource changes could not be applied: %1"
+				text: qsTrId("pagesettingscontainerresources_apply_error")
+						.arg(resourceApplyError.value || "")
+				preferredVisible: !!resourceApplyError.value
+			}
+
+			ListButton {
+				//% "Resource changes"
+				text: qsTrId("pagesettingscontainerresources_changes")
+				secondaryText: root.applying
+						//% "Applying..."
+						? qsTrId("pagesettingscontainerresources_applying")
+						//% "Apply"
+						: qsTrId("pagesettingscontainerresources_apply")
+				preferredVisible: resourceApply.valid
+				readOnly: !root.draftDirty || root.applying
+				writeAccessLevel: VenusOS.User_AccessType_User
+				onClicked: root.applyDraft()
+			}
+
+			ListButton {
+				//% "Discard resource changes"
+				text: qsTrId("pagesettingscontainerresources_discard_changes")
+				//% "Discard"
+				secondaryText: qsTrId("pagesettingscontainerresources_discard")
+				preferredVisible: root.draftDirty && !root.applying
+				onClicked: root.syncDraftFromBackend(true)
 			}
 		}
 	}
@@ -224,7 +369,80 @@ Page {
 			stepSize: root.memoryStepMib
 			presets: root.memoryPresets(to)
 
-			onAccepted: memoryLimit.setValue(Containers.mebibytesToBytes(value))
+			onAccepted: root.draftMemoryLimit = Containers.mebibytesToBytes(value)
+		}
+	}
+
+	Component {
+		id: cpuSelectorComponent
+
+		NumberSelectorDialog {
+			//% "CPU maximum"
+			title: qsTrId("pagesettingscontainerresources_cpu_limit")
+			fillValueFieldWidth: true
+			decimals: 1
+			from: 0
+			to: systemMaxCpu.value
+			stepSize: 0.5
+			presets: root.cpuPresets(to)
+			onAccepted: root.draftCpuLimit = value
+		}
+	}
+
+	Component {
+		id: cpuWeightSelectorComponent
+
+		NumberSelectorDialog {
+			//% "CPU priority"
+			title: qsTrId("pagesettingscontainerresources_cpu_weight")
+			fillValueFieldWidth: true
+			decimals: 0
+			from: 1
+			to: 1000
+			stepSize: 10
+			presets: [1, 50, 100, 250, 500, 750, 1000].map(function(value) {
+				return { value: value, display: String(value), enabled: true }
+			})
+			onAccepted: root.draftCpuWeight = value
+		}
+	}
+
+	Component {
+		id: pidsSelectorComponent
+
+		NumberSelectorDialog {
+			//% "Process maximum"
+			title: qsTrId("pagesettingscontainerresources_pids_limit")
+			fillValueFieldWidth: true
+			decimals: 0
+			from: 0
+			to: 4096
+			stepSize: 16
+			presets: [0, 64, 128, 256, 512, 1024, 2048, 4096].map(function(value) {
+				return { value: value, display: String(value), enabled: true }
+			})
+			onAccepted: root.draftPidsLimit = value
+		}
+	}
+
+	Component {
+		id: discardChangesDialogComponent
+
+		ModalWarningDialog {
+			property var toPage
+
+			//% "Discard resource changes?"
+			title: qsTrId("pagesettingscontainerresources_discard_title")
+			//% "The resource limits have not been applied."
+			description: qsTrId("pagesettingscontainerresources_discard_description")
+			dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_OkAndCancel
+			//% "Discard"
+			acceptText: qsTrId("pagesettingscontainerresources_discard")
+			onAccepted: {
+				root.syncDraftFromBackend(true)
+				root.tryPop = undefined
+				Global.pageManager.popPage(toPage)
+			}
 		}
 	}
 }
