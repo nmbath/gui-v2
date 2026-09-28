@@ -28,6 +28,12 @@ Page {
 		const translated = qsTrId("pagesettingscontainers_service_migrating_storage")
 		return translated === id ? qsTr("Migrating container storage") : translated
 	}
+	readonly property string storageUnavailableText: {
+		const id = "pagesettingscontainers_storage_unavailable"
+		//% "Storage unavailable"
+		const translated = qsTrId("pagesettingscontainers_storage_unavailable")
+		return translated === id ? qsTr("Storage unavailable") : translated
+	}
 
 	// docs/dbus-api.md: MaxMemoryLimitBytes/MaxCpuLimit are the host ceiling
 	// (RAM minus a fixed OS/Venus reserve; host core count) - the same bound
@@ -637,6 +643,14 @@ Page {
 						// (Stopped/Starting/etc) still falls back to the
 						// plain state text.
 						secondaryText: {
+							// A missing selected volume is the common cause for
+							// every container. Do not repeat stale, potentially
+							// very long per-container errors from before the
+							// volume disappeared; the service/storage rows above
+							// provide the action needed to resolve it.
+							if (root.storageMissing) {
+								return root.storageUnavailableText
+							}
 							if (state.value === 4) { // ContainerState.Running
 								//% "%1% CPU, %2 MB"
 								return qsTrId("pagesettingscontainers_running_stats")
@@ -673,7 +687,8 @@ Page {
 						// independently of the two-line name/image block.
 						contentItem: Item {
 							implicitWidth: Theme.geometry_listItem_width
-							implicitHeight: identityColumn.implicitHeight
+							implicitHeight: Math.max(identityColumn.implicitHeight, rightContent.implicitHeight)
+							clip: true
 
 							ColumnLayout {
 								id: identityColumn
@@ -705,6 +720,7 @@ Page {
 								id: rightContent
 								implicitWidth: statusLabel.implicitWidth + containerDelegate.spacing + forwardIcon.implicitWidth
 								implicitHeight: Math.max(statusLabel.implicitHeight, forwardIcon.implicitHeight)
+								width: Math.min(implicitWidth, parent.width * 0.45)
 
 								anchors {
 									right: parent.right
@@ -713,6 +729,10 @@ Page {
 
 								SecondaryListLabel {
 									id: statusLabel
+									width: Math.max(0, parent.width - containerDelegate.spacing - forwardIcon.implicitWidth)
+									elide: Text.ElideRight
+									maximumLineCount: 1
+									horizontalAlignment: Text.AlignRight
 
 									anchors {
 										left: parent.left
