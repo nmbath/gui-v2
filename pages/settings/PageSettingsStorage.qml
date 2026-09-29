@@ -31,8 +31,7 @@ Page {
 	// real sections without the underlying model itself needing to
 	// reorder, and without a second, separate model/pass per section -
 	// same "shadow Repeater over the full model, computed once"
-	// convention this app already uses (PageSettingsContainerStorage.qml's
-	// volumeInfoRepeater, data/Storage.qml's _volumeWatchers).
+	// convention this app already uses in other model-backed settings pages.
 	property var volumeRecords: []
 	readonly property var adoptedVolumes: root.volumeRecords.filter(function (v) {
 		return v.lifecycle === VenusOS.Storage_Lifecycle_AdoptedPersistent
@@ -202,7 +201,7 @@ Page {
 	function adoptedUsageText(record) {
 		//% "%1 used / %2 free"
 		return qsTrId("pagesettingsstorage_adopted_usage").arg(Containers.formatBytes(record.used))
-				.arg(Containers.formatBytes(record.free))
+				.arg(Containers.formatBytes(Math.max(0, record.capacity - record.used)))
 	}
 
 	function newCaption(record) {
@@ -235,8 +234,8 @@ Page {
 				"lifecycle": row.lifecycleValue,
 				"state": row.stateValue,
 				"claimedBy": row.claimedBy,
+				"capacity": row.capacityValue,
 				"used": row.usedValue,
-				"free": row.freeValue,
 				"mountPoint": row.mountPointValue,
 				"deviceId": row.deviceIdValue,
 				"filesystem": row.filesystemValue,
@@ -282,8 +281,8 @@ Page {
 			readonly property int lifecycleValue: lifecycleItem.value || 0
 			readonly property int stateValue: stateItem.value || 0
 			readonly property string claimedBy: claimedByItem.value || ""
+			readonly property real capacityValue: capacityItem.value || 0
 			readonly property real usedValue: usedItem.value || 0
-			readonly property real freeValue: freeItem.value || 0
 			readonly property string mountPointValue: mountPointItem.value || ""
 			readonly property string deviceIdValue: deviceIdItem.value || ""
 			readonly property string filesystemValue: filesystemItem.value || ""
@@ -303,8 +302,8 @@ Page {
 			onLifecycleValueChanged: root.recomputeVolumes()
 			onStateValueChanged: root.recomputeVolumes()
 			onClaimedByChanged: root.recomputeVolumes()
+			onCapacityValueChanged: root.recomputeVolumes()
 			onUsedValueChanged: root.recomputeVolumes()
-			onFreeValueChanged: root.recomputeVolumes()
 			onMountPointValueChanged: root.recomputeVolumes()
 			onDeviceIdValueChanged: root.recomputeVolumes()
 			onFilesystemValueChanged: root.recomputeVolumes()
@@ -316,8 +315,8 @@ Page {
 			VeQuickItem { id: stateItem; uid: volumeInfoRow.prefix + "/State" }
 			VeQuickItem { id: lifecycleItem; uid: volumeInfoRow.prefix + "/Lifecycle" }
 			VeQuickItem { id: claimedByItem; uid: volumeInfoRow.prefix + "/ClaimedBy" }
+			VeQuickItem { id: capacityItem; uid: volumeInfoRow.prefix + "/Capacity" }
 			VeQuickItem { id: usedItem; uid: volumeInfoRow.prefix + "/Used" }
-			VeQuickItem { id: freeItem; uid: volumeInfoRow.prefix + "/Free" }
 			VeQuickItem { id: mountPointItem; uid: volumeInfoRow.prefix + "/MountPoint" }
 			VeQuickItem { id: deviceIdItem; uid: volumeInfoRow.prefix + "/DeviceId" }
 			VeQuickItem { id: filesystemItem; uid: volumeInfoRow.prefix + "/Filesystem" }
@@ -330,7 +329,7 @@ Page {
 	// next one - chaining dialogLayer.open() calls synchronously risks
 	// the first dialog's own closed-signal handler destroying the second
 	// dialog instead of the first. Same pattern PageSettingsStorageVolume.
-	// qml and PageSettingsContainerStorage.qml already use.
+	// qml uses for all chained storage dialogs.
 	property bool pendingReformatAfterClose: false
 	property bool pendingReformatConfirmAfterClose: false
 	property string pendingReformatVolumePrefix: ""

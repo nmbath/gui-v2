@@ -10,21 +10,18 @@ import Victron.VenusOS
 	Storage Manager volume picker for the VRM online logging buffer (vrm-cache role).
 
 	Lists adopted (Lifecycle == AdoptedPersistent), currently available/active volumes published
-	by com.victronenergy.storage per VenusOS_Storage_Manager_MVP_Architecture_v5.docx S14.4, and
+	by com.victronenergy.storage, and
 	shows shared use with a coloured indicator rather than enumerating consumers in text.
 	Selecting a volume writes its stable Id to
-	/Settings/Vrmlogger/StorageVolumeId - a Settings leaf, not a raw device/mount path (S12.3),
-	and not a direct call to Storage Manager's proposed /Management D-Bus methods (S14.7): GUIv2's
+	/Settings/Vrmlogger/StorageVolumeId - a Settings leaf, not a raw device/mount path,
+	and not a direct call to Storage Manager's /Management D-Bus methods: GUIv2's
 	VeQItem layer can only get/set BusItem leaves (plus the one hand-built AddSetting bridge for
-	the settings service - see ve_qitems_dbus.cpp), the same constraint that made venus-containers
-	use a writable /Admin/Purge trigger path instead of a real Purge method. Storage Manager's own
-	reconciler is expected to watch this setting and perform the actual RequestAllocationSet once
-	Phase 4 exists.
+	the settings service - see ve_qitems_dbus.cpp). Storage Manager's own
+	vrmlogger consumer watches this setting and requests the corresponding allocation.
 
 	Eject/release scope decision for this phase: choosing "Not set" below clears the setting (the
 	GUI-observable equivalent of ReleaseAllocationSet for the vrm-cache role). It does not perform
-	a bounded quiesce/unmount transaction - S11's Safe eject with blocking-consumer feedback is
-	Phase 7 territory in venus-storage, not yet implemented there. PageSettingsFirmwareOffline.qml's
+	a bounded quiesce/unmount transaction. PageSettingsFirmwareOffline.qml's
 	ListMountStateButton (shared Storage_MountState-based Eject) is intentionally left untouched;
 	only this page's storage-selection surface moves to Storage Manager for this phase.
 */
@@ -32,12 +29,17 @@ Page {
 	id: root
 
 	readonly property string storageServiceUid: BackendConnection.serviceUidForType("storage")
+	readonly property string loggerServiceUid: BackendConnection.serviceUidForType("logger")
 	readonly property string currentVolumeId: storageVolumeIdSetting.value || ""
 
 	VeQuickItem {
 		id: storageVolumeIdSetting
 
 		uid: Global.systemSettings.serviceUid + "/Settings/Vrmlogger/StorageVolumeId"
+	}
+	VeQuickItem {
+		id: bufferLocation
+		uid: root.loggerServiceUid + "/Buffer/Location"
 	}
 
 	property VeQItemSortTableModel volumes: VeQItemSortTableModel {
@@ -130,7 +132,9 @@ Page {
 				text: qsTrId("settings_logger_storage_none")
 				//% "%1 free"
 				secondaryText: qsTrId("settings_logger_storage_free").arg(dataPartitionFreeSpaceText)
-				checked: !root.currentVolumeId
+				// Keep the external UUID as a preference while absent, but show
+				// where VRM is actually writing. 2 means external storage.
+				checked: bufferLocation.value !== 2
 				writeAccessLevel: VenusOS.User_AccessType_User
 				onClicked: {
 					storageVolumeIdSetting.setValue("")
@@ -184,7 +188,7 @@ Page {
 			indicatorColor: root.volumeIsShared(volumeId) ? Theme.color_orange : Theme.color_green
 			//% "%1 free"
 			secondaryText: qsTrId("settings_logger_storage_free").arg(freeSpaceText)
-			checked: volumeId === root.currentVolumeId
+			checked: bufferLocation.value === 2 && volumeId === root.currentVolumeId
 			writeAccessLevel: VenusOS.User_AccessType_User
 
 			readonly property string freeSpaceText: Utils.qtyToString(free.value,
