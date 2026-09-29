@@ -25,8 +25,10 @@ ModalDialog {
 
 	readonly property string exchangeServiceUid: BackendConnection.serviceUidForType("exchange")
 	readonly property string claimAddress: localAddress(networkServices.value)
+	readonly property string claimScheme: securityProfile.valid
+			&& securityProfile.value === VenusOS.Security_Profile_Secured ? "https" : "http"
 	readonly property string claimOrigin: claimAddress.length > 0
-			? "http://" + claimAddress : "http://venus.local"
+			? claimScheme + "://" + claimAddress : claimScheme + "://venus.local"
 	readonly property string claimUrl: capabilityRef.value
 			? claimOrigin + "/exchange/claim/" + capabilityRef.value : ""
 	readonly property int secondsRemaining: transferExpires.valid && transferExpires.value > 0
@@ -149,6 +151,10 @@ ModalDialog {
 
 	VeQuickItem { id: connected; uid: root.exchangeServiceUid + "/Connected"; onValidChanged: root.maybeStart() }
 	VeQuickItem { id: networkServices; uid: Global.venusPlatform.serviceUid + "/Network/Services" }
+	VeQuickItem {
+		id: securityProfile
+		uid: Global.systemSettings.serviceUid + "/Settings/System/SecurityProfile"
+	}
 	VeQuickItem { id: availableItem; uid: root.exchangeServiceUid + "/Actions/" + root.actionDbusKey + "/Available"; onValidChanged: root.maybeStart() }
 	VeQuickItem { id: requestItem; uid: root.exchangeServiceUid + "/Request"; onValidChanged: root.maybeStart() }
 	VeQuickItem { id: requestReply; uid: root.exchangeServiceUid + "/RequestReply" }
