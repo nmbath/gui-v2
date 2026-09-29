@@ -13,6 +13,9 @@ Loader {
 
 	signal controlCardsActivated()
 	signal auxCardsActivated()
+	// Landscape-only for now - see StatusBar_Portrait.qml, which has no
+	// web-pages button yet (the design's target device is landscape).
+	signal webPagesActivated()
 	signal cardsDeactivated()
 	signal sidePanelToggled()
 
@@ -27,6 +30,7 @@ Loader {
 
 			onControlCardsActivated: root.controlCardsActivated()
 			onAuxCardsActivated: root.auxCardsActivated()
+			onWebPagesActivated: root.webPagesActivated()
 			onCardsDeactivated: root.cardsDeactivated()
 			onSidePanelToggled: root.sidePanelToggled()
 		}
@@ -41,6 +45,7 @@ Loader {
 
 			onControlCardsActivated: root.controlCardsActivated()
 			onAuxCardsActivated: root.auxCardsActivated()
+			onWebPagesActivated: root.webPagesActivated()
 			onCardsDeactivated: root.cardsDeactivated()
 			onSidePanelToggled: root.sidePanelToggled()
 		}

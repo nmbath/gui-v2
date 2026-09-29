@@ -11,16 +11,18 @@ FocusScope {
 	id: root
 
 	required property PageStack pageStack
+	readonly property bool webNavigationActive: Global.mainView.currentPage?.webNavigationBar ?? false
 
 	signal controlCardsActivated()
 	signal auxCardsActivated()
+	signal webPagesActivated()
 	signal cardsDeactivated()
 	signal sidePanelToggled()
 
 	function updateBreadcrumbsFocusHint() {
 		// When breadcrumbs list is focused: if focus is arriving from the left side, focus the
 		// the left-most breadcrumb, or if from the right side, focus the right-most breadcrumb.
-		if (leftButton.activeFocus || auxButton.activeFocus) {
+		if (leftButton.activeFocus || auxButton.activeFocus || webPagesButton.activeFocus) {
 			breadcrumbs.focusEdgeHint = Qt.LeftEdge
 		} else if (rightButton.activeFocus || sleepButton.activeFocus) {
 			breadcrumbs.focusEdgeHint = Qt.RightEdge
@@ -75,11 +77,14 @@ FocusScope {
 		leftInset: Theme.geometry_statusBar_horizontalMargin
 		bottomInset: Theme.geometry_statusBar_spacing
 
-		icon.source: buttonType === VenusOS.StatusBar_LeftButton_ControlsInactive ? "qrc:/images/icon_controls_off_32.svg"
+		y: root.webNavigationActive ? -Theme.geometry_statusBar_spacing / 2 : 0
+		icon.source: root.webNavigationActive ? "qrc:/images/icon_webpages_32.svg"
+			: Global.mainView.webPagesActive ? ""
+			: buttonType === VenusOS.StatusBar_LeftButton_ControlsInactive ? "qrc:/images/icon_controls_off_32.svg"
 			: buttonType === VenusOS.StatusBar_LeftButton_ControlsActive ? "qrc:/images/icon_controls_on_32.svg"
 			: buttonType === VenusOS.StatusBar_LeftButton_Back ? "qrc:/images/icon_back_32.svg"
 			: ""
-		enabled: buttonType !== VenusOS.StatusBar_LeftButton_None
+		enabled: !(Global.mainView?.webPagesActive ?? false) && buttonType !== VenusOS.StatusBar_LeftButton_None
 		visible: !(Global.mainView?.cardsActive ?? false) || controlsPaneActive || pageStack.opened
 		KeyNavigation.right: auxButton
 
@@ -124,11 +129,13 @@ FocusScope {
 		visible: (!root.pageStack.opened && Global.switches.groups.count > 0
 				&& !(Global.mainView?.cardsActive ?? false))
 				|| auxCardsOpened // allow cards to be closed if all switches are disconnected while opened
-		icon.source: auxCardsOpened ? "qrc:/images/icon_smartswitch_on_32.svg"
+		icon.source: (Global.mainView?.webPagesActive ?? false) ? ""
+				: leftButton.buttonType === VenusOS.StatusBar_LeftButton_ControlsActive ? ""
+				: auxCardsOpened ? "qrc:/images/icon_smartswitch_on_32.svg"
 				: "qrc:/images/icon_smartswitch_off_32.svg"
-		enabled: visible
+		enabled: visible && !(Global.mainView?.webPagesActive ?? false)
 		KeyNavigation.right: pluginPaneButtons.count > 0
-			? pluginPaneButtons.itemAt(0) : breadcrumbs
+			? pluginPaneButtons.itemAt(0) : webPagesButton
 
 		onClicked: {
 			if (auxCardsOpened) {
@@ -181,7 +188,7 @@ FocusScope {
 
 				KeyNavigation.left: index > 0 ? pluginPaneButtons.itemAt(index - 1) : auxButton
 				KeyNavigation.right: index < pluginPaneButtons.count - 1
-						? pluginPaneButtons.itemAt(index + 1) : breadcrumbs
+						? pluginPaneButtons.itemAt(index + 1) : webPagesButton
 
 				onClicked: {
 					if (paneOpened) {
@@ -226,17 +233,56 @@ FocusScope {
 		}
 	}
 
+	StatusBarButton {
+		id: webPagesButton
+
+		// Always-available entry point to the registered-web-pages list
+		// (VenusOS_GUIv2_Web_Content_and_Container_Proxy_Design,
+		// venus-private#707) - not page-specific, unlike leftButton/auxButton.
+		anchors {
+			left: pluginButtonRow.right
+			leftMargin: pluginPaneButtons.count > 0 ? 0 : -auxButton.rightInset
+		}
+		rightInset: Theme.geometry_statusBar_spacing
+		bottomInset: Theme.geometry_statusBar_spacing
+
+		enabled: visible
+		visible: !root.pageStack.opened
+				&& (!(Global.mainView?.cardsActive ?? false) || (Global.mainView?.webPagesActive ?? false))
+		icon.source: "qrc:/images/icon_webpages_32.svg"
+		KeyNavigation.left: pluginPaneButtons.count > 0
+				? pluginPaneButtons.itemAt(pluginPaneButtons.count - 1) : auxButton
+		KeyNavigation.right: breadcrumbs
+
+		// Shown via cardsLoader (root.webPagesActivated(), relayed to
+		// MainView's cardsLoader.show()), not pageManager.pushPage() - same
+		// mechanism as auxButton/AuxCardsPage above, not a stacked page. A
+		// pushed page always picks up a "Boat > ..." breadcrumb (Breadcrumbs.qml
+		// shows one for any pageStack depth >= 1, regardless of which tab),
+		// which read as "taken to Settings/Boat first" - the cards mechanism
+		// has no such breadcrumb and also covers the nav bar while open,
+		// matching how every other top-left-area button already behaves.
+		onClicked: (Global.mainView?.webPagesActive ?? false)
+				? root.cardsDeactivated() : root.webPagesActivated()
+		onActiveFocusChanged: {
+			if (activeFocus) {
+				root.updateBreadcrumbsFocusHint()
+			}
+		}
+	}
+
 	Breadcrumbs {
 		id: breadcrumbs
 
 		anchors {
 			top: parent.top
 			topMargin: Theme.geometry_settings_breadcrumb_topMargin
-			left: pluginButtonRow.right
+			left: webPagesButton.right
 			leftMargin: Theme.geometry_settings_breadcrumb_horizontalMargin
 			right: rightButtonRow.left
 		}
 		pageStack: root.pageStack
+		visible: !root.webNavigationActive && count >= 2
 
 		KeyNavigation.right: wifiButton
 
@@ -265,10 +311,63 @@ FocusScope {
 	}
 
 	Label {
+		id: webNavigationTitle
+
+		anchors {
+			left: leftButton.right
+			leftMargin: Theme.geometry_statusBar_spacing
+			right: webHistoryBackButton.left
+			rightMargin: Theme.geometry_statusBar_spacing
+			verticalCenter: parent.verticalCenter
+			verticalCenterOffset: -Theme.geometry_statusBar_spacing / 2
+		}
+		visible: root.webNavigationActive
+		height: Theme.geometry_statusBar_button_height
+		verticalAlignment: Text.AlignVCenter
+		elide: Text.ElideRight
+		font.pixelSize: Theme.font_size_body2
+		text: Global.mainView.currentPage?.title ?? ""
+	}
+
+	StatusBarButton {
+		id: webHistoryBackButton
+
+		anchors {
+			right: webHistoryForwardButton.left
+			verticalCenter: parent.verticalCenter
+			verticalCenterOffset: -Theme.geometry_statusBar_spacing / 2
+		}
+		visible: root.webNavigationActive
+		// Keep this control clickable even if the asynchronous iframe history
+		// state has not reached QML yet. The injected bridge safely ignores a
+		// back request when the iframe has no earlier entry.
+		enabled: visible
+		icon.source: "qrc:/images/icon_back_32.svg"
+		onClicked: Global.mainView.currentPage?.goBack()
+	}
+
+	StatusBarButton {
+		id: webHistoryForwardButton
+
+		anchors {
+			right: rightButtonRow.left
+			verticalCenter: parent.verticalCenter
+			verticalCenterOffset: -Theme.geometry_statusBar_spacing / 2
+		}
+		visible: root.webNavigationActive
+		// See webHistoryBackButton: availability is enforced by the iframe
+		// bridge, avoiding a stale QML state from swallowing the click.
+		enabled: visible
+		icon.source: "qrc:/images/icon_back_32.svg"
+		rotation: 180
+		onClicked: Global.mainView.currentPage?.goForward()
+	}
+
+	Label {
 		id: clockLabel
 		anchors.centerIn: parent
 		font.pixelSize: Theme.font_size_body2
-		visible: !breadcrumbs.visible
+		visible: !breadcrumbs.visible && !root.webNavigationActive
 		text: ClockTime.currentTime
 	}
 
@@ -280,7 +379,7 @@ FocusScope {
 			leftMargin: Theme.geometry_statusBar_spacing
 			verticalCenter: parent.verticalCenter
 		}
-		visible: !breadcrumbs.visible
+		visible: !breadcrumbs.visible && !root.webNavigationActive
 
 		StatusBarButton {
 			id: wifiButton
@@ -339,7 +438,8 @@ FocusScope {
 
 		// The notificationButton should always be shown, even when the page is not interactive
 		opacity: 1
-		visible: !breadcrumbs.visible && (Global.notifications?.statusBarNotificationIconVisible ?? false)
+		visible: !breadcrumbs.visible && !root.webNavigationActive
+				&& (Global.notifications?.statusBarNotificationIconVisible ?? false)
 
 		color: Global.notifications?.statusBarNotificationIconColor ?? "transparent"
 		icon.source: Global.notifications?.statusBarNotificationIconSource ?? ""
@@ -385,6 +485,53 @@ FocusScope {
 		height: parent.height
 		anchors.right: parent.right
 
+		// Background work is commonly started from a Settings page. Keep this
+		// in the always-visible right-hand controls rather than connectivityRow,
+		// which is deliberately hidden while Settings breadcrumbs are shown.
+		StatusBarButton {
+			id: activityButton
+			property QtObject activityDialog
+
+			visible: !root.webNavigationActive && (Global.backgroundActivity?.busy ?? false)
+			enabled: visible
+			// Long-running work must remain visible after normal controls fade
+			// when the display becomes inactive (same exception as notifications).
+			opacity: 1.0
+			// Keep the rotating control square and centred. Asymmetric clickable
+			// insets rotate with the whole button and make the glyph orbit off-centre.
+			icon.width: Theme.geometry_icon_size_medium * 0.75
+			icon.height: Theme.geometry_icon_size_medium * 0.75
+			// No dedicated "background activity" icon exists yet - reuses
+			// the generic refresh glyph, with continuous rotation as the
+			// "something is happening" cue a static icon can't give alone.
+			icon.source: "qrc:/images/icon_refresh_32.svg"
+
+			RotationAnimation on rotation {
+				running: activityButton.visible && Global.animationEnabled
+				loops: Animation.Infinite
+				from: 0
+				to: 360
+				duration: 1500
+			}
+
+			KeyNavigation.left: alarmButton
+			KeyNavigation.right: rightButton
+
+			onClicked: {
+				if (activityDialog) {
+					activityDialog.close()
+				} else {
+					activityDialog = Global.dialogLayer.open(backgroundActivityDialogComponent)
+				}
+			}
+
+			Component {
+				id: backgroundActivityDialogComponent
+
+				BackgroundActivityDialog {}
+			}
+		}
+
 		StatusBarButton {
 			id: rightButton
 
@@ -405,8 +552,9 @@ FocusScope {
 							 : buttonType === VenusOS.StatusBar_RightButton_Refresh
 							   ? "qrc:/images/icon_refresh_32.svg"
 							   : ""
-			KeyNavigation.left: pluginPaneButtons.count > 0
-					? pluginPaneButtons.itemAt(pluginPaneButtons.count - 1) : alarmButton
+			KeyNavigation.left: activityButton.visible ? activityButton
+					: pluginPaneButtons.count > 0
+					  ? pluginPaneButtons.itemAt(pluginPaneButtons.count - 1) : alarmButton
 			KeyNavigation.right: sleepButton
 
 			onClicked: root.sidePanelToggled()
@@ -455,7 +603,7 @@ FocusScope {
 						return
 					}
 				}
-				for (const button of [leftButton, auxButton, breadcrumbs, notificationButton, alarmButton, rightButton, sleepButton]) {
+				for (const button of [leftButton, auxButton, webPagesButton, breadcrumbs, notificationButton, alarmButton, activityButton, rightButton, sleepButton]) {
 					if (button.enabled) {
 						button.focus = true
 						break

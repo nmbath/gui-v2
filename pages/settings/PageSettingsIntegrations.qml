@@ -67,6 +67,19 @@ Page {
 			}
 
 			ListNavigation {
+				// Not qsTrId: this and the pages it leads to are new
+				// (venus-private#707) and were never run through lupdate, so
+				// on a device whose translation catalogue predates them,
+				// qsTrId falls back to showing the raw id text - found live
+				// on raspberrypi4-64 (192.168.1.120): the "Remove" button
+				// literally read "settings_web_page_remove" on screen. Plain
+				// strings avoid that regardless of catalogue state; revisit
+				// once this is a real PR and lupdate has run for real.
+				text: "Web pages"
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsWebPages.qml", {"title": text})
+			}
+
+			ListNavigation {
 				// Not qsTrId: this and the page it leads to are new and
 				// were never run through lupdate, so on a device whose
 				// translation catalogue predates them, qsTrId falls back to
@@ -215,6 +228,29 @@ Page {
 					id: modbusServerEnabled
 
 					uid: Global.systemSettings.serviceUid + "/Settings/Services/Modbus"
+				}
+			}
+
+			ListNavigation {
+				id: containers
+
+				//% "Containers"
+				text: qsTrId("pagesettingsintegrations_containers")
+				// Gated on venus-platform's own Services/Containers/Enabled
+				// (published whenever the image has the container
+				// packagegroup, see venus-platform's serviceExists("dbus-containers")
+				// check) rather than the dbus-containers service's own
+				// /Connected - the row (and the enable switch behind it)
+				// must stay reachable even when the service isn't running
+				// yet, since enabling it from here is what starts it.
+				// Matches Services/SignalK/Enabled's row above.
+				secondaryText: containersEnabledItem.valid && containersEnabledItem.value ? CommonWords.enabled : CommonWords.disabled
+				preferredVisible: containersEnabledItem.valid
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsContainers.qml", {"title": text})
+
+				VeQuickItem {
+					id: containersEnabledItem
+					uid: Global.venusPlatform.serviceUid + "/Services/Containers/Enabled"
 				}
 			}
 

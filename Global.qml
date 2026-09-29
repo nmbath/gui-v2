@@ -13,6 +13,7 @@ QtObject {
 	property var pageManager
 	property var mainView
 	property var firmwareUpdate
+	property var backgroundActivity
 	property bool applicationActive: true // i.e. not in Idle mode
 	property bool keyNavigationEnabled
 
@@ -38,6 +39,7 @@ QtObject {
 	property var inverterChargers
 	property var notifications
 	property var solarInputs
+	property var storage
 	property var system
 	property var switches
 	property var systemSettings
@@ -77,6 +79,7 @@ QtObject {
 		pageManager = null
 		mainView = null
 		firmwareUpdate = null
+		backgroundActivity = null
 		dialogLayer = null
 		notificationLayer = null
 		pressEffect = null
@@ -89,6 +92,7 @@ QtObject {
 		inverterChargers = null
 		notifications = null
 		solarInputs = null
+		storage = null
 		system = null
 		systemSettings = null
 		tanks = null

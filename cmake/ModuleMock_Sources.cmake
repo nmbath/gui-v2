@@ -85,6 +85,7 @@ SET(VictronMock_QML_MODULE_RESOURCES
     data/mock/conf/services/smartshunt-battery.json
     data/mock/conf/services/smartshunt-dcsource.json
     data/mock/conf/services/smartswitch.json
+    data/mock/conf/services/storage.json
     data/mock/conf/services/switch-controls-tester.json
     data/mock/conf/services/tank-blackwater-error-state.json
     data/mock/conf/services/tank-fuel1.json
@@ -99,6 +100,7 @@ SET(VictronMock_QML_MODULE_RESOURCES
     data/mock/conf/services/temperature-freezer.json
     data/mock/conf/services/temperature-watertank.json
     data/mock/conf/services/unsupported.json
+    data/mock/conf/services/webpages.json
     data/mock/conf/services/wind.json
     data/mock/conf/setup-common.json
     data/mock/conf/setup-essential-loads.json

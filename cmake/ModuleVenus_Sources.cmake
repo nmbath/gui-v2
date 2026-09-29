@@ -1,5 +1,6 @@
 set (VictronVenusOS_QML_MODULE_SINGLETON_SOURCES # All qml singletons have to be added here
     components/CommonWords.qml
+    components/Containers.qml
     components/Exchange.qml
     components/FirmwareVersion.qml
     components/PartnerBriefConfiguration.qml
@@ -25,6 +26,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/ArcGauge.qml
     components/ArcGaugeQuantityRow.qml
     components/AsymmetricRoundedRectangle.qml
+    components/BackgroundActivity.qml
     components/BarGauge.qml
     components/BarGaugeBase.qml
     components/BaseListView.qml
@@ -40,6 +42,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/ColorSelector.qml
     components/ColorWheelModeButton.qml
     components/ConsoleTerminal.qml
+    components/ContainersActivity.qml
     components/ControlCard.qml
     components/CpuMonitor.qml
     components/DateSelector.qml
@@ -124,6 +127,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/StatusBar.qml
     components/StatusBar_Landscape.qml
     components/StatusBar_Portrait.qml
+    components/StorageVolumeConsumers.qml
+    components/StorageFilesystemCompatibility.qml
     components/SwipePageModel.qml
     components/SwipeViewPage.qml
     components/SystemBatteryDelegate.qml
@@ -146,6 +151,9 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/VeQItemFilteredServiceModel.qml
     components/ViewGradient.qml
     components/WasmVirtualKeyboardHandler.qml
+    components/WebContentPage.qml
+    components/WebContentPageNative.qml
+    components/WebContentPageWasm.qml
     components/WifiModel.qml
     components/controls/AutoToggleButton.qml
     components/controls/Button.qml
@@ -182,15 +190,19 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/controls/ToggleButtonRow.qml
     components/controls/TextValidationField.qml
 
+    components/dialogs/BackgroundActivityDialog.qml
     components/dialogs/ColorWheelDialog.qml
     components/dialogs/ExchangeQrDialog.qml
     components/dialogs/CurrentLimitDialog.qml
     components/dialogs/DateSelectorDialog.qml
     components/dialogs/DialogHeader_Portrait.qml
     components/dialogs/DialogShadow.qml
+    components/dialogs/EjectDialog.qml
     components/dialogs/VrmInstanceSwapDialog.qml
     components/dialogs/ESSMinimumSOCDialog.qml
     components/dialogs/EvcsChargerModeDialog.qml
+    components/dialogs/FormatChooseDialog.qml
+    components/dialogs/FormatConfirmDialog.qml
     components/dialogs/GeneratorDialog.qml
     components/dialogs/GeneratorStartDialog.qml
     components/dialogs/GeneratorStopDialog.qml
@@ -243,6 +255,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/listitems/ListPvInverterPositionRadioButtonGroup.qml
     components/listitems/ListRebootButton.qml
     components/listitems/ListRelayState.qml
+    components/listitems/ListResourceGauge.qml
     components/listitems/ListSpinBoxRange.qml
     components/listitems/ListGeneratorAutoStartSwitch.qml
     components/listitems/ListTemperatureRelay.qml
@@ -337,6 +350,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     data/Notifications.qml
     data/SolarInputs.qml
     data/StartPageConfiguration.qml
+    data/Storage.qml
     data/Switches.qml
     data/System.qml
     data/SystemLoad.qml
@@ -387,6 +401,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/PageManager.qml
     pages/SettingsPage.qml
     pages/TanksTab.qml
+    pages/WebPageOpenDelegate.qml
+    pages/WebPagesPage.qml
     pages/controlcards/ESSCard.qml
     pages/controlcards/EVCSCard.qml
     pages/controlcards/GeneratorCard.qml
@@ -441,6 +457,15 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsCGwacs.qml
     pages/settings/PageSettingsCGwacsOverview.qml
     pages/settings/PageSettingsConnectivity.qml
+    pages/settings/PageSettingsContainer.qml
+    pages/settings/PageSettingsContainerChild.qml
+    pages/settings/PageSettingsContainerResources.qml
+    pages/settings/PageSettingsContainerStorage.qml
+    pages/settings/PageSettingsContainerService.qml
+    pages/settings/PageSettingsContainerStartup.qml
+    pages/settings/PageSettingsContainerSubcontainers.qml
+    pages/settings/PageSettingsContainers.qml
+    pages/settings/PageSettingsExchange.qml
     pages/settings/PageSettingsDisplayAndAppearance.qml
     pages/settings/PageSettingsDisplayBrief.qml
     pages/settings/PageSettingsDisplayMinMax.qml
@@ -451,7 +476,6 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsDynamicEss.qml
     pages/settings/PageSettingsEebus.qml
     pages/settings/PageSettingsEebusDevice.qml
-    pages/settings/PageSettingsExchange.qml
     pages/settings/PageSettingsFirmware.qml
     pages/settings/PageSettingsFirmwareOffline.qml
     pages/settings/PageSettingsFirmwareOnline.qml
@@ -471,6 +495,9 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsIntegrations.qml
     pages/settings/PageSettingsLarge.qml
     pages/settings/PageSettingsLogger.qml
+    pages/settings/PageSettingsLoggerStorage.qml
+    pages/settings/PageSettingsStorage.qml
+    pages/settings/PageSettingsStorageVolume.qml
     pages/settings/PageSettingsModbus.qml
     pages/settings/PageSettingsModbusAddDevice.qml
     pages/settings/PageSettingsModbusDevices.qml
@@ -497,9 +524,12 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsTcpIp.qml
     pages/settings/PageSettingsVecanDevice.qml
     pages/settings/PageSettingsVecanDevices.qml
+    pages/settings/PageSettingsWebPage.qml
+    pages/settings/PageSettingsWebPages.qml
     pages/settings/PageSettingsWifi.qml
     pages/settings/PageTzInfo.qml
     pages/settings/PageVrmDeviceInstances.qml
+    pages/settings/WebPageDelegate.qml
     pages/settings/debug/HubData.qml
     pages/settings/debug/PageDebug.qml
     pages/settings/debug/PageDebugVeQItems.qml
@@ -806,6 +836,7 @@ set(VictronVenusOS_RESOURCES
     images/icon_more_dots.svg
     images/icon_smartswitch_off_32.svg
     images/icon_smartswitch_on_32.svg
+    images/icon_storage_32.svg
     images/icon_switchdev_32.svg
     images/icon_system_32.svg
     images/icon_vrm_32.svg
@@ -839,6 +870,7 @@ set(VictronVenusOS_RESOURCES
     images/icon_lng_32.svg
     images/icon_lpg_32.svg
     images/icon_open_link_32.svg
+    images/icon_webpages_32.svg
     images/icon_to_grid.svg
     images/gauge_intro_5_matte_black.gif
     images/gauge_intro_5_matte_white.gif

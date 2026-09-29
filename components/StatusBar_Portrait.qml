@@ -12,9 +12,11 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 	id: root
 
 	required property PageStack pageStack
+	readonly property bool webNavigationActive: Global.mainView.currentPage?.webNavigationBar ?? false
 
 	signal controlCardsActivated()
 	signal auxCardsActivated()
+	signal webPagesActivated()
 	signal cardsDeactivated()
 	signal sidePanelToggled()
 
@@ -40,14 +42,36 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 
 			leftInset: Theme.geometry_statusBar_spacing
 			bottomInset: Theme.geometry_statusBar_spacing
-			icon.source: "qrc:/images/icon_back_32.svg"
-			enabled: breadcrumbs.enabled
-			visible: breadcrumbs.visible
+			icon.source: root.webNavigationActive
+					? "qrc:/images/icon_webpages_32.svg" : "qrc:/images/icon_back_32.svg"
+			enabled: breadcrumbs.enabled || root.webNavigationActive
+			visible: breadcrumbs.visible || root.webNavigationActive
 			opacity: breadcrumbs.opacity
 
-			Layout.alignment: Qt.AlignTop
+			Layout.alignment: root.webNavigationActive ? Qt.AlignVCenter : Qt.AlignTop
 			KeyNavigation.right: controlCardsButton
 			onClicked: Global.pageManager.popPage()
+		}
+
+		StatusBarButton {
+			visible: root.webNavigationActive
+			// The cross-origin iframe reports its history asynchronously. Keep
+			// the control active; the bridge safely ignores an unavailable action.
+			enabled: visible
+			icon.source: "qrc:/images/icon_back_32.svg"
+			Layout.alignment: Qt.AlignVCenter
+			transform: Translate { y: -Theme.geometry_statusBar_spacing / 2 }
+			onClicked: Global.mainView.currentPage?.goBack()
+		}
+
+		StatusBarButton {
+			visible: root.webNavigationActive
+			enabled: visible
+			icon.source: "qrc:/images/icon_back_32.svg"
+			rotation: 180
+			Layout.alignment: Qt.AlignVCenter
+			transform: Translate { y: -Theme.geometry_statusBar_spacing / 2 }
+			onClicked: Global.mainView.currentPage?.goForward()
 		}
 
 		StatusBarButton {
@@ -62,10 +86,12 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 			leftInset: Theme.geometry_statusBar_spacing / 2
 			rightInset: Theme.geometry_statusBar_spacing / 2
 			bottomInset: Theme.geometry_statusBar_spacing
-			icon.source: buttonType === VenusOS.StatusBar_LeftButton_ControlsInactive ? "qrc:/images/icon_controls_off_32.svg"
+			icon.source: Global.mainView.webPagesActive ? ""
+				: buttonType === VenusOS.StatusBar_LeftButton_ControlsInactive ? "qrc:/images/icon_controls_off_32.svg"
 				: buttonType === VenusOS.StatusBar_LeftButton_ControlsActive ? "qrc:/images/icon_controls_on_32.svg"
 				: ""
-			enabled: !breadcrumbs.enabled && buttonType !== VenusOS.StatusBar_LeftButton_None
+			enabled: !root.webNavigationActive && !(Global.mainView?.webPagesActive ?? false)
+				&& !breadcrumbs.enabled && buttonType !== VenusOS.StatusBar_LeftButton_None
 			visible: enabled && (!(Global.mainView?.cardsActive ?? false) || controlsPaneActive)
 
 			Layout.alignment: Qt.AlignTop
@@ -99,9 +125,13 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 			visible: (!root.pageStack.opened && Global.switches.groups.count > 0
 					&& !(Global.mainView?.cardsActive ?? false))
 					|| auxCardsOpened // allow cards to be closed if all switches are disconnected while opened
-			icon.source: auxCardsOpened ? "qrc:/images/icon_smartswitch_on_32.svg"
+			icon.source: (Global.mainView?.webPagesActive ?? false) ? ""
+					: controlCardsButton.buttonType === VenusOS.StatusBar_LeftButton_ControlsActive ? ""
+					: auxCardsOpened ? "qrc:/images/icon_smartswitch_on_32.svg"
 					: "qrc:/images/icon_smartswitch_off_32.svg"
-			enabled: !breadcrumbs.enabled && visible
+			enabled: !root.webNavigationActive && !(Global.mainView?.webPagesActive ?? false)
+					&& !breadcrumbs.enabled
+					&& controlCardsButton.buttonType !== VenusOS.StatusBar_LeftButton_ControlsActive
 
 			Layout.alignment: Qt.AlignTop
 
@@ -185,10 +215,27 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 			}
 		}
 
+		StatusBarButton {
+			id: webPagesButton
+
+			leftInset: Theme.geometry_statusBar_spacing / 2
+			rightInset: Theme.geometry_statusBar_horizontalMargin
+			bottomInset: Theme.geometry_statusBar_spacing
+			visible: !root.webNavigationActive && !root.pageStack.opened && !breadcrumbs.enabled
+					&& (!(Global.mainView?.cardsActive ?? false) || (Global.mainView?.webPagesActive ?? false))
+			enabled: visible
+			icon.source: "qrc:/images/icon_webpages_32.svg"
+			Layout.alignment: Qt.AlignTop
+
+			onClicked: (Global.mainView?.webPagesActive ?? false)
+					? root.cardsDeactivated() : root.webPagesActivated()
+		}
+
 		Breadcrumbs {
 			id: breadcrumbs
 
 			pageStack: root.pageStack
+			visible: !root.webNavigationActive && count >= 2
 			Layout.fillWidth: true
 			Layout.topMargin: ((backButton.height - height) / 2) - Theme.geometry_statusBar_spacing/2
 			Layout.alignment: Qt.AlignTop
@@ -209,10 +256,56 @@ Item { // Doesn't need to be a FocusScope, as we don't need key navigation in po
 		}
 
 		StatusBarButton {
+			id: activityButton
+			property QtObject activityDialog
+
+			// Background work is commonly started from a Settings page, so keep
+			// the indicator visible alongside the breadcrumbs while it runs.
+			visible: !root.webNavigationActive && (Global.backgroundActivity?.busy ?? false)
+			enabled: visible
+			// Long-running work must remain visible after normal controls fade
+			// when the display becomes inactive (same exception as notifications).
+			opacity: 1.0
+			// Keep the rotating control square and centred. Asymmetric clickable
+			// insets rotate with the whole button and make the glyph orbit off-centre.
+			icon.width: Theme.geometry_icon_size_medium * 0.75
+			icon.height: Theme.geometry_icon_size_medium * 0.75
+			// No dedicated "background activity" icon exists yet - reuses
+			// the generic refresh glyph, with continuous rotation as the
+			// "something is happening" cue a static icon can't give alone.
+			icon.source: "qrc:/images/icon_refresh_32.svg"
+
+			RotationAnimation on rotation {
+				running: activityButton.visible && Global.animationEnabled
+				loops: Animation.Infinite
+				from: 0
+				to: 360
+				duration: 1500
+			}
+
+			Layout.alignment: Qt.AlignTop
+			KeyNavigation.right: notificationButton
+
+			onClicked: {
+				if (activityDialog) {
+					activityDialog.close()
+				} else {
+					activityDialog = Global.dialogLayer.open(backgroundActivityDialogComponent)
+				}
+			}
+
+			Component {
+				id: backgroundActivityDialogComponent
+
+				BackgroundActivityDialog {}
+			}
+		}
+
+		StatusBarButton {
 			id: notificationButton
 
 			enabled: Global.notifications?.statusBarNotificationIconVisible ?? false
-			visible: !breadcrumbs.visible && enabled
+			visible: !breadcrumbs.visible && !root.webNavigationActive && enabled
 			leftInset: Theme.geometry_statusBar_spacing / 2
 			rightInset: Theme.geometry_statusBar_horizontalMargin
 			bottomInset: Theme.geometry_statusBar_spacing
