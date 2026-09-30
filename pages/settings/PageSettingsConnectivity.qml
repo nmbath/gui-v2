@@ -30,6 +30,7 @@ Page {
 			ListNavigation {
 				//% "Ethernet"
 				text: qsTrId("pagesettingsconnectivity_ethernet")
+				preferredVisible: !Services.platform.isContainer
 				secondaryText: networkServices.networkState !== "idle" && networkServices.networkState !== ""
 					? (networkServices.ipAddress ? networkServices.ipAddress : Utils.connmanServiceState(networkServices.networkState))
 					//% "Unplugged"
@@ -42,6 +43,7 @@ Page {
 
 				//% "Wi-Fi"
 				text: qsTrId("pagesettingsconnectivity_wifi")
+				preferredVisible: !Services.platform.isContainer
 				secondaryText: wifiModel.connectedNetworkName
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsWifi.qml", {"title": text, "ethernetNetworkServices": networkServices})
 				WifiModel {
@@ -52,6 +54,7 @@ Page {
 			ListNavigation {
 				//% "Bluetooth (for VictronConnect App)"
 				text: qsTrId("pagesettingsconnectivity_bluetooth_for_victronconnect_app")
+				preferredVisible: !Services.platform.isContainer
 				secondaryText: networkServices.hasBluetoothSupport
 					? (bluetooth.value === 1 ? CommonWords.enabled : CommonWords.disabled)
 					//% "No Bluetooth available"
@@ -69,6 +72,7 @@ Page {
 
 				//% "Mobile network"
 				text: qsTrId("pagesettingsconnectivity_mobile_network")
+				preferredVisible: !Services.platform.isContainer
 				//% "No cellular modem connected"
 				secondaryText: simStatus.valid ? networkServices.mobileNetworkName : qsTrId("page_settings_no_cellular_modem_connected")
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsGsm.qml", {"title": text})
