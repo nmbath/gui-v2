@@ -24,7 +24,7 @@ Page {
 					//% "Check only"
 					{ display: qsTrId("settings_firmware_check_only"), value: VenusOS.Firmware_AutoUpdate_CheckOnly },
 					//% "Check and update"
-					{ display: qsTrId("settings_firmware_check_and_update"), value: VenusOS.Firmware_AutoUpdate_CheckAndUpdate }
+					{ display: qsTrId("settings_firmware_check_and_update"), value: VenusOS.Firmware_AutoUpdate_CheckAndUpdate, readOnly: Services.platform.isContainer }
 				]
 			}
 
@@ -70,6 +70,8 @@ Page {
 			ListButton {
 				id: installUpdate
 
+				readonly property bool updateAvailable: !!Global.firmwareUpdate.onlineAvailableVersion && !Global.firmwareUpdate.checkingForUpdate
+
 				//% "Update available"
 				text: qsTrId("settings_firmware_update_available")
 				secondaryText: {
@@ -89,7 +91,7 @@ Page {
 
 				interactive: !Global.firmwareUpdate.busy
 				writeAccessLevel: VenusOS.User_AccessType_User
-				preferredVisible: !!Global.firmwareUpdate.onlineAvailableVersion && !Global.firmwareUpdate.checkingForUpdate
+				preferredVisible: updateAvailable && !Services.platform.isContainer
 				onClicked: {
 					Global.firmwareUpdate.installUpdate(VenusOS.Firmware_UpdateType_Online)
 				}
@@ -100,11 +102,18 @@ Page {
 				}
 			}
 
+			ListInfoLabel {
+				//: %1 = firmware version
+				//% "%1 is available. Update the container to the new image."
+				text: qsTrId("settings_firmware_container_update_available").arg(Global.firmwareUpdate.onlineAvailableVersion)
+				preferredVisible: installUpdate.updateAvailable && Services.platform.isContainer
+			}
+
 			ListText {
 				//% "Update build date/time"
 				text: qsTrId("settings_firmware_update_build_date_time")
 				dataItem.uid: Services.platform.serviceUid + "/Firmware/Online/AvailableBuild"
-				preferredVisible: installUpdate.preferredVisible
+				preferredVisible: installUpdate.updateAvailable
 					&& Services.settings.canAccess(VenusOS.User_AccessType_SuperUser)
 			}
 		}
