@@ -30,11 +30,11 @@ using namespace Victron::VenusOS;
 namespace {
 	QStringList guiPluginDirs(const QStringList &packages) {
 #if defined(VENUS_GX_BUILD)
-		// Packages installed by venus-package-manager are in /data/apps/[name],
-		// with their gui-v2 plugins in /data/apps/[name]/gui-v2/.
+		// Packages installed by venus-package-manager are in /run/venus-packages/apps/[name],
+		// with their gui-v2 plugins in /run/venus-packages/apps/[name]/gui-v2/.
 		QStringList pluginDirs;
 		for (const QString &package : packages) {
-			const QDir pluginDir(QStringLiteral("/data/apps/") + package + QStringLiteral("/gui-v2"));
+			const QDir pluginDir(QStringLiteral("/run/venus-packages/apps/") + package + QStringLiteral("/gui-v2"));
 			if (pluginDir.exists()) {
 				qCInfo(venusGui) << "Found gui-v2 plugin directory:" << pluginDir.absolutePath();
 				pluginDirs.append(pluginDir.absolutePath());
