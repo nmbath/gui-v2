@@ -88,7 +88,10 @@ private:
 	void triggerWatchMqttPluginPaths();
 	void onEnabledCustomisationsSynchronized(VeQItem::State state);
 	void watchMqttPluginPaths();
-	void watchPluginDirs(const QString &appsDir);
+	void watchPackageManager();
+	void watchPackageItem(VeQItem *packageItem);
+	void updateEnabledPackages();
+	void watchPluginDirs();
 	void readFromFilesystem(const QString &path);
 	void initPlugins();
 	void populatePlugins();
@@ -100,12 +103,14 @@ private:
 	QVector<GuiPlugin> m_plugins;
 	QHash<QString, QHash<QLocale::Language, QTranslator*> > m_pluginTranslators;
 	QHash<QString, QPointer<QTranslator> > m_currentTranslators;
-	QFileSystemWatcher *m_enabledAppsDirWatcher = nullptr;
 	QFileSystemWatcher *m_guiPluginDirsWatcher = nullptr;
+	QPointer<VeQItem> m_packagesItem;
+	QStringList m_enabledPackages;
 	QMap<QString, QStringList> m_pluginDirData;
 	QVector<GuiPluginMqttFetcher*> m_mqttFetchers;
 	QTimer m_invokeOnceTimer;
 	QTimer m_timeoutTimer;
+	QTimer m_packagesTimer;
 	bool m_busy = true;
 	QQmlEngine *m_qmlEngine = nullptr;
 };

@@ -28,58 +28,23 @@
 using namespace Victron::VenusOS;
 
 namespace {
-	QString enabledAppsDir() {
+	QStringList guiPluginDirs(const QStringList &packages) {
 #if defined(VENUS_GX_BUILD)
-		// Custom Applications available on the GX are in:
-		// /data/apps/available/[app-name]
-		// and when enabled the folder will be symlinked into:
-		// /data/apps/enabled/[app-name]
-		// Each application may consist of a variety of different parts,
-		// including Node-RED plugins, system services, and gui-v2 plugins.
-		// The gui-v2 plugins will be found under a `gui-v2` subdirectory,
-		// e.g.: /data/apps/enabled/[app-name]/gui-v2/
-		const QString path = QStringLiteral("/data/apps/enabled/");
-		QDir dir;
-		if (!dir.exists(path)) {
-			if (!dir.mkpath(path)) {
-				qCWarning(venusGui) << "/data/apps/enabled/ does not exist and could not be created!";
-				return QString();
+		// Packages installed by venus-package-manager are in /data/apps/[name],
+		// with their gui-v2 plugins in /data/apps/[name]/gui-v2/.
+		QStringList pluginDirs;
+		for (const QString &package : packages) {
+			const QDir pluginDir(QStringLiteral("/data/apps/") + package + QStringLiteral("/gui-v2"));
+			if (pluginDir.exists()) {
+				qCInfo(venusGui) << "Found gui-v2 plugin directory:" << pluginDir.absolutePath();
+				pluginDirs.append(pluginDir.absolutePath());
+			} else {
+				qCInfo(venusGui) << "Package" << package << "does not contain a gui-v2 plugins directory.";
 			}
 		}
-		return path;
-#else
-		return QString();
-#endif
-	}
-
-	QStringList guiPluginDirs(const QString &appsDirPath) {
-#if defined(VENUS_GX_BUILD)
-		// enumerate the enabled appsDirPath for application subdirectories.
-		QDir appsDir = QDir::root();
-		if (appsDir.cd(appsDirPath)) {
-			const QStringList appDirs = appsDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-
-			// for each application subdirectory, find those which include a `gui-v2` plugins subdirectory.
-			// each such directory should be appended to the list of directories to watch.
-			QStringList pluginDirs;
-			for (const QString &appDirPath : appDirs) {
-				QDir appDir = appsDir;
-				if (!appDir.cd(appDirPath)) {
-					qCWarning(venusGui) << "Cannot cd into application directory:" << appDir.filePath(appDirPath);
-					continue;
-				}
-				qCInfo(venusGui) << "Checking application directory:" << appDir.absolutePath() << "for gui-v2 plugins directory...";
-				if (!appDir.cd(QStringLiteral("gui-v2"))) {
-					qCWarning(venusGui) << "Application" << appDir.absolutePath() << "does not contain a gui-v2 plugins directory.";
-				} else {
-					qCInfo(venusGui) << "Found gui-v2 plugin directory:" << appDir.absolutePath();
-					pluginDirs.append(appDir.absolutePath());
-				}
-			}
-			return pluginDirs;
-		}
-		return QStringList();
+		return pluginDirs;
 #elif defined(VENUS_DESKTOP_BUILD)
+		Q_UNUSED(packages)
 		// look in ~appdir/plugins/
 		const QString appDirPath = QCoreApplication::applicationDirPath();
 		QDir pluginDir = QDir(appDirPath);
@@ -94,6 +59,7 @@ namespace {
 		}
 		return QStringList();
 #else
+		Q_UNUSED(packages)
 		return QStringList();
 #endif
 	}
@@ -109,7 +75,7 @@ GuiPluginLoader* GuiPluginLoader::create(QQmlEngine *engine, QJSEngine *)
 }
 
 GuiPluginLoader::GuiPluginLoader(QObject *parent)
-	: QObject(parent), m_invokeOnceTimer(this), m_timeoutTimer(this)
+	: QObject(parent), m_invokeOnceTimer(this), m_timeoutTimer(this), m_packagesTimer(this)
 {
 	Language *languageSingleton = Language::create();
 	connect(languageSingleton, &Language::currentLanguageChanged,
@@ -156,18 +122,18 @@ GuiPluginLoader::GuiPluginLoader(QObject *parent)
 		return;
 	}
 
-	// Set up a filesystem watcher on the enabled applications dir (if it exists).
 	connect(&m_invokeOnceTimer, &QTimer::timeout, this, &GuiPluginLoader::initPlugins);
-	const QString appsDir = enabledAppsDir();
-	if (!appsDir.isEmpty()) {
-		m_enabledAppsDirWatcher = new QFileSystemWatcher(QStringList { appsDir }, this);
-		connect(m_enabledAppsDirWatcher, &QFileSystemWatcher::directoryChanged,
-			this, &GuiPluginLoader::watchPluginDirs);
-	}
+#if defined(VENUS_GX_BUILD)
+	// Load only the plugins of packages venus-package-manager has enabled.
+	m_packagesTimer.setSingleShot(true);
+	m_packagesTimer.setInterval(100);
+	connect(&m_packagesTimer, &QTimer::timeout, this, &GuiPluginLoader::updateEnabledPackages);
+	watchPackageManager();
+#endif
 
 	// Set up filesystem watchers on all of the plugin dirs (if they exist),
 	// and read in plugin data from those plugin dirs.
-	watchPluginDirs(appsDir);
+	watchPluginDirs();
 
 	// Now force initialisation of plugins immediately rather than waiting
 	// for the invoke-once timer to complete.
@@ -532,7 +498,60 @@ void GuiPluginMqttFetcher::checkFinished()
 	Q_EMIT succeeded();
 }
 
-void GuiPluginLoader::watchPluginDirs(const QString &appsDir)
+void GuiPluginLoader::watchPackageManager()
+{
+	// Only com.victronenergy.packagemanager's /Packages/<name>/Enable is followed, so no
+	// package is enabled while it isn't running.
+	m_packagesItem = VeQItems::getRoot()->itemGetOrCreate(
+			QStringLiteral("dbus/com.victronenergy.packagemanager/Packages"), false);
+	connect(m_packagesItem, &VeQItem::childAdded, this, &GuiPluginLoader::watchPackageItem);
+	connect(m_packagesItem, &VeQItem::childAboutToBeRemoved, &m_packagesTimer, qOverload<>(&QTimer::start));
+	for (VeQItem *packageItem : m_packagesItem->itemChildren()) {
+		watchPackageItem(packageItem);
+	}
+	updateEnabledPackages();
+}
+
+void GuiPluginLoader::watchPackageItem(VeQItem *packageItem)
+{
+	for (const QString &child : { QStringLiteral("Enable"), QStringLiteral("Name") }) {
+		VeQItem *item = packageItem->itemGetOrCreate(child);
+		connect(item, &VeQItem::valueChanged, &m_packagesTimer, qOverload<>(&QTimer::start), Qt::UniqueConnection);
+		connect(item, &VeQItem::stateChanged, &m_packagesTimer, qOverload<>(&QTimer::start), Qt::UniqueConnection);
+	}
+	m_packagesTimer.start();
+}
+
+void GuiPluginLoader::updateEnabledPackages()
+{
+	QStringList packages;
+	if (m_packagesItem) {
+		for (VeQItem *packageItem : m_packagesItem->itemChildren()) {
+			VeQItem *enableItem = packageItem->itemGet(QStringLiteral("Enable"));
+			if (!enableItem || enableItem->getValue().toInt() != 1) {
+				continue;
+			}
+			// A path has '-' as '_'; /Packages/<name>/Name holds the real name.
+			VeQItem *nameItem = packageItem->itemGet(QStringLiteral("Name"));
+			const QString name = nameItem && nameItem->getValue().isValid()
+					? nameItem->getValue().toString()
+					: packageItem->id();
+			if (name.isEmpty() || name.contains(QLatin1Char('/')) || name.startsWith(QLatin1Char('.'))) {
+				continue;
+			}
+			packages.append(name);
+		}
+	}
+	packages.sort();
+
+	if (packages != m_enabledPackages) {
+		qCInfo(venusGui) << "Enabled packages:" << packages;
+		m_enabledPackages = packages;
+		watchPluginDirs();
+	}
+}
+
+void GuiPluginLoader::watchPluginDirs()
 {
 	// first, clear the previously read plugin data.
 	m_pluginDirData.clear();
@@ -544,7 +563,7 @@ void GuiPluginLoader::watchPluginDirs(const QString &appsDir)
 	}
 
 	// third, construct the watcher if required.
-	const QStringList pluginDirs = guiPluginDirs(appsDir);
+	const QStringList pluginDirs = guiPluginDirs(m_enabledPackages);
 	if (!pluginDirs.isEmpty()) {
 		m_guiPluginDirsWatcher = new QFileSystemWatcher(pluginDirs, this);
 		connect(m_guiPluginDirsWatcher, &QFileSystemWatcher::directoryChanged,
