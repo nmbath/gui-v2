@@ -273,6 +273,12 @@ Page {
 				preferredVisible: osLargeFeatures.largeEnabled
 			}
 
+			ListNavigation {
+				//% "System customization"
+				text: qsTrId("pagesettingsintegrations_system_customization")
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsPackages.qml", {"title": text})
+			}
+
 			SettingsListHeader {
 				id: guiPluginsHeader
 

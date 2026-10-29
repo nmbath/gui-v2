@@ -473,6 +473,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsModbusTcpServices.qml
     pages/settings/PageSettingsMqttDevices.qml
     pages/settings/PageSettingsNodeRed.qml
+    pages/settings/PageSettingsPackage.qml
+    pages/settings/PageSettingsPackages.qml
     pages/settings/PageSettingsRelay.qml
     pages/settings/PageSettingsRelayTempSensors.qml
     pages/settings/PageSettingsRootfsSelect.qml
