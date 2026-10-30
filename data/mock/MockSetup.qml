@@ -16,6 +16,7 @@ Item {
 	BatteriesImpl {}
 	DevicesImpl {}
 	EvChargersImpl {}
+	ExchangeImpl {}
 	GeneratorsImpl {}
 	InverterChargersImpl {}
 	MiscServicesImpl {}

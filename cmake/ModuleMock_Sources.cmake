@@ -2,6 +2,7 @@ set(VictronMock_QML_MODULE_SOURCES
     data/mock/BatteriesImpl.qml
     data/mock/DevicesImpl.qml
     data/mock/EvChargersImpl.qml
+    data/mock/ExchangeImpl.qml
     data/mock/GeneratorsImpl.qml
     data/mock/InverterChargersImpl.qml
     data/mock/MiscServicesImpl.qml
@@ -48,6 +49,7 @@ SET(VictronMock_QML_MODULE_RESOURCES
     data/mock/conf/services/ess.json
     data/mock/conf/services/ev.json
     data/mock/conf/services/evcharger1.json
+    data/mock/conf/services/exchange.json
     data/mock/conf/services/fronius.json
     data/mock/conf/services/generator.json
     data/mock/conf/services/gioextender.json

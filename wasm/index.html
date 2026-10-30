@@ -829,6 +829,11 @@
             const filename = encodeURIComponent(upload.file.name)
             upload.started = true
             reportExchangeUpload(upload, "sending")
+            // Mock mode has no venus-exchange; the mock service receives the file itself.
+            if (new URLSearchParams(location.search).has("mock")) {
+                setTimeout(() => reportExchangeUpload(upload, "sent"), 2000)
+                return true
+            }
 
             const claim = new XMLHttpRequest()
             claim.open("POST", claimPath)
