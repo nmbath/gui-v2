@@ -499,6 +499,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageVrmDeviceInstances.qml
     pages/settings/debug/HubData.qml
     pages/settings/debug/PageDebug.qml
+    pages/settings/debug/PageDebugExchange.qml
     pages/settings/debug/PageDebugVeQItems.qml
     pages/settings/debug/PagePowerDebug.qml
     pages/settings/debug/PageSettingsDemo.qml

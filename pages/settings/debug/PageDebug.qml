@@ -44,6 +44,11 @@ Page {
 				onClicked: Global.pageManager.pushPage("/pages/settings/debug/PageDebugVeQItems.qml", { title: text })
 			}
 
+			ListNavigation {
+				text: "Exchange packages"
+				onClicked: Global.pageManager.pushPage("/pages/settings/debug/PageDebugExchange.qml", { title: text })
+			}
+
 			ListSwitch {
 				//% "Enable frame-rate visualizer"
 				text: qsTrId("settings_page_debug_enable_fps_visualizer")
