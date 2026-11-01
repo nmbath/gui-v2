@@ -28,13 +28,17 @@
 using namespace Victron::VenusOS;
 
 namespace {
+	// Packages installed by venus-package-manager are in /run/venus-packages/apps/[name],
+	// with their gui-v2 plugins in /run/venus-packages/apps/[name]/gui-v2/.
+	QString packagePluginDir(const QString &package) {
+		return QStringLiteral("/run/venus-packages/apps/") + package + QStringLiteral("/gui-v2");
+	}
+
 	QStringList guiPluginDirs(const QStringList &packages) {
 #if defined(VENUS_GX_BUILD)
-		// Packages installed by venus-package-manager are in /run/venus-packages/apps/[name],
-		// with their gui-v2 plugins in /run/venus-packages/apps/[name]/gui-v2/.
 		QStringList pluginDirs;
 		for (const QString &package : packages) {
-			const QDir pluginDir(QStringLiteral("/run/venus-packages/apps/") + package + QStringLiteral("/gui-v2"));
+			const QDir pluginDir(packagePluginDir(package));
 			if (pluginDir.exists()) {
 				qCInfo(venusGui) << "Found gui-v2 plugin directory:" << pluginDir.absolutePath();
 				pluginDirs.append(pluginDir.absolutePath());
@@ -75,7 +79,7 @@ GuiPluginLoader* GuiPluginLoader::create(QQmlEngine *engine, QJSEngine *)
 }
 
 GuiPluginLoader::GuiPluginLoader(QObject *parent)
-	: QObject(parent), m_invokeOnceTimer(this), m_timeoutTimer(this), m_packagesTimer(this)
+	: QObject(parent), m_invokeOnceTimer(this), m_timeoutTimer(this)
 {
 	Language *languageSingleton = Language::create();
 	connect(languageSingleton, &Language::currentLanguageChanged,
@@ -124,16 +128,14 @@ GuiPluginLoader::GuiPluginLoader(QObject *parent)
 
 	connect(&m_invokeOnceTimer, &QTimer::timeout, this, &GuiPluginLoader::initPlugins);
 #if defined(VENUS_GX_BUILD)
-	// Load only the plugins of packages venus-package-manager has enabled.
-	m_packagesTimer.setSingleShot(true);
-	m_packagesTimer.setInterval(100);
-	connect(&m_packagesTimer, &QTimer::timeout, this, &GuiPluginLoader::updateEnabledPackages);
+	// Load only the plugins of packages venus-package-manager has enabled,
+	// each read from its plugin dir as it is enabled.
 	watchPackageManager();
-#endif
-
+#else
 	// Set up filesystem watchers on all of the plugin dirs (if they exist),
 	// and read in plugin data from those plugin dirs.
 	watchPluginDirs();
+#endif
 
 	// Now force initialisation of plugins immediately rather than waiting
 	// for the invoke-once timer to complete.
@@ -264,6 +266,10 @@ void GuiPluginLoader::watchMqttPluginPaths()
 
 	if (enabledCustomisations.isEmpty()) {
 		qCInfo(venusGui) << "No enabled gui plugins available from MQTT.";
+		qDeleteAll(m_mqttFetchers);
+		m_mqttFetchers.clear();
+		m_pluginDirData.clear();
+		m_mqttPlugins.clear();
 		initPlugins(); // no plugins to init, but transition to busy=false state.
 		return;
 	}
@@ -275,11 +281,27 @@ void GuiPluginLoader::watchMqttPluginPaths()
 		return;
 	}
 
-	// fetch each individual plugin.
+	// fetch only the plugins that are new or whose sha256 has changed, and drop the
+	// ones no longer enabled, so one plugin changing doesn't download all of them again.
 	qDeleteAll(m_mqttFetchers);
 	m_mqttFetchers.clear();
-	m_pluginDirData.clear();
+	if (oldApplistBehaviour) {
+		// without a sha256 in the applist, a changed plugin can't be told apart: fetch them all.
+		m_pluginDirData.clear();
+		m_mqttPlugins.clear();
+	}
+	for (auto it = m_mqttPlugins.begin(); it != m_mqttPlugins.end();) {
+		if (enabledCustomisations.value(it.key()) == it.value().second) {
+			++it;
+			continue;
+		}
+		m_pluginDirData.remove(it.value().first);
+		it = m_mqttPlugins.erase(it);
+	}
 	for (const QString &name : enabledCustomisations.keys()) {
+		if (m_mqttPlugins.contains(name)) {
+			continue; // already loaded, and unchanged.
+		}
 		VeQItem *currCustomisation = apps->itemChildren().value(name);
 		VeQItem *currInfo = currCustomisation ? currCustomisation->itemChildren().value(QStringLiteral("info")) : nullptr;
 		if (!currInfo) {
@@ -313,6 +335,7 @@ void GuiPluginLoader::watchMqttPluginPaths()
 					m_mqttFetchers.removeOne(currFetcher);
 					const QByteArray pluginData = currFetcher->data();
 					m_pluginDirData.insert(currFetcher->pluginPath(), QStringList() << QString::fromUtf8(pluginData));
+					m_mqttPlugins.insert(currFetcher->name(), { currFetcher->pluginPath(), currFetcher->sha256() });
 					if (m_mqttFetchers.isEmpty()) {
 						qCInfo(venusGui) << "All plugin data loaded, attempting to initialise...";
 						initPlugins();
@@ -333,8 +356,8 @@ void GuiPluginLoader::watchMqttPluginPaths()
 		// so, we start the fetcher now, after populating that array.
 		m_mqttFetchers.first()->start();
 	} else {
-		qCInfo(venusGui) << "No gui plugins available from MQTT.";
-		initPlugins(); // all plugins ignored; immediately transition to busy=false etc.
+		qCInfo(venusGui) << "No gui plugins to fetch from MQTT.";
+		initPlugins(); // none new or changed; rebuild from what is loaded, and transition to busy=false etc.
 	}
 }
 
@@ -501,54 +524,84 @@ void GuiPluginMqttFetcher::checkFinished()
 void GuiPluginLoader::watchPackageManager()
 {
 	// Only com.victronenergy.packagemanager's /Packages/<name>/Enable is followed, so no
-	// package is enabled while it isn't running.
+	// package is enabled while it isn't running. Each package is handled on its own: a
+	// change to one reads or drops only that package's plugins.
 	m_packagesItem = VeQItems::getRoot()->itemGetOrCreate(
 			QStringLiteral("dbus/com.victronenergy.packagemanager/Packages"), false);
 	connect(m_packagesItem, &VeQItem::childAdded, this, &GuiPluginLoader::watchPackageItem);
-	connect(m_packagesItem, &VeQItem::childAboutToBeRemoved, &m_packagesTimer, qOverload<>(&QTimer::start));
+	connect(m_packagesItem, &VeQItem::childAboutToBeRemoved, this, [this](VeQItem *packageItem) {
+		setPackageEnabled(m_packageNames.take(packageItem->id()), false);
+	});
 	for (VeQItem *packageItem : m_packagesItem->itemChildren()) {
 		watchPackageItem(packageItem);
 	}
-	updateEnabledPackages();
 }
 
 void GuiPluginLoader::watchPackageItem(VeQItem *packageItem)
 {
-	for (const QString &child : { QStringLiteral("Enable"), QStringLiteral("Name") }) {
+	for (const QString &child : { QStringLiteral("Enable"), QStringLiteral("Components"), QStringLiteral("Name") }) {
 		VeQItem *item = packageItem->itemGetOrCreate(child);
-		connect(item, &VeQItem::valueChanged, &m_packagesTimer, qOverload<>(&QTimer::start), Qt::UniqueConnection);
-		connect(item, &VeQItem::stateChanged, &m_packagesTimer, qOverload<>(&QTimer::start), Qt::UniqueConnection);
+		connect(item, &VeQItem::valueChanged, this, [this, packageItem] { updatePackage(packageItem); });
+		connect(item, &VeQItem::stateChanged, this, [this, packageItem] { updatePackage(packageItem); });
 	}
-	m_packagesTimer.start();
+	updatePackage(packageItem);
 }
 
-void GuiPluginLoader::updateEnabledPackages()
+void GuiPluginLoader::updatePackage(VeQItem *packageItem)
 {
-	QStringList packages;
-	if (m_packagesItem) {
-		for (VeQItem *packageItem : m_packagesItem->itemChildren()) {
-			VeQItem *enableItem = packageItem->itemGet(QStringLiteral("Enable"));
-			if (!enableItem || enableItem->getValue().toInt() != 1) {
-				continue;
-			}
-			// A path has '-' as '_'; /Packages/<name>/Name holds the real name.
-			VeQItem *nameItem = packageItem->itemGet(QStringLiteral("Name"));
-			const QString name = nameItem && nameItem->getValue().isValid()
-					? nameItem->getValue().toString()
-					: packageItem->id();
-			if (name.isEmpty() || name.contains(QLatin1Char('/')) || name.startsWith(QLatin1Char('.'))) {
-				continue;
-			}
-			packages.append(name);
-		}
-	}
-	packages.sort();
+	// The bit of /Packages/<name>/Components for a gui component.
+	constexpr int guiComponent = 1;
+	// <name> in the path is only an identifier; /Packages/<name>/Name is the package's
+	// name and its folder in /run/venus-packages/apps. Until it arrives, nothing is loaded.
+	VeQItem *nameItem = packageItem->itemGet(QStringLiteral("Name"));
+	VeQItem *enableItem = packageItem->itemGet(QStringLiteral("Enable"));
+	VeQItem *componentsItem = packageItem->itemGet(QStringLiteral("Components"));
+	const QString name = nameItem ? nameItem->getValue().toString() : QString();
+	const bool enabled = !name.isEmpty()
+			&& enableItem && enableItem->getValue().toInt() == 1
+			&& componentsItem && (componentsItem->getValue().toInt() & guiComponent);
 
-	if (packages != m_enabledPackages) {
-		qCInfo(venusGui) << "Enabled packages:" << packages;
-		m_enabledPackages = packages;
-		watchPluginDirs();
+	const QString id = packageItem->id();
+	const QString oldName = m_packageNames.value(id);
+	if (!oldName.isEmpty() && (!enabled || oldName != name)) {
+		m_packageNames.remove(id);
+		setPackageEnabled(oldName, false);
 	}
+	if (enabled) {
+		m_packageNames.insert(id, name);
+		setPackageEnabled(name, true);
+	}
+}
+
+void GuiPluginLoader::setPackageEnabled(const QString &name, bool enabled)
+{
+	if (name.isEmpty() || name.contains(QLatin1Char('/')) || name.startsWith(QLatin1Char('.'))
+			|| enabled == m_enabledPackages.contains(name)) {
+		return;
+	}
+
+	qCInfo(venusGui) << "Package" << name << (enabled ? "enabled" : "disabled");
+	const QString dir = packagePluginDir(name);
+	if (enabled) {
+		m_enabledPackages.append(name);
+		if (QDir(dir).exists()) {
+			if (!m_guiPluginDirsWatcher) {
+				m_guiPluginDirsWatcher = new QFileSystemWatcher(this);
+				connect(m_guiPluginDirsWatcher, &QFileSystemWatcher::directoryChanged,
+					this, &GuiPluginLoader::readFromFilesystem);
+			}
+			m_guiPluginDirsWatcher->addPath(dir);
+			readFromFilesystem(dir); // queues the rebuild.
+			return;
+		}
+	} else {
+		m_enabledPackages.removeOne(name);
+		if (m_guiPluginDirsWatcher && m_guiPluginDirsWatcher->directories().contains(dir)) {
+			m_guiPluginDirsWatcher->removePath(dir);
+		}
+		m_pluginDirData.remove(dir);
+	}
+	m_invokeOnceTimer.start();
 }
 
 void GuiPluginLoader::watchPluginDirs()
@@ -603,6 +656,8 @@ void GuiPluginLoader::readFromFilesystem(const QString &path)
 
 	if (plugins.size()) {
 		m_pluginDirData.insert(path, plugins);
+	} else {
+		m_pluginDirData.remove(path);
 	}
 
 	m_invokeOnceTimer.start();

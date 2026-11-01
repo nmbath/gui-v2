@@ -90,7 +90,8 @@ private:
 	void watchMqttPluginPaths();
 	void watchPackageManager();
 	void watchPackageItem(VeQItem *packageItem);
-	void updateEnabledPackages();
+	void updatePackage(VeQItem *packageItem);
+	void setPackageEnabled(const QString &name, bool enabled);
 	void watchPluginDirs();
 	void readFromFilesystem(const QString &path);
 	void initPlugins();
@@ -106,11 +107,14 @@ private:
 	QFileSystemWatcher *m_guiPluginDirsWatcher = nullptr;
 	QPointer<VeQItem> m_packagesItem;
 	QStringList m_enabledPackages;
+	// The Name of each enabled package, by its /Packages/<name> path identifier.
+	QHash<QString, QString> m_packageNames;
 	QMap<QString, QStringList> m_pluginDirData;
+	// Plugins loaded from MQTT, by name: their m_pluginDirData key and sha256.
+	QHash<QString, QPair<QString, QString> > m_mqttPlugins;
 	QVector<GuiPluginMqttFetcher*> m_mqttFetchers;
 	QTimer m_invokeOnceTimer;
 	QTimer m_timeoutTimer;
-	QTimer m_packagesTimer;
 	bool m_busy = true;
 	QQmlEngine *m_qmlEngine = nullptr;
 };
