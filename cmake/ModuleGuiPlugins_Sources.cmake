@@ -3,6 +3,10 @@ set(VictronGuiPlugins_CPP_SOURCES
     guiplugins/pluginaccesslevel.cpp
     guiplugins/plugindataitem.h
     guiplugins/plugindataitem.cpp
+    guiplugins/plugindevicemodel.h
+    guiplugins/plugindevicemodel.cpp
+    guiplugins/pluginpathmodel.h
+    guiplugins/pluginpathmodel.cpp
     guiplugins/pluginunit.h
     guiplugins/pluginunit.cpp
 )
