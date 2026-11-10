@@ -4,16 +4,18 @@ A GUI plugin adds pages to gui-v2, without changing gui-v2. A plugin can add a:
 
 - **plugin settings page**, opened from Settings -> Integrations -> UI Plugins
 - **device sub-page**, opened from the page of a device in the Devices list
+- **navigation page**, added to the main navigation bar at a named location
 
-A navigation page, a quick access pane, and a card in a quick access pane (integration types 3, 4 and 5) are not yet part of the plugin API. `PluginCard` is a card on the plugin's own page. It is not added to the Controls or Switches pane. Plugin pages are written with the types of the `Victron.GuiPlugins` module, which gui-v2 keeps stable for plugins.
+A quick access pane and a card in a quick access pane (integration types 4 and 5) are not yet part of the plugin API. `PluginCard` is a card on the plugin's own page. It is not added to the Controls or Switches pane. Plugin pages are written with the types of the `Victron.GuiPlugins` module, which gui-v2 keeps stable for plugins.
 
 This document is for OEM and third-party developers, and for AI agents that write or check a plugin. It is complete on its own: you do not need to read gui-v2's internals. Custom branding plugins, which change the GUI's colors, fonts and logos, are a separate kind of plugin and are not covered here.
 
-Four example plugins show the rules in practice:
+Five example plugins show the rules in practice:
 
 - `examples/SimpleExample`: a plugin settings page with one switch.
 - `examples/SimpleTrExample`: the same, with the switch text translated.
 - `examples/DeviceListExample`: device sub-pages.
+- `examples/NavigationExample`: a navigation page with live system values.
 - `examples/FullApiExample`: a plugin settings page and a device sub-page that, between them, show every type in the [type reference](#type-reference).
 
 `Victron.GuiPlugins` is not finished yet. It has the types in the [type reference](#type-reference); more list item types will be added.
@@ -30,6 +32,8 @@ Four example plugins show the rules in practice:
 
    For a device sub-page, give the product id, the page file and the list item text instead: `--devicelist 0x106 PluginNameDevice.qml "Cell Voltages"`.
 
+   For a navigation page, give the page, the icon and the bar title: `--navigation PluginNamePage.qml icon.svg "Title"`. The bar title is shown as written; it is not translated. The location, if given, must be the last argument and one of `BeforeBoat`, `BeforeBrief`, `BeforeOverview`, `BeforeLevels`, `BeforeNotifications`, `BeforeSettings` or `AfterSettings`. An integer is an error. If you omit the location, the page is inserted before Levels. The page file name must be unique and must not match a built-in page.
+
    Alternatively, compile it on a GX device if a Large image is installed, using `/opt/victronenergy/gui-v2/gui-v2-plugin-compiler.py`.
 4. The compiler packs every `.qml` file in the directory, so subpages need no option of their own. It writes `PluginName.json`.
 5. To try it on a GX device, add `--install <gx-host> --ssh-key <private-key>` to the compile command. This is for testing only. The compiler connects as root with that key, copies `PluginName.json` to `/data/apps/available/PluginName/gui-v2/`, and symlinks that app directory to `/data/apps/enabled/PluginName`. A repeat install replaces that symlink. It will not replace a real directory. You can do the same copy and symlink by hand. On a desktop build of gui-v2, copy `PluginName.json` into the `plugins` directory next to the `venus-gui-v2` executable.
@@ -39,7 +43,7 @@ Four example plugins show the rules in practice:
 The compiler does not check these rules. A page that breaks them may work today, and then break with any GUI update.
 
 1. **Imports.** Import `Victron.GuiPlugins`, without a version, and Qt modules such as `QtQuick` and `QtQuick.Layouts`. Never import `Victron.VenusOS`, or any other Victron module: their types are gui-v2's own, and change without notice.
-2. **The base type.** The base type of a plugin settings page, and of every subpage, is `PluginPage`. The base type of a device sub-page is `PluginDevicePage`. It may also be a type that your plugin defines in its own file, if that file's base type is one of these. The GUI refuses a page whose base type is a `Page` from the `Victron.VenusOS` module, or a type derived from it. It does not open it, and logs `Aborted attempt to push a plugin page whose base type is a Page`. It also refuses a page whose base type is not an item, such as `QtObject`, and logs `Aborted attempt to push a plugin page whose base type is not an item`. It also refuses a page whose base type is an item but not a `PluginPage`, such as a plain `Item`, and logs `Aborted attempt to push a plugin page whose base type is not a PluginPage`. Plugins written for older versions of gui-v2, with a `Page` base type, must be ported.
+2. **The base type.** The base type of a plugin settings page, a navigation page, and of every subpage, is `PluginPage`. The base type of a device sub-page is `PluginDevicePage`. It may also be a type that your plugin defines in its own file, if that file's base type is one of these. The navigation bar loads a navigation page into the swipe view. It does not open it with `pushPluginPage()`. Settings pages, device sub-pages and subpages are opened with `pushPluginPage()`. That function refuses a page whose base type is a `Page` from the `Victron.VenusOS` module, or a type derived from it. It does not open it, and logs `Aborted attempt to push a plugin page whose base type is a Page`. It also refuses a page whose base type is not an item, such as `QtObject`, and logs `Aborted attempt to push a plugin page whose base type is not an item`. It also refuses a page whose base type is an item but not a `PluginPage`, such as a plain `Item`, and logs `Aborted attempt to push a plugin page whose base type is not a PluginPage`. Plugins written for older versions of gui-v2, with a `Page` base type, must be ported.
 3. **List items.** Declare the list items as direct children of a `PluginItemListView`, in the order they are shown. Only the `Plugin*` list item types can be list items. The list items are fixed when the page is created: to hide a list item, set its `preferredVisible` to `false`, and the list item then takes no space, and key navigation skips it. If that list item has the key focus, focus moves to a visible list item. Never set `visible` on a list item. A list of devices is not fixed. Show it in a `PluginModelListView`, with a `PluginDeviceModel` as its `model` and a `Plugin*` list item as its `delegate`. See [Devices](#devices) and [Lists from a model](#lists-from-a-model).
 4. **Subpages.** Open a subpage with a `PluginListNavigation` list item, and give its file as `pageUrl: Qt.resolvedUrl("SubPage.qml")`, so that it is found next to your page. A subpage must be a file of its own: a page written inline, as a `Component`, cannot be opened.
 5. **Backend data values.** Read and write values with a `PluginDataItem`, which every list item with a value has as `dataItem`. To find the devices on the system, use a `PluginDeviceModel`, and to find the paths on a device or service, use a `PluginPathModel`. See [Backend data values](#backend-data-values), [Devices](#devices) and [Paths on a device or service](#paths-on-a-device-or-service).
