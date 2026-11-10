@@ -23,12 +23,8 @@ This produces CardExample-gui-v2.json.
 
 2) Deploy to device
 
-  scp CardExample-gui-v2.json root@venus.local:/tmp/
-  ssh root@venus.local
-  mkdir -p /data/apps/available/CardExample/gui-v2/
-  cp /tmp/CardExample-gui-v2.json /data/apps/available/CardExample/gui-v2/CardExample.json
-  ln -sf /data/apps/available/CardExample /data/apps/enabled/CardExample
-  svc -t /service/start-gui
+  Install it as a GX app, and enable it: see "Deploying to Device" in
+  examples/README.md.
 
 3) Verify
 

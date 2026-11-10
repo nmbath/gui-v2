@@ -264,7 +264,7 @@ class RequiredGuiPluginsVersionTest(unittest.TestCase):
 
 
 class GxInstallCommandTest(unittest.TestCase):
-    def test_connects_as_root_and_enables_the_app(self):
+    def test_connects_as_root_and_replaces_the_installed_file(self):
         argv, remote_json = compiler.gx_install_command('OemName', 'root@gx.local', 'id_ed25519')
         self.assertEqual(argv[0], 'ssh')
         self.assertEqual(argv[argv.index('-i') + 1], 'id_ed25519')
@@ -272,14 +272,19 @@ class GxInstallCommandTest(unittest.TestCase):
         self.assertNotIn('root@root@gx.local', argv)
         self.assertIn('BatchMode=yes', argv)
         self.assertIn('IdentitiesOnly=yes', argv)
-        self.assertEqual(remote_json, '/data/apps/available/OemName/gui-v2/OemName.json')
+        self.assertEqual(remote_json, '/run/gx-apps/apps/OemName/gui-v2/OemName.json')
         script = argv[-1]
-        self.assertIn('mkdir -p', script)
-        self.assertIn('/data/apps/available/OemName/gui-v2', script)
-        self.assertIn('ln -sfn', script)
-        self.assertIn('/data/apps/available/OemName', script)
-        self.assertIn('/data/apps/enabled/OemName', script)
-        self.assertIn('is not a symlink', script)
+        self.assertIn('[ ! -d /run/gx-apps/apps/OemName/gui-v2 ]', script)
+        self.assertIn('add the app with venus-app-manager first', script)
+        self.assertIn('cat > /run/gx-apps/apps/OemName/gui-v2/OemName.json', script)
+        self.assertNotIn('mkdir', script)
+        self.assertNotIn('ln ', script)
+
+    def test_custom_branding_goes_in_its_own_folder(self):
+        _argv, remote_json = compiler.gx_install_command('OemName', 'gx.local', 'key', 'custom-branding')
+        self.assertEqual(remote_json, '/run/gx-apps/apps/OemName/custom-branding/OemName.json')
+        with self.assertRaises(ValueError):
+            compiler.gx_install_command('OemName', 'gx.local', 'key', '../etc')
 
     def test_plugin_name_rule(self):
         self.assertIsNone(compiler.plugin_name_error('PluginName'))
@@ -300,7 +305,7 @@ class GxInstallCommandTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             compiler.gx_install_command('Plugin-Name', 'gx.local', 'key')
         argv, remote_json = compiler.gx_install_command('Plugin_Name', 'gx.local', 'key')
-        self.assertEqual(remote_json, '/data/apps/available/Plugin_Name/gui-v2/Plugin_Name.json')
+        self.assertEqual(remote_json, '/run/gx-apps/apps/Plugin_Name/gui-v2/Plugin_Name.json')
         self.assertIn('root@gx.local', argv)
 
     def test_sends_the_json_on_stdin(self):

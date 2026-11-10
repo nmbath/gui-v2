@@ -34,22 +34,33 @@ This produces a `.json` file containing the compiled QML resources.
 
 ## Deploying to Device
 
+On a GX device, gui-v2 loads only the plugins of the GX apps that
+venus-app-manager has installed and enabled: each enabled app's
+`/run/gx-apps/apps/<name>/gui-v2/<name>.json`. A file copied anywhere else
+by hand is not loaded.
+
+1. Compile a copy of the example in a directory named as the app, for
+   example `myplugin`. The plugin's name is the directory name, and
+   venus-app-manager requires it to be the app's `name`. An app name is
+   lowercase, and a plugin name cannot have a `-`, so use lowercase letters
+   and digits.
+2. Ship `myplugin-gui-v2.json` as the `gui` component of a GX app named
+   `myplugin`, and add the app with venus-app-manager.
+3. Enable it:
+
 ```
-scp MyPlugin-gui-v2.json root@venus.local:/tmp/
 ssh root@venus.local
-mkdir -p /data/apps/available/MyPlugin/gui-v2/
-cp /tmp/MyPlugin-gui-v2.json /data/apps/available/MyPlugin/gui-v2/MyPlugin.json
-ln -sf /data/apps/available/MyPlugin /data/apps/enabled/MyPlugin
-svc -t /service/start-gui
+dbus -y com.victronenergy.appmanager /GxApps/myplugin/Enable SetValue 1
 ```
 
-To remove it, delete the symlink and restart. The files under
-`available/` can stay.
+gui-v2 loads the plugin straight away. To try a new build of the plugin, add
+`--install venus.local --ssh-key <private-key>` to the compile command: it
+copies the plugin over the installed app's file, and gui-v2 loads it again.
+
+To remove it, disable the app, which unloads the plugin:
 
 ```
-ssh root@venus.local
-rm /data/apps/enabled/MyPlugin
-svc -t /service/start-gui
+dbus -y com.victronenergy.appmanager /GxApps/myplugin/Enable SetValue 0
 ```
 
 ## Examples

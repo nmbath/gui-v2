@@ -1,6 +1,6 @@
 # Custom branding plugins
 
-A custom branding plugin lets an OEM change the GUI's colors, fonts, and start-up logos, without changing gui-v2. It is a gui-v2 plugin whose integration is one file, `Branding.qml`, which declares a `Branding` object from the `Victron.Branding` module.
+A custom branding lets an OEM change the GUI's colors, fonts, and start-up logos, without changing gui-v2. It is one file, `Branding.qml`, which declares a `Branding` object from the `Victron.Branding` module, compiled with its images and fonts into a custom branding file of its own, apart from any gui-v2 plugin. A device applies one custom branding at a time: the one selected in `com.victronenergy.appmanager` `/CustomBranding`.
 
 This document is for OEM developers, and for AI agents that write or check a custom branding plugin for an OEM. It is complete on its own: you do not need to read gui-v2's internals. Two example plugins show the rules in practice:
 
@@ -27,8 +27,8 @@ Custom branding does not change:
 
 ## Quick start
 
-1. Make a directory named after your plugin, for example `OemName`. The compiler names the plugin after the directory.
-2. Write `OemName/Branding.qml`, following the rules below. Start from one of the examples.
+1. Make a directory named after your app, for example `oemname`. The compiler names the custom branding after the directory, and venus-app-manager requires that name to be the app's `name`. Use lowercase letters and digits: an app name is lowercase, and a plugin name cannot have a `-`.
+2. Write `oemname/Branding.qml`, following the rules below. Start from one of the examples.
 3. Compile it, from that directory:
 
    ```
@@ -36,13 +36,16 @@ Custom branding does not change:
    ```
 
    On a GX device with the Large image, the compiler is `/opt/victronenergy/gui-v2/gui-v2-plugin-compiler.py`.
-4. Fix every problem the compiler reports, and compile again, until it succeeds. It writes `OemName-custom-branding.json`.
-5. Install it on a GX device by adding `--install <gx-host> --ssh-key <private-key>` to the compile command, or by hand: copy `OemName-custom-branding.json` to `/data/apps/available/OemName/gui-v2/OemName.json`, then `ln -s /data/apps/available/OemName /data/apps/enabled/OemName`.
-6. Look at the device. The colors change straight away. The start-up logos and gauge animation show only when the GUI starts: restart it with `svc -d /service/start-gui && svc -u /service/start-gui`. Switch Settings -> General -> Display & Appearance -> GX display appearance between Dark and Light, and check both.
+4. Fix every problem the compiler reports, and compile again, until it succeeds. It writes the custom branding, `oemname-custom-branding.json`.
+5. Ship it as the `customBranding` component of a venus-app-manager app named `oemname`. venus-app-manager installs it as `/run/gx-apps/apps/oemname/custom-branding/oemname.json`, where the GUI reads it.
+6. Enable the app, by writing 1 to `com.victronenergy.appmanager` `/GxApps/oemname/Enable`, and select its custom branding: on the device, write `oemname` to `com.victronenergy.appmanager` `/CustomBranding`. The GUI applies only that custom branding, and none while `/CustomBranding` is empty. It follows `/CustomBranding`, and reads the file again when it changes.
+7. Look at the device. The colors change straight away. The start-up logos and gauge animation show only when the GUI starts: restart it with `svc -d /service/start-gui && svc -u /service/start-gui`. Switch Settings -> General -> Display & Appearance -> GX display appearance between Dark and Light, and check both.
 
-To remove the custom branding, remove the link: `rm /data/apps/enabled/OemName`.
+To go back to Victron's look, select no custom branding: write an empty string to `/CustomBranding`.
 
-A plugin can have a custom branding integration and other integrations, such as a settings page. Compile it with `--branding Branding.qml` and the other options together.
+While you work on a custom branding, add `--install <gx-host> --ssh-key <private-key>` to the compile command. It copies `oemname-custom-branding.json` over the installed app's custom branding, as `/run/gx-apps/apps/oemname/custom-branding/oemname.json`, and the GUI applies it again if it is the selected custom branding. `/CustomBranding` can only name an enabled app that has a custom branding, so add and enable the app once first.
+
+A plugin can have a custom branding and other integrations, such as a settings page. Compile it with `--branding Branding.qml` and the other options together. The compiler then writes two files: `oemname-gui-v2.json`, the plugin, without the branding, and `oemname-custom-branding.json`, the custom branding. Ship them as the app's `gui` and `customBranding` components. Put `Branding.qml` and its files in a subdirectory, such as `custom-branding/`, so that they are not also packed into the plugin, which packs the image and font files at the top of the directory. A branding in a plugin file is never applied.
 
 ## Rules for Branding.qml
 
@@ -57,12 +60,12 @@ Text in a comment does not count. A name inside a string does count. `//` hides 
 The compiler enforces the import rule and that name search. It does not check property values. It reports each problem as `file:line:column: message`.
 
 1. **Imports.** `import Victron.Branding` is required. `import QtQml` and `import QtQuick` are allowed but not needed. Nothing else is allowed, not even `Victron.VenusOS`. No `as` qualifier, no import of a file or directory, and no `pragma`.
-2. **The root object is `Branding`.** The GUI ignores the custom branding integration if the file does not declare one. Set the properties in the [property reference](#property-reference).
+2. **The root object is `Branding`.** The GUI ignores the custom branding if the file does not declare one. Set the properties in the [property reference](#property-reference).
 3. **Write each property on its own line**, as `name: value`, with nothing before the name except spaces or tabs. The examples indent with tabs; that counts. The compiler reads those lines to write `requiredBrandingVersion` (see [Versioning](#versioning)). A property set in any other way is not counted. If that property is newer than the version the compiler wrote, an older GUI fails to load the file, instead of logging that the plugin needs a newer `Victron.Branding`.
 4. **Values the GUI accepts.** The compiler does not check these. The GUI does, when it loads the plugin.
    - Colors must be opaque. Write `"#RGB"`, `"#RRGGBB"`, or an SVG color name such as `"orange"`. The GUI ignores, and logs, a color that is not opaque, including `"transparent"`. QML's 8-digit form is `#AARRGGBB`, with the alpha first; CSS's `#RRGGBBAA` is not the same color.
-   - File paths are relative to `Branding.qml`. Write `"logo.svg"`, not a `qrc:` or `file:` URL, not a leading `/`, and not `..`. Logos are `.svg` or `.png`. Font files are `.ttf` or `.otf`. Gauge animations are `.gif`. With `--branding`, the compiler packs every such file in the plugin directory and its subdirectories. It does not read the paths out of the file, so a file that is not in that directory is not packed.
-   - `font_family` and `quantity_font_family` must name a family that `font_files` in this same file registers. If not, the GUI ignores this plugin's custom branding and logs why. The plugin's other integrations still load.
+   - File paths are relative to `Branding.qml`. Write `"logo.svg"`, not a `qrc:` or `file:` URL, not a leading `/`, and not `..`. Logos are `.svg` or `.png`. Font files are `.ttf` or `.otf`. Gauge animations are `.gif`. With `--branding`, the compiler packs every such file in the directory of `Branding.qml` and its subdirectories into the custom branding. It does not read the paths out of the file, so a file that is not in that directory is not packed.
+   - `font_family` and `quantity_font_family` must name a family that `font_files` in this same file registers. If not, the GUI ignores the custom branding and logs why.
    - `light_mode_background_factor` must be more than 0 and at most 2. The GUI ignores a value outside that range, and logs it.
 5. **Do not touch gui-v2's own files.** Do not edit gui-v2's theme JSON files, and do not copy files over gui-v2's images. Custom branding is only what `Branding.qml` sets.
 
@@ -73,7 +76,7 @@ The GUI ignores, and logs, a `Branding.qml` that does not load. It also logs a w
 - **One set of colors, for the Dark scheme.** The `color_` properties are the Dark scheme's colors. The GUI computes the Light scheme from them. There are no Light-only properties.
 - **The brand, info, success, warning, and critical colors are the same in both schemes.** Choose colors that work on both the Dark and the Light background.
 - **The Light backgrounds** are the Dark backgrounds with their lightness inverted, keeping their hue. `light_mode_background_factor` adjusts this: 1.0 is the plain inversion, a lower value makes the Light backgrounds grayer (`BrandingExample` uses 0.45 for mid gray), and a higher value spreads them apart.
-- **Set the backgrounds together.** The background factor, `color_background_secondary`, and `color_background_page` are chosen to suit one `color_background_primary`. They are read from the Branding whose `color_background_primary` is used. If your plugin sets `color_background_primary`, that is your plugin: set the factor and the other two colors in the same file, or the factor is 1.0 and the two colors are computed from `color_background_primary`, not taken from Victron. If your plugin sets `color_background_secondary` or `color_background_page` without setting `color_background_primary`, those two still replace Victron's. See [One custom branding plugin](#one-custom-branding-plugin).
+- **Set the backgrounds together.** The background factor, `color_background_secondary`, and `color_background_page` are chosen to suit one `color_background_primary`. Set them in the same file as `color_background_primary`. If it does not set them, the factor is 1.0 and the two colors are computed from `color_background_primary`, not taken from Victron.
 - **Text.** The Light scheme's text colors are computed from the Dark ones for contrast. `color_font_primary` on `color_background_primary` should have a contrast ratio of at least 4.5:1, or the GUI logs a warning. `color_font_secondary` is made darker or lighter, in each scheme, until it has at least 3:1 on the backgrounds.
 - **Text on colored fills**, such as a label on a brand-colored button, is chosen automatically: white if white has at least 3:1 contrast on every fill the text is drawn on, otherwise a dark text color. If that dark color is still under 3:1, it is darkened toward black until it is not. A toast's text and icon use one color, chosen for the dimmed background only. The icon on the status strip may be below 3:1, as on Victron's warning toast. An animated accept button is drawn on both its resting fill and its sliding fill, so a light status color can force dark text.
 - **Overview battery gauge.** The readings are drawn on both the filled part and the unfilled part. If those two are too close in brightness for one text color, the fill is made darker or lighter until the readings can be read on both. A white brand does not leave that fill white.
@@ -100,7 +103,7 @@ The GUI ignores, and logs, a `Branding.qml` that does not load. It also logs a w
 ## Fonts
 
 - List the font files in `font_files`, and name the family in `font_family`, the font for all text except quantities, and `quantity_font_family`, the font for numbers with their units.
-- The family must be one that a font file in this same file registers. Do not name a family that another plugin's file provides, or a font that is only installed on the device. If you do, the GUI ignores this plugin's custom branding and logs why. The plugin's other integrations still load.
+- The family must be one that a font file in this same file registers. Do not name a font that is only installed on the device, or that another plugin provides. If you do, the GUI ignores the custom branding and logs why.
 - The font must have the letters of every language your product ships. For a language it does not have the letters for, the GUI uses its built-in font (Roboto) instead, and logs it. Languages that have their own font on the device, such as Chinese, Japanese, Arabic, and Thai, always keep it.
 - The quantity font is used for every language, and needs digits of equal width (tabular digits), or values jitter as they change.
 
@@ -116,17 +119,9 @@ Branding {
 }
 ```
 
-## One custom branding plugin
+## One custom branding at a time
 
-Only one custom branding plugin is used. If more than one is enabled, the GUI uses the first one in the order it loads plugins, and does not enable the others. A later plugin that has a custom branding integration is not enabled, including its other pages. The GUI logs:
-
-`Refusing to enable branding plugin <name> as a prior branding plugin is already enabled`
-
-Plugins are loaded in directory-path order, and by file name within a directory. They are not sorted by plugin name.
-
-A property the active plugin does not set keeps Victron's value. The exceptions are the background factor, `color_background_secondary` and `color_background_page`, which follow `color_background_primary` as described in [Colors](#colors). A font family is not shared: the plugin that names it must also list the font file. Another plugin's file does not count.
-
-If a Branding file cannot be loaded, that plugin is not the active custom branding plugin. Its other pages still load, and the next custom branding plugin can be used. A plugin should have one custom branding integration. If it has more than one, only the first that loads is used.
+Several installed apps can have a custom branding. The GUI applies only the one named in `com.victronenergy.appmanager` `/CustomBranding`, and only if the custom branding file's `"name"` is that name. A property that the custom branding does not set keeps Victron's value. A gui-v2 plugin file that carries a branding integration, as the compiler wrote before custom branding had its own file, has that integration ignored, and logged; its other integrations still load.
 
 ## Checking your work
 
@@ -140,17 +135,17 @@ This is the loop to follow, by hand or as an agent:
 
 2. Fix every reported problem, and run the compiler again, until it passes.
 3. The compiler then runs `qmllint` on the file, if it can find `qmllint` and the `Victron.Branding` module. On a GX device it cannot, and says that it skipped it. Fix anything `qmllint` reports.
-4. Install the plugin with `--install <gx-host> --ssh-key <private-key>`, and look at the device in both the Dark and the Light scheme: the start-up screen, the Overview page, a settings page with switches and buttons, and the notifications.
-5. Check the GUI's log for warnings that name your plugin.
-6. To compare your plugin with the Victron colors on a desktop build, capture the same pages with and without it, as described in [Capturing with a custom branding plugin](visual-regression-tests.md#capturing-with-a-custom-branding-plugin).
+4. Install the custom branding with `--install <gx-host> --ssh-key <private-key>`, select it in `/CustomBranding`, and look at the device in both the Dark and the Light scheme: the start-up screen, the Overview page, a settings page with switches and buttons, and the notifications.
+5. Check the GUI's log for warnings that name your custom branding.
+6. To compare your custom branding with the Victron colors on a desktop build, capture the same pages with and without it, as described in [Capturing with a custom branding plugin](visual-regression-tests.md#capturing-with-a-custom-branding-plugin).
 
 ## Versioning
 
 `Victron.Branding` has its own version, `major.minor`, separate from gui-v2's version and from the other plugin modules.
 
 - **Minor versions add properties.** The property reference says which version added each property ("Added in").
-- **The required version.** The compiler writes `requiredBrandingVersion` into the plugin's JSON file: the lowest `Victron.Branding` version that has every property it can see. It sees a property only when that property is written on its own line, as `name: value`, with nothing before the name except spaces or tabs. A plugin that sets only properties from 1.0 needs 1.0, even if the compiler was built for a newer version, so it still runs on older GX devices. A property set in any other way is not counted. If that property is newer than the version written here, an older GUI fails to load the file, instead of logging the version it needs.
-- **What the GUI does with it.** If the GUI's `Victron.Branding` has a different major version, or an older minor version, than `requiredBrandingVersion`, the GUI ignores the plugin's custom branding integration and logs why, for example `Ignoring the branding integration in plugin OemName - it needs Victron.Branding 1.2, but this GUI only has 1.1`. The plugin's other integrations still load. A plugin without `requiredBrandingVersion` is not checked.
+- **The required version.** The compiler writes `requiredBrandingVersion` into the custom branding file: the lowest `Victron.Branding` version that has every property it can see. It sees a property only when that property is written on its own line, as `name: value`, with nothing before the name except spaces or tabs. A custom branding that sets only properties from 1.0 needs 1.0, even if the compiler was built for a newer version, so it still runs on older GX devices. A property set in any other way is not counted. If that property is newer than the version written here, an older GUI fails to load the file, instead of logging the version it needs.
+- **What the GUI does with it.** If the GUI's `Victron.Branding` has a different major version, or an older minor version, than `requiredBrandingVersion`, the GUI ignores the custom branding and logs why, for example `Ignoring the selected custom branding oemname - it needs Victron.Branding 1.2, but this GUI only has 1.1`. A custom branding without `requiredBrandingVersion` is not checked.
 - **Deprecation.** A property that is to be removed is first marked as deprecated in the property reference, and from then on the GUI logs a warning, once, when a plugin sets it. It is removed only in the next major version. No property is deprecated yet.
 - **Major versions** remove or change properties. When a new major version is announced, plugin authors must port their plugins to the new API.
 

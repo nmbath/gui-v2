@@ -16,12 +16,8 @@ This produces QuickAccessExample-gui-v2.json.
 
 2) Deploy to device
 
-  scp QuickAccessExample-gui-v2.json root@venus.local:/tmp/
-  ssh root@venus.local
-  mkdir -p /data/apps/available/QuickAccessExample/gui-v2/
-  cp /tmp/QuickAccessExample-gui-v2.json /data/apps/available/QuickAccessExample/gui-v2/QuickAccessExample.json
-  ln -sf /data/apps/available/QuickAccessExample /data/apps/enabled/QuickAccessExample
-  svc -t /service/start-gui
+  Install it as a GX app, and enable it: see "Deploying to Device" in
+  examples/README.md.
 
 3) Verify
 

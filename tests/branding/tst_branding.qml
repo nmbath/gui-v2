@@ -36,10 +36,6 @@ TestCase {
 	property var builtInLight
 	// The checks only resolve URLs against this URL, so no file needs to exist there.
 	readonly property string pluginBrandingFileUrl: "qrc:/TestPlugin/Branding.qml"
-	// GuiPluginLoader.PluginSettingsPage and GuiPluginLoader.Branding. The enum values are not
-	// used directly, as that would create the GuiPluginLoader singleton.
-	readonly property int pluginSettingsPageType: 1
-	readonly property int brandingIntegrationType: 6
 
 	function themeBrandingColors() {
 		let result = {}
@@ -166,131 +162,6 @@ TestCase {
 	// The background colors of the Branding whose color_background_primary is used, or of a later
 	// one, and that Branding's light_mode_background_factor. Each list is background_primary,
 	// background_secondary, page background, font_primary and font_secondary.
-	function warningListContains(warnings, text) {
-		for (let i = 0; i < warnings.length; ++i) {
-			if (String(warnings[i]).indexOf(text) >= 0) {
-				return true
-			}
-		}
-		return false
-	}
-
-	function test_firstBrandingPluginInLoadOrderIsUsed() {
-		const refuseZebra = "Refusing to enable branding plugin Zebra as a prior branding plugin is already enabled"
-		ignoreWarning(refuseZebra)
-		// Apple sorts before Zebra, so a name-sorted last-writer merge would use Zebra.
-		const plugins = [
-			{
-				name: "Before",
-				integrations: [{ type: pluginSettingsPageType, url: "qrc:/Before/SettingsPage.qml" }],
-			},
-			{
-				name: "Apple",
-				integrations: [{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("valid") }],
-			},
-			{
-				name: "Zebra",
-				integrations: [
-					{ type: pluginSettingsPageType, url: "qrc:/Zebra/SettingsPage.qml" },
-					{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("BrandingMinimalExample") },
-				],
-			},
-			{
-				name: "After",
-				integrations: [{ type: pluginSettingsPageType, url: "qrc:/After/SettingsPage.qml" }],
-			},
-		]
-		const result = BrandingTestHelper.enableFirstBrandingPlugin(JSON.stringify(plugins))
-		compare(result.branding.length, 1)
-		compare(result.branding[0].pluginName, "Apple")
-		compare(result.branding[0].color_brand.toString(), "#003366")
-		compare(result.removed, ["Zebra"])
-		compare(result.remaining.length, 3)
-		compare(result.remaining[0].name, "Before")
-		compare(result.remaining[0].types, [pluginSettingsPageType])
-		compare(result.remaining[1].name, "Apple")
-		compare(result.remaining[1].types, [brandingIntegrationType])
-		compare(result.remaining[2].name, "After")
-		compare(result.remaining[2].types, [pluginSettingsPageType])
-		compare(result.warnings, [refuseZebra])
-	}
-
-	function test_invalidBrandingPluginDoesNotBlockTheNextPlugin() {
-		ignoreWarning(/Cannot load branding for plugin BrokenOnly : /)
-		ignoreWarning(/Ignoring invalid branding integration in plugin "BrokenOnly"/)
-		ignoreWarning(/Ignoring plugin without valid integrations: "BrokenOnly"/)
-		ignoreWarning(/Cannot load branding for plugin BadWithPages : /)
-		ignoreWarning(/Ignoring invalid branding integration in plugin "BadWithPages"/)
-		const plugins = [
-			{
-				name: "BrokenOnly",
-				integrations: [{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("syntax_error") }],
-			},
-			{
-				name: "BadWithPages",
-				integrations: [
-					{ type: pluginSettingsPageType, url: "qrc:/BadWithPages/SettingsPage.qml" },
-					{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("syntax_error") },
-				],
-			},
-			{
-				name: "Apple",
-				integrations: [{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("valid") }],
-			},
-		]
-		const result = BrandingTestHelper.enableFirstBrandingPlugin(JSON.stringify(plugins))
-		compare(result.removed, ["BrokenOnly"])
-		compare(result.remaining.length, 2)
-		compare(result.remaining[0].name, "BadWithPages")
-		compare(result.remaining[0].types, [pluginSettingsPageType])
-		compare(result.remaining[1].name, "Apple")
-		compare(result.remaining[1].types, [brandingIntegrationType])
-		compare(result.branding.length, 1)
-		compare(result.branding[0].pluginName, "Apple")
-		compare(result.branding[0].color_brand.toString(), "#003366")
-		verify(!warningListContains(result.warnings, "Refusing to enable"))
-		verify(warningListContains(result.warnings, "Ignoring invalid branding integration in plugin"))
-	}
-
-	function test_failedBrandingIntegrationDoesNotBlockTheNextOnTheSamePlugin() {
-		ignoreWarning(/Cannot load branding for plugin Apple : /)
-		ignoreWarning(/Ignoring invalid branding integration in plugin "Apple"/)
-		const plugins = [{
-			name: "Apple",
-			integrations: [
-				{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("syntax_error") },
-				{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("valid") },
-				{ type: pluginSettingsPageType, url: "qrc:/Apple/SettingsPage.qml" },
-			],
-		}]
-		const result = BrandingTestHelper.enableFirstBrandingPlugin(JSON.stringify(plugins))
-		compare(result.removed, [])
-		compare(result.branding.length, 1)
-		compare(result.branding[0].color_brand.toString(), "#003366")
-		compare(result.remaining[0].types, [brandingIntegrationType, pluginSettingsPageType])
-		verify(!warningListContains(result.warnings, "Refusing to enable"))
-		verify(!warningListContains(result.warnings, "Ignoring extra branding integration"))
-	}
-
-	function test_extraBrandingIntegrationOnTheSamePluginIsNotUsed() {
-		const extra = "Ignoring extra branding integration in plugin Apple; only the first branding integration is used"
-		ignoreWarning(extra)
-		const plugins = [{
-			name: "Apple",
-			integrations: [
-				{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("valid") },
-				{ type: brandingIntegrationType, url: BrandingTestHelper.brandingFileUrl("BrandingMinimalExample") },
-				{ type: pluginSettingsPageType, url: "qrc:/Apple/SettingsPage.qml" },
-			],
-		}]
-		const result = BrandingTestHelper.enableFirstBrandingPlugin(JSON.stringify(plugins))
-		compare(result.removed, [])
-		compare(result.branding.length, 1)
-		compare(result.branding[0].color_brand.toString(), "#003366")
-		compare(result.remaining[0].types, [brandingIntegrationType, pluginSettingsPageType])
-		compare(result.warnings, [extra])
-	}
-
 	function test_backgroundColors_data() {
 		const victronDarkScheme = ["#000000", "#141414", "#000000", "#ffffff", "#969591"]
 		const victronLightScheme = ["#ffffff", "#f7f7f7", "#e5e5e5", "#262626", "#807f7c"]
@@ -903,23 +774,77 @@ TestCase {
 		compare(BrandingTestHelper.checkRequiredBrandingVersion(JSON.stringify(data.plugin)), data.problem)
 	}
 
-	function test_unsupportedBrandingVersionDropsOnlyTheBrandingIntegration() {
+	function test_pluginBrandingIntegrationIsIgnored() {
 		// GuiPluginLoader.PluginSettingsPage and GuiPluginLoader.Branding. The enum values are not
 		// used directly, as that would create the GuiPluginLoader singleton.
 		const settingsPageType = 1
 		const brandingType = 6
-		const major = Number(BrandingTestHelper.brandingModuleVersion().split(".")[0])
 		const plugin = {
 			integrations: [
 				{ type: settingsPageType, url: "qrc:/TestPlugin/SettingsPage.qml" },
 				{ type: brandingType, url: "qrc:/TestPlugin/Branding.qml" },
 			]
 		}
-		compare(BrandingTestHelper.integrationTypes(JSON.stringify(plugin)), [settingsPageType, brandingType])
-
-		plugin.requiredBrandingVersion = (major + 1) + ".0"
-		ignoreWarning(/^Ignoring the branding integration in plugin TestPlugin - it needs Victron\.Branding /)
+		ignoreWarning(/^Ignoring the branding integration in plugin TestPlugin - a branding is applied only from the selected custom branding$/)
 		compare(BrandingTestHelper.integrationTypes(JSON.stringify(plugin)), [settingsPageType])
+	}
+
+	function customBrandingFile(changes) {
+		const branding = {
+			name: "oem",
+			version: "1.0",
+			minRequiredVersion: "",
+			maxRequiredVersion: "",
+			requiredBrandingVersion: BrandingTestHelper.brandingModuleVersion().split(".")[0] + ".0",
+			integrations: [ { type: 6, url: "qrc:/oem/custom-branding/Branding.qml" } ],
+			resource: Qt.btoa("rcc"),
+		}
+		for (const key in changes) {
+			if (changes[key] === undefined) {
+				delete branding[key]
+			} else {
+				branding[key] = changes[key]
+			}
+		}
+		return JSON.stringify(branding)
+	}
+
+	function test_customBrandingFile_data() {
+		const major = Number(BrandingTestHelper.brandingModuleVersion().split(".")[0])
+		return [
+			{ tag: "valid", changes: {}, problem: "" },
+			{ tag: "other name", changes: { name: "other" }, problem: "its name is \"other\", not the selected custom branding \"oem\"" },
+			{ tag: "no name", changes: { name: undefined }, problem: "its name is \"\", not the selected custom branding \"oem\"" },
+			{ tag: "newer branding", changes: { requiredBrandingVersion: (major + 1) + ".0" },
+				problem: "it needs Victron.Branding " + (major + 1) + ".0, but this GUI has " + BrandingTestHelper.brandingModuleVersion() },
+			{ tag: "newer gui", changes: { minRequiredVersion: "999.0.0" }, problem: /^requires GUIv2 >= 999\.0\.0 but running / },
+			{ tag: "older gui", changes: { maxRequiredVersion: "0.0.1" }, problem: /^requires GUIv2 <= 0\.0\.1 but running / },
+			{ tag: "plugin integration", changes: { integrations: [ { type: 1, url: "qrc:/oem/Page.qml" } ] },
+				problem: "it must have one integration, a branding with a qrc url" },
+			{ tag: "two integrations", changes: { integrations: [ { type: 6, url: "qrc:/oem/custom-branding/Branding.qml" }, { type: 1, url: "qrc:/oem/Page.qml" } ] },
+				problem: "it must have one integration, a branding with a qrc url" },
+			{ tag: "file url", changes: { integrations: [ { type: 6, url: "file:///tmp/Branding.qml" } ] },
+				problem: "it must have one integration, a branding with a qrc url" },
+			{ tag: "no resource", changes: { resource: undefined }, problem: "its resource is missing" },
+		]
+	}
+
+	function test_customBrandingFile(data) {
+		const result = BrandingTestHelper.parseCustomBranding(customBrandingFile(data.changes), "oem")
+		if (data.problem instanceof RegExp) {
+			verify(data.problem.test(result.problem), result.problem)
+		} else {
+			compare(result.problem, data.problem)
+		}
+		compare(result.url, data.problem === "" ? "qrc:/oem/custom-branding/Branding.qml" : "")
+		compare(result.resourceSize, data.problem === "" ? 3 : 0)
+	}
+
+	function test_customBrandingFilePath() {
+		compare(BrandingTestHelper.customBrandingFilePath("oem"), "/run/gx-apps/apps/oem/custom-branding/oem.json")
+		compare(BrandingTestHelper.customBrandingFilePath(""), "")
+		compare(BrandingTestHelper.customBrandingFilePath("../oem"), "")
+		compare(BrandingTestHelper.customBrandingFilePath(".oem"), "")
 	}
 
 	function test_colorThatIsNotOpaqueIsIgnored() {

@@ -305,41 +305,6 @@ QByteArray asciiFontData()
 	return font;
 }
 
-class WarningCapture
-{
-public:
-	QStringList warnings;
-	QtMessageHandler previous = nullptr;
-	static WarningCapture *active;
-
-	WarningCapture()
-	{
-		active = this;
-		previous = qInstallMessageHandler(&WarningCapture::handle);
-	}
-
-	~WarningCapture()
-	{
-		qInstallMessageHandler(previous);
-		if (active == this) {
-			active = nullptr;
-		}
-	}
-
-	static void handle(QtMsgType type, const QMessageLogContext &context, const QString &message)
-	{
-		if (active && type == QtWarningMsg && context.category
-				&& QLatin1String(context.category) == QLatin1String("venus.gui")) {
-			active->warnings.append(message);
-		}
-		if (active && active->previous) {
-			active->previous(type, context, message);
-		}
-	}
-};
-
-WarningCapture *WarningCapture::active = nullptr;
-
 }
 
 class BrandingTestHelper : public QObject
@@ -347,68 +312,6 @@ class BrandingTestHelper : public QObject
 	Q_OBJECT
 
 public:
-	// Runs the loader's one-custom-branding-plugin rule on a JSON array of plugin entries.
-	// Fonts registered by an accepted snapshot are removed before this returns.
-	Q_INVOKABLE QVariantMap enableFirstBrandingPlugin(const QString &pluginsJson)
-	{
-		// pluginsFromJson() parses a compiled plugin, so it requires a version and a
-		// resource. These tests only describe integrations, so fill those in.
-		QJsonArray array = QJsonDocument::fromJson(pluginsJson.toUtf8()).array();
-		for (qsizetype i = 0; i < array.size(); ++i) {
-			if (!array.at(i).isObject()) {
-				continue;
-			}
-			QJsonObject plugin = array.at(i).toObject();
-			if (plugin.value(QStringLiteral("version")).toString().isEmpty()) {
-				plugin.insert(QStringLiteral("version"), QStringLiteral("1.0.0"));
-			}
-			if (plugin.value(QStringLiteral("resource")).toString().isEmpty()) {
-				plugin.insert(QStringLiteral("resource"), QStringLiteral("YQ=="));
-			}
-			array.replace(i, plugin);
-		}
-		const QString json = QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Compact));
-		QVector<Victron::VenusOS::GuiPlugin> plugins = GuiPluginLoader::pluginsFromJson(json);
-		QList<BrandingData> branding;
-		QList<int> fontIds;
-		QVector<Victron::VenusOS::GuiPlugin> removed;
-		QStringList warnings;
-		{
-			WarningCapture capture;
-			removed = GuiPluginLoader::enableFirstBrandingPlugin(m_engine, &plugins, &branding, &fontIds);
-			warnings = capture.warnings;
-		}
-		removeFonts(fontIds);
-
-		QVariantList remainingPlugins;
-		for (const Victron::VenusOS::GuiPlugin &plugin : plugins) {
-			QVariantList types;
-			for (const Victron::VenusOS::GuiPluginIntegration &integration : plugin.integrations()) {
-				types.append(static_cast<int>(integration.type()));
-			}
-			remainingPlugins.append(QVariantMap{
-				{ QStringLiteral("name"), plugin.name() },
-				{ QStringLiteral("types"), types },
-			});
-		}
-		QVariantList removedNames;
-		for (const Victron::VenusOS::GuiPlugin &plugin : removed) {
-			removedNames.append(plugin.name());
-		}
-		QVariantList brandingList;
-		for (const BrandingData &data : branding) {
-			QVariantMap map = toVariantMap(data);
-			map.insert(QStringLiteral("pluginName"), data.pluginName);
-			brandingList.append(map);
-		}
-		return {
-			{ QStringLiteral("remaining"), remainingPlugins },
-			{ QStringLiteral("removed"), removedNames },
-			{ QStringLiteral("branding"), brandingList },
-			{ QStringLiteral("warnings"), warnings },
-		};
-	}
-
 	explicit BrandingTestHelper(QObject *parent = nullptr) : QObject(parent) {}
 
 	Q_INVOKABLE QVariantMap snapshot(QObject *object) const
@@ -548,6 +451,27 @@ public:
 			types.append(static_cast<int>(integration.type()));
 		}
 		return types;
+	}
+
+	// Runs the loader's custom branding file check on brandingJson, as the custom branding named selectedBranding. Returns the
+	// reason it is rejected, or an empty string, and then the branding url and resource size.
+	Q_INVOKABLE QVariantMap parseCustomBranding(const QString &brandingJson, const QString &selectedBranding) const
+	{
+		QUrl brandingUrl;
+		QByteArray resource;
+		const QString problem = GuiPluginLoader::parseCustomBranding(QJsonDocument::fromJson(brandingJson.toUtf8()).object(),
+				selectedBranding, &brandingUrl, &resource);
+		return {
+			{ QStringLiteral("problem"), problem },
+			{ QStringLiteral("url"), brandingUrl.toString() },
+			{ QStringLiteral("resourceSize"), resource.size() },
+		};
+	}
+
+	// The loader's custom branding file path for brandingName.
+	Q_INVOKABLE QString customBrandingFilePath(const QString &brandingName) const
+	{
+		return GuiPluginLoader::customBrandingFilePath(brandingName);
 	}
 
 	// Reads the image at image://tinted/<id>, with the given sourceSize (0 for "not set").

@@ -38,12 +38,8 @@ running gui-v2.
 
 2) Deploy to a GX device
 
-  scp NavigationExample-gui-v2.json root@venus.local:/tmp/
-  ssh root@venus.local
-  mkdir -p /data/apps/available/NavigationExample/gui-v2/
-  cp /tmp/NavigationExample-gui-v2.json /data/apps/available/NavigationExample/gui-v2/NavigationExample.json
-  ln -sf /data/apps/available/NavigationExample /data/apps/enabled/NavigationExample
-  svc -t /service/start-gui
+  Install it as a GX app, and enable it: see "Deploying to Device" in
+  examples/README.md.
 
 Or add --install <gx-host> --ssh-key <private-key> to the compile
 command. That is for testing only.

@@ -29,16 +29,27 @@ must not appear (see .github/branding-plugins.md). It does not check the
 color. Fix each problem that it reports at file:line:column, and compile
 again.
 
-2) Install the plugin. Either add
-`--install gx.device.ip.address --ssh-key <private-key>` to the compile command
-in step 1, which connects as root, copies the plugin to the device and enables
-it, or do that by hand:
-- Copy the output file `BrandingMinimalExample-custom-branding.json` to /data/apps/available/BrandingMinimalExample/gui-v2/BrandingMinimalExample.json on device: `mkdir -p /data/apps/available/BrandingMinimalExample/gui-v2/ && cp BrandingMinimalExample-custom-branding.json /data/apps/available/BrandingMinimalExample/gui-v2/BrandingMinimalExample.json`
-- Symlink the `BrandingMinimalExample` directory as follows: `ln -s /data/apps/available/BrandingMinimalExample /data/apps/enabled/BrandingMinimalExample` on device
+2) The compiler writes the custom branding, `BrandingMinimalExample-custom-branding.json`.
+The GUI applies a custom branding only while it is the one selected in
+com.victronenergy.appmanager /CustomBranding, and reads it from
+/run/gx-apps/apps/<name>/custom-branding/<name>.json, where venus-app-manager
+installs an app's custom branding. So ship it as the `customBranding`
+component of a GX app. The app's name must be the custom branding's "name",
+which is the directory name. An app name is lowercase, and a plugin name
+cannot have a '-', so compile a copy of this directory named `brandingminimalexample`.
+Add the app with venus-app-manager, enable it, then select its custom
+branding:
+`dbus -y com.victronenergy.appmanager /GxApps/brandingminimalexample/Enable SetValue 1`
+`dbus -y com.victronenergy.appmanager /CustomBranding SetValue brandingminimalexample`
 
-3) The GUI reloads its plugins when /data/apps/enabled/ changes, so the colors
-change straight away.
+Once the app is installed, adding
+`--install gx.device.ip.address --ssh-key <private-key>` to the compile
+command in step 1 copies the custom branding over the app's file, and the GUI
+applies it again.
+
+3) The GUI follows /CustomBranding, and reads the custom branding file again
+when it changes, so the colors change straight away.
 4) Switch Settings -> General -> Display & Appearance -> GX display appearance
 between Dark and Light: the brand color is orange in both.
-5) To go back to Victron's colors, remove the link:
-`rm /data/apps/enabled/BrandingMinimalExample`
+5) To go back to Victron's colors, select no custom branding:
+`dbus -y com.victronenergy.appmanager /CustomBranding SetValue ""`
