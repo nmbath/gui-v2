@@ -19,14 +19,14 @@ This example uses cardType 1 (Controls).
   python3 ../../tools/gui-v2-plugin-compiler.py \
     --card CardExample_BatteryCard.qml 1
 
-This produces CardExample.json.
+This produces CardExample-gui-v2.json.
 
 2) Deploy to device
 
-  scp CardExample.json root@venus.local:/tmp/
+  scp CardExample-gui-v2.json root@venus.local:/tmp/
   ssh root@venus.local
   mkdir -p /data/apps/available/CardExample/gui-v2/
-  cp /tmp/CardExample.json /data/apps/available/CardExample/gui-v2/
+  cp /tmp/CardExample-gui-v2.json /data/apps/available/CardExample/gui-v2/CardExample.json
   ln -sf /data/apps/available/CardExample /data/apps/enabled/CardExample
   svc -t /service/start-gui
 

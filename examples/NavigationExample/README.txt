@@ -29,7 +29,7 @@ the status bar in portrait layout.
     --navigation NavigationExample_Page.qml \
       icon_brick.svg navigationexample_title BeforeNotifications
 
-This writes NavigationExample.json. BeforeNotifications inserts the
+This writes NavigationExample-gui-v2.json. BeforeNotifications inserts the
 page after Levels when Levels is shown, and before Notifications.
 Omitting the location does the same: that is the default. The other
 rules are in .github/gui-plugins.md.
@@ -41,10 +41,10 @@ running gui-v2.
 
 2) Deploy to a GX device
 
-  scp NavigationExample.json root@venus.local:/tmp/
+  scp NavigationExample-gui-v2.json root@venus.local:/tmp/
   ssh root@venus.local
   mkdir -p /data/apps/available/NavigationExample/gui-v2/
-  cp /tmp/NavigationExample.json /data/apps/available/NavigationExample/gui-v2/
+  cp /tmp/NavigationExample-gui-v2.json /data/apps/available/NavigationExample/gui-v2/NavigationExample.json
   ln -sf /data/apps/available/NavigationExample /data/apps/enabled/NavigationExample
   svc -t /service/start-gui
 

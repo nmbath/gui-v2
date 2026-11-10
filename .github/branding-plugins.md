@@ -36,8 +36,8 @@ Custom branding does not change:
    ```
 
    On a GX device with the Large image, the compiler is `/opt/victronenergy/gui-v2/gui-v2-plugin-compiler.py`.
-4. Fix every problem the compiler reports, and compile again, until it succeeds. It writes `OemName.json`.
-5. Install it on a GX device by adding `--install <gx-host> --ssh-key <private-key>` to the compile command, or by hand: copy `OemName.json` to `/data/apps/available/OemName/gui-v2/`, then `ln -s /data/apps/available/OemName /data/apps/enabled/OemName`.
+4. Fix every problem the compiler reports, and compile again, until it succeeds. It writes `OemName-custom-branding.json`.
+5. Install it on a GX device by adding `--install <gx-host> --ssh-key <private-key>` to the compile command, or by hand: copy `OemName-custom-branding.json` to `/data/apps/available/OemName/gui-v2/OemName.json`, then `ln -s /data/apps/available/OemName /data/apps/enabled/OemName`.
 6. Look at the device. The colors change straight away. The start-up logos and gauge animation show only when the GUI starts: restart it with `svc -d /service/start-gui && svc -u /service/start-gui`. Switch Settings -> General -> Display & Appearance -> GX display appearance between Dark and Light, and check both.
 
 To remove the custom branding, remove the link: `rm /data/apps/enabled/OemName`.

@@ -85,7 +85,7 @@ capture the same pages with and without the plugin, and compare them.
 Desktop builds load plugins from the `plugins/` directory next to the executable; there is no
 option to load them from somewhere else. So:
 
-1. Compile the plugin, and copy its `<Name>.json` into `<executable directory>/plugins/`.
+1. Compile the plugin, and copy its `<Name>-custom-branding.json` into `<executable directory>/plugins/`.
 2. Run the captures.
 3. Remove the `.json` again, so that later captures show the Victron colors.
 

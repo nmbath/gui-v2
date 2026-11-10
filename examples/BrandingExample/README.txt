@@ -49,7 +49,7 @@ splash_gauge.gif.
 `--install gx.device.ip.address --ssh-key <private-key>` to the compile command
 in step 1, which connects as root, copies the plugin to the device and enables
 it, or do that by hand:
-- Copy the output file `BrandingExample.json` to /data/apps/available/BrandingExample/gui-v2/BrandingExample.json on device: `mkdir -p /data/apps/available/BrandingExample/gui-v2/ && cp BrandingExample.json /data/apps/available/BrandingExample/gui-v2/BrandingExample.json`
+- Copy the output file `BrandingExample-custom-branding.json` to /data/apps/available/BrandingExample/gui-v2/BrandingExample.json on device: `mkdir -p /data/apps/available/BrandingExample/gui-v2/ && cp BrandingExample-custom-branding.json /data/apps/available/BrandingExample/gui-v2/BrandingExample.json`
 - Symlink the `BrandingExample` directory as follows: `ln -s /data/apps/available/BrandingExample /data/apps/enabled/BrandingExample` on device
 
 3) The GUI reloads its plugins when /data/apps/enabled/ changes, so the colors

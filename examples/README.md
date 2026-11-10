@@ -33,10 +33,10 @@ This produces a `.json` file containing the compiled QML resources.
 ## Deploying to Device
 
 ```
-scp MyPlugin.json root@venus.local:/tmp/
+scp MyPlugin-gui-v2.json root@venus.local:/tmp/
 ssh root@venus.local
 mkdir -p /data/apps/available/MyPlugin/gui-v2/
-cp /tmp/MyPlugin.json /data/apps/available/MyPlugin/gui-v2/
+cp /tmp/MyPlugin-gui-v2.json /data/apps/available/MyPlugin/gui-v2/MyPlugin.json
 ln -sf /data/apps/available/MyPlugin /data/apps/enabled/MyPlugin
 svc -t /service/start-gui
 ```
