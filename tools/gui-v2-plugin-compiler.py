@@ -1095,13 +1095,19 @@ def plugin_name_error(name):
             'and be at most 64 characters' % name)
 
 
-def gx_install_command(name, host, key_path):
+# Where venus-app-manager installs apps, and the folder in an app of each kind of compiled file.
+GX_APPS_DIR = '/run/gx-apps/apps'
+PLUGIN_COMPONENT_DIRECTORY = 'gui-v2'
+CUSTOM_BRANDING_COMPONENT_DIRECTORY = 'custom-branding'
+
+
+def gx_install_command(name, host, key_path, component=PLUGIN_COMPONENT_DIRECTORY):
     """Returns (ssh argv, remote JSON path) for a testing install. Does not run ssh.
 
-    Connects as root with key_path. The remote command reads the JSON on stdin, writes
-    /data/apps/available/<name>/gui-v2/<name>.json, and symlinks
-    /data/apps/available/<name> to /data/apps/enabled/<name>. It will not replace a
-    real directory at the enabled path.
+    Connects as root with key_path. The remote command reads the JSON on stdin and writes
+    it over /run/gx-apps/apps/<name>/<component>/<name>.json, the file of an app that
+    venus-app-manager has installed with that component. It refuses if that folder is not
+    there: the app must be added, and enabled or selected, with the app manager first.
     """
     host = host.strip()
     if host.startswith('root@'):
@@ -1113,23 +1119,21 @@ def gx_install_command(name, host, key_path):
     error = plugin_name_error(name)
     if error:
         raise ValueError(error)
-    available = '/data/apps/available/' + name
-    gui_dir = available + '/gui-v2'
-    remote_json = gui_dir + '/' + name + '.json'
-    enabled = '/data/apps/enabled/' + name
-    quoted = [shlex.quote(path) for path in (
-        gui_dir, '/data/apps/enabled', enabled, enabled, enabled, remote_json, available, enabled)]
+    if component not in (PLUGIN_COMPONENT_DIRECTORY, CUSTOM_BRANDING_COMPONENT_DIRECTORY):
+        raise ValueError('unknown component %r' % component)
+    component_dir = GX_APPS_DIR + '/' + name + '/' + component
+    remote_json = component_dir + '/' + name + '.json'
+    quoted = [shlex.quote(path) for path in (component_dir, component_dir, remote_json)]
     script = (
-        'mkdir -p %s %s && '
-        'if [ -e %s ] && [ ! -L %s ]; then '
-        'echo "ERROR: %s exists and is not a symlink" >&2; exit 1; '
-        'fi && cat > %s && ln -sfn %s %s' % tuple(quoted))
+        'if [ ! -d %s ]; then '
+        'echo "ERROR: %s does not exist: add the app with venus-app-manager first" >&2; exit 1; '
+        'fi && cat > %s' % tuple(quoted))
     argv = ['ssh', '-i', key_path] + _SSH_OPTIONS + ['root@' + host, script]
     return argv, remote_json
 
 
-def install_on_gx(name, host, key_path, json_path=''):
-    """Copies the compiled JSON to a GX device and enables the app. For testing only."""
+def install_on_gx(name, host, key_path, json_path='', component=PLUGIN_COMPONENT_DIRECTORY):
+    """Copies the compiled JSON over the installed app's file on a GX device. For testing only."""
     json_path = json_path or (name + '.json')
     if not os.path.isfile(json_path):
         print("\n\nERROR: cannot install %s: the compiled JSON was not written" % json_path)
@@ -1138,7 +1142,7 @@ def install_on_gx(name, host, key_path, json_path=''):
         print("\n\nERROR: --ssh-key must be the private key file used to connect as root")
         sys.exit(1)
     try:
-        argv, remote_json = gx_install_command(name, host, key_path)
+        argv, remote_json = gx_install_command(name, host, key_path, component)
     except ValueError as e:
         print("\n\nERROR: --install: %s" % e)
         sys.exit(1)
@@ -1244,8 +1248,9 @@ if __name__ == '__main__':
                              '(default: the directory of this script)')
     parser.add_argument('-f', '--filter-empty-sources', action='store_true', help='Strip empty source entries from .ts files')
     parser.add_argument('--install', metavar='HOST', default='',
-                        help='For testing only: install the compiled JSON on a GX device as root. '
-                             'HOST is the device address, or root@HOST')
+                        help='For testing only: copy the compiled files over those of the app <name> on a GX '
+                             'device, as root. venus-app-manager must have installed the app with the same '
+                             'components. HOST is the device address, or root@HOST')
     parser.add_argument('--ssh-key', metavar='FILE', default='',
                         help='Private key for --install. Required with --install')
     parser.add_argument('--config', metavar='FILE', default='',
@@ -1421,9 +1426,11 @@ if __name__ == '__main__':
                             requiredBrandingVersion=requiredBrandingVersion)
 
     if args.install:
-        install_on_gx(args.name, args.install, args.ssh_key, pluginFile or customBrandingFile)
-        if pluginFile and customBrandingFile:
-            print("    " + customBrandingFile + " was not installed: only one file can be installed with --install")
+        if pluginFile:
+            install_on_gx(args.name, args.install, args.ssh_key, pluginFile, PLUGIN_COMPONENT_DIRECTORY)
+        if customBrandingFile:
+            install_on_gx(args.name, args.install, args.ssh_key, customBrandingFile,
+                          CUSTOM_BRANDING_COMPONENT_DIRECTORY)
 
     print("--- done!")
     sys.exit(0)

@@ -128,19 +128,6 @@ public:
 	static std::optional<Victron::BrandingData> createBrandingSnapshot(
 			QQmlEngine *engine, const QUrl &url, const QString &pluginName, QList<int> *fontIds);
 
-	// Enables the first custom branding plugin in *plugins (load order). A later plugin
-	// that has a custom branding integration is removed and returned, so the caller can
-	// unload it; its Branding file is not read. Replaces *branding with that
-	// plugin's snapshot. Font ids from the snapshot are appended to *fontIds.
-	// A Branding file that cannot be loaded does not count as enabled, so a later
-	// custom branding plugin can still be enabled. A second custom branding integration on the
-	// accepted plugin is not read.
-	static QVector<GuiPlugin> enableFirstBrandingPlugin(
-			QQmlEngine *engine,
-			QVector<GuiPlugin> *plugins,
-			QList<Victron::BrandingData> *branding,
-			QList<int> *fontIds);
-
 	// Logs a warning for each card that it removes. Does not catch a card that compiles but
 	// cannot be created, or check a file that is not local. Removes and returns each plugin
 	// that is left without integrations, so the caller can unload it.
@@ -167,11 +154,22 @@ public:
 	// Victron.Branding module and a minor that is not newer.
 	static QString checkRequiredBrandingVersion(const QJsonValue &value);
 
-	// Returns the valid integrations of the plugin. If
-	// checkRequiredGuiPluginsVersion() rejects requiredGuiPluginsVersion,
-	// the integrations are left out. If checkRequiredBrandingVersion()
-	// rejects requiredBrandingVersion, its custom branding integrations are left out.
+	// Returns the valid integrations of the plugin. Branding integrations
+	// are left out: a branding is applied only from the selected custom branding.
 	static QVector<GuiPluginIntegration> parseIntegrations(const QJsonObject &plugin, const QString &pluginName);
+
+	// The custom branding file of the custom branding named brandingName, as venus-app-manager
+	// installs it: /run/gx-apps/apps/<name>/custom-branding/<name>.json.
+	// Empty if brandingName cannot be a file name.
+	static QString customBrandingFilePath(const QString &brandingName);
+
+	// Checks a custom branding file. Returns an empty string if it can be applied as
+	// the custom branding named selectedBranding, and sets brandingUrl and resource, or
+	// returns the reason it cannot. The file's "name" must be selectedBranding,
+	// its version requirements must be met, and its only integration must
+	// be a Branding integration in its own resource.
+	static QString parseCustomBranding(const QJsonObject &customBranding, const QString &selectedBranding,
+			QUrl *brandingUrl, QByteArray *resource);
 
 Q_SIGNALS:
 	void busyChanged();
@@ -183,7 +181,11 @@ private:
 	void triggerWatchMqttPluginPaths();
 	void onEnabledCustomisationsSynchronized(VeQItem::State state);
 	void watchMqttPluginPaths();
-	void watchPluginDirs(const QString &appsDir);
+	void watchGxApps();
+	void watchGxApp(VeQItem *appItem);
+	QStringList enabledGxApps() const;
+	void updateEnabledGxApps();
+	void watchPluginDirs();
 	void readFromFilesystem(const QString &path);
 	void initPlugins();
 	void populatePlugins();
@@ -191,24 +193,40 @@ private:
 	bool loadPluginData(const GuiPlugin &plugin);
 	void unloadPluginData(bool clearCache);
 	void unloadSinglePluginData(const GuiPlugin &plugin);
-	void loadBrandingAndCards(QVector<GuiPlugin> *plugins);
-	void loadPendingBrandingAndCards();
-	void applyBranding();
+	void loadCards(QVector<GuiPlugin> *plugins);
+	void loadPendingCards();
+	void watchSelectedCustomBranding();
+	void loadCustomBrandingFile();
+	void applyCustomBranding(const QByteArray &json, const QString &selectedBranding);
 	bool installPluginTranslatorForLanguage(const QString &pluginName, QLocale::Language language);
 	QString m_pluginsJson;
 	QVector<GuiPlugin> m_plugins;
+	// The selected custom branding's branding, its fonts and its resource.
 	QList<Victron::BrandingData> m_branding;
 	QList<int> m_brandingFontIds;
+	QByteArray m_customBrandingResource;
+	QString m_customBrandingMapRoot;
+	int m_customBrandingLoadCount = 0;
+	QPointer<VeQItem> m_selectedCustomBrandingItem;
+	QFileSystemWatcher *m_customBrandingWatcher = nullptr;
+	QTimer m_customBrandingTimer;
+	// The custom branding to apply once the QML engine is known.
+	QByteArray m_pendingCustomBrandingJson;
+	QString m_pendingCustomBrandingName;
 	QHash<QString, QHash<QLocale::Language, QTranslator*> > m_pluginTranslators;
 	QHash<QString, QPointer<QTranslator> > m_currentTranslators;
-	QFileSystemWatcher *m_enabledAppsDirWatcher = nullptr;
+	// The apps whose /GxApps/<name>/Enable is 1, by name, sorted.
+	QPointer<VeQItem> m_gxAppsItem;
+	QStringList m_enabledGxApps;
+	QTimer m_gxAppsTimer;
 	QFileSystemWatcher *m_guiPluginDirsWatcher = nullptr;
 	QMap<QString, QStringList> m_pluginDirData;
 	QVector<GuiPluginMqttFetcher*> m_mqttFetchers;
 	QTimer m_invokeOnceTimer;
 	QTimer m_timeoutTimer;
 	bool m_busy = true;
-	bool m_brandingAndCardsPending = false;
+	bool m_cardsPending = false;
+	bool m_customBrandingPending = false;
 	QPointer<QQmlEngine> m_qmlEngine;
 };
 
@@ -242,8 +260,9 @@ There are currently 6 supported types of integrations:
 		- the url is a Branding.qml file (Victron.Branding module)
 		  whose colors, fonts and splash logos override the
 		  built-in ones. The loader reads it once and destroys it.
-		  Only the first custom branding plugin in load order is enabled.
-		  A later plugin that has a custom branding integration is not enabled.
+		  It is applied only from a custom branding file, and only while
+		  com.victronenergy.appmanager /CustomBranding names that app.
+		  A branding integration in a plugin is ignored.
 
 Types 1, 2, 3 (navigation page), 4 (quick access pane), 5 (quick access pane card) and
 6 (custom branding) are supported.

@@ -1,4 +1,4 @@
-BrandingExample: a custom branding plugin
+BrandingExample: an OEM custom branding plugin
 
 This plugin changes the GUI's colors, splash logos, and the start-up gauge
 animation: a mid orange brand and info color, very dark grey Dark backgrounds,
@@ -45,20 +45,31 @@ not; the compiler says that it skipped it. It also packs every .svg, .png,
 .gif, .ttf and .otf file in this directory, here logo.svg, wordmark.svg and
 splash_gauge.gif.
 
-2) Install the plugin. Either add
-`--install gx.device.ip.address --ssh-key <private-key>` to the compile command
-in step 1, which connects as root, copies the plugin to the device and enables
-it, or do that by hand:
-- Copy the output file `BrandingExample-custom-branding.json` to /data/apps/available/BrandingExample/gui-v2/BrandingExample.json on device: `mkdir -p /data/apps/available/BrandingExample/gui-v2/ && cp BrandingExample-custom-branding.json /data/apps/available/BrandingExample/gui-v2/BrandingExample.json`
-- Symlink the `BrandingExample` directory as follows: `ln -s /data/apps/available/BrandingExample /data/apps/enabled/BrandingExample` on device
+2) The compiler writes the custom branding, `BrandingExample-custom-branding.json`.
+The GUI applies a custom branding only while it is the one selected in
+com.victronenergy.appmanager /CustomBranding, and reads it from
+/run/gx-apps/apps/<name>/custom-branding/<name>.json, where venus-app-manager
+installs an app's custom branding. So ship it as the `customBranding`
+component of a GX app. The app's name must be the custom branding's "name",
+which is the directory name. An app name is lowercase, and a plugin name
+cannot have a '-', so compile a copy of this directory named `brandingexample`.
+Add the app with venus-app-manager, enable it, then select its custom
+branding:
+`dbus -y com.victronenergy.appmanager /GxApps/brandingexample/Enable SetValue 1`
+`dbus -y com.victronenergy.appmanager /CustomBranding SetValue brandingexample`
 
-3) The GUI reloads its plugins when /data/apps/enabled/ changes, so the colors
-change straight away. The splash logos and gauge animation show only when the
-GUI starts, so restart it to see them: `svc -d /service/start-gui && svc -u /service/start-gui`
+Once the app is installed, adding
+`--install gx.device.ip.address --ssh-key <private-key>` to the compile
+command in step 1 copies the custom branding over the app's file, and the GUI
+applies it again.
+
+3) The GUI follows /CustomBranding, and reads the custom branding file again
+when it changes, so the colors change straight away. The splash logos and gauge animation show
+only when the GUI starts, so restart it to see them: `svc -d /service/start-gui && svc -u /service/start-gui`
 4) Switch Settings -> General -> Display & Appearance -> GX display appearance
 between Dark and Light, and compare with the expected result below.
-5) To go back to Victron's colors, logos, and gauge animation, remove the link:
-`rm /data/apps/enabled/BrandingExample`
+5) To go back to Victron's colors, logos, and gauge animation, select no custom branding:
+`dbus -y com.victronenergy.appmanager /CustomBranding SetValue ""`
 
 Expected result:
 - Splash: the orange hexagon and "EXAMPLE", not Victron's logos. The gauge is

@@ -54,10 +54,8 @@ python3 /opt/victronenergy/gui-v2/gui-v2-plugin-compiler.py \
     --settings FullApiExample_Main.qml \
     --devicelist 0x106 FullApiExample_Device.qml 'Full API example'
 
-For a testing install on a GX device, add `--install <gx-host> --ssh-key <private-key>` to the command above. It connects as root and does steps 2 and 3. Or do them by hand:
-
-2) Copy the output file `FullApiExample-gui-v2.json` to /data/apps/available/FullApiExample/gui-v2/FullApiExample.json on device: `mkdir -p /data/apps/available/FullApiExample/gui-v2/ && cp FullApiExample-gui-v2.json /data/apps/available/FullApiExample/gui-v2/FullApiExample.json`
-3) Symlink the `FullApiExample` directory as follows: `ln -s /data/apps/available/FullApiExample /data/apps/enabled/FullApiExample` on device
+2) Install it on a GX device as a GX app, and enable it: see "Deploying to Device" in examples/README.md.
+3) Or skip the device, and run it on a desktop build: copy `FullApiExample-gui-v2.json` into the `plugins` directory next to the `venus-gui-v2` executable.
 4) Run gui-v2 to test it. Mock mode is not required, but it is useful during testing: the mock backend includes a Skylla-i, and Reset to defaults can create the example's settings. For example: `/opt/victronenergy/venus-gui-v2 --mock --no-mock-timers`
 5) Navigate to Settings -> Integrations -> UI Plugins -> FullApiExample to see the settings page
 6) In mock mode, open the Settings subpage and click Reset to defaults to create the example's settings. On a GX device, create them with the dbus command below.

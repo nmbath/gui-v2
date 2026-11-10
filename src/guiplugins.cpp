@@ -15,6 +15,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QCryptographicHash>
 #include <QRegularExpression>
@@ -63,6 +64,46 @@ namespace {
 			return QStringLiteral("it needs %1 %2, but this GUI only has %3").arg(moduleName, value.toString(), supported);
 		}
 		return QString();
+	}
+
+	// Checks a compiled plugin's or custom branding's minRequiredVersion and maxRequiredVersion against
+	// this build's version. Both are inclusive. Returns an empty string if they are met, or why not.
+	QString checkRequiredGuiVersion(const QString &minRequiredVersion, const QString &maxRequiredVersion) {
+		static const QVersionNumber guiv2Version(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
+
+		auto parseVersion = [](const QString &raw) -> QVersionNumber {
+			// Strip optional leading 'v'/'V' prefix (e.g. "v1.3.6" -> "1.3.6").
+			const QString s = (raw.startsWith('v') || raw.startsWith('V')) ? raw.mid(1) : raw;
+			return QVersionNumber::fromString(s);
+		};
+
+		if (!minRequiredVersion.isEmpty()) {
+			const QVersionNumber minVer = parseVersion(minRequiredVersion);
+			if (!minVer.isNull() && guiv2Version < minVer) {
+				return QStringLiteral("requires GUIv2 >= %1 but running %2").arg(minRequiredVersion, guiv2Version.toString());
+			}
+		}
+
+		if (!maxRequiredVersion.isEmpty()) {
+			const QVersionNumber maxVer = parseVersion(maxRequiredVersion);
+			if (!maxVer.isNull() && guiv2Version > maxVer) {
+				return QStringLiteral("requires GUIv2 <= %1 but running %2").arg(maxRequiredVersion, guiv2Version.toString());
+			}
+		}
+		return QString();
+	}
+
+	// Where venus-app-manager installs apps. An app's gui-v2 plugin is in gui-v2/ in its folder,
+	// and its custom branding is custom-branding/<name>.json.
+	const QString gxAppsDir = QStringLiteral("/run/gx-apps/apps");
+
+	// The folder of the app named name, or an empty string if name cannot be a folder name.
+	QString gxAppPath(const QString &name) {
+		static const QRegularExpression nameExpression(QStringLiteral("^[A-Za-z0-9_.-]+$"));
+		if (!nameExpression.match(name).hasMatch() || name.startsWith(QLatin1Char('.'))) {
+			return QString();
+		}
+		return gxAppsDir + QLatin1Char('/') + name;
 	}
 
 	// Returns a path that QFile and QFontDatabase accept, or an empty string.
@@ -169,58 +210,23 @@ namespace {
 		return true;
 	}
 
-	QString enabledAppsDir() {
+	QStringList guiPluginDirs(const QStringList &enabledApps) {
 #if defined(VENUS_GX_BUILD)
-		// Custom Applications available on the GX are in:
-		// /data/apps/available/[app-name]
-		// and when enabled the folder will be symlinked into:
-		// /data/apps/enabled/[app-name]
-		// Each application may consist of a variety of different parts,
-		// including Node-RED plugins, system services, and gui-v2 plugins.
-		// The gui-v2 plugins will be found under a `gui-v2` subdirectory,
-		// e.g.: /data/apps/enabled/[app-name]/gui-v2/
-		const QString path = QStringLiteral("/data/apps/enabled/");
-		QDir dir;
-		if (!dir.exists(path)) {
-			if (!dir.mkpath(path)) {
-				qCWarning(venusGui) << "/data/apps/enabled/ does not exist and could not be created!";
-				return QString();
+		// venus-app-manager installs each app in /run/gx-apps/apps/[name], with its
+		// gui-v2 plugins in /run/gx-apps/apps/[name]/gui-v2/.
+		QStringList pluginDirs;
+		for (const QString &app : enabledApps) {
+			const QDir pluginDir(gxAppPath(app) + QStringLiteral("/gui-v2"));
+			if (pluginDir.exists()) {
+				qCInfo(venusGui) << "Found gui-v2 plugin directory:" << pluginDir.absolutePath();
+				pluginDirs.append(pluginDir.absolutePath());
+			} else {
+				qCInfo(venusGui) << "App" << app << "does not contain a gui-v2 plugins directory.";
 			}
 		}
-		return path;
-#else
-		return QString();
-#endif
-	}
-
-	QStringList guiPluginDirs(const QString &appsDirPath) {
-#if defined(VENUS_GX_BUILD)
-		// enumerate the enabled appsDirPath for application subdirectories.
-		QDir appsDir = QDir::root();
-		if (appsDir.cd(appsDirPath)) {
-			const QStringList appDirs = appsDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-
-			// for each application subdirectory, find those which include a `gui-v2` plugins subdirectory.
-			// each such directory should be appended to the list of directories to watch.
-			QStringList pluginDirs;
-			for (const QString &appDirPath : appDirs) {
-				QDir appDir = appsDir;
-				if (!appDir.cd(appDirPath)) {
-					qCWarning(venusGui) << "Cannot cd into application directory:" << appDir.filePath(appDirPath);
-					continue;
-				}
-				qCInfo(venusGui) << "Checking application directory:" << appDir.absolutePath() << "for gui-v2 plugins directory...";
-				if (!appDir.cd(QStringLiteral("gui-v2"))) {
-					qCWarning(venusGui) << "Application" << appDir.absolutePath() << "does not contain a gui-v2 plugins directory.";
-				} else {
-					qCInfo(venusGui) << "Found gui-v2 plugin directory:" << appDir.absolutePath();
-					pluginDirs.append(appDir.absolutePath());
-				}
-			}
-			return pluginDirs;
-		}
-		return QStringList();
+		return pluginDirs;
 #elif defined(VENUS_DESKTOP_BUILD)
+		Q_UNUSED(enabledApps)
 		const QByteArray overrideDir = qgetenv("VENUS_GUI_PLUGINS_DIR");
 		if (!overrideDir.isEmpty()) {
 			return QStringList { QString::fromLocal8Bit(overrideDir) };
@@ -239,6 +245,7 @@ namespace {
 		}
 		return QStringList();
 #else
+		Q_UNUSED(enabledApps)
 		return QStringList();
 #endif
 	}
@@ -253,7 +260,10 @@ GuiPluginLoader* GuiPluginLoader::create(QQmlEngine *engine, QJSEngine *)
 	static GuiPluginLoader* instance = new GuiPluginLoader(engine, nullptr);
 	if (engine && !instance->m_qmlEngine) {
 		instance->m_qmlEngine = engine;
-		instance->loadPendingBrandingAndCards();
+		instance->loadPendingCards();
+		if (instance->m_customBrandingPending) {
+			instance->applyCustomBranding(instance->m_pendingCustomBrandingJson, instance->m_pendingCustomBrandingName);
+		}
 	}
 	return instance;
 }
@@ -285,6 +295,8 @@ GuiPluginLoader::GuiPluginLoader(QQmlEngine *engine, QObject *parent)
 	// reload and re-initialise the plugins once.
 	m_invokeOnceTimer.setSingleShot(true);
 	m_invokeOnceTimer.setInterval(100); // file operations are asynchronous, so give some leeway.
+	m_customBrandingTimer.setSingleShot(true);
+	m_customBrandingTimer.setInterval(100);
 	if (loadFromMqtt) {
 		// Allow some time to receive plugin metadata from the broker.
 		// If the broker does not publish GuiCustomizations topics
@@ -306,23 +318,28 @@ GuiPluginLoader::GuiPluginLoader(QQmlEngine *engine, QObject *parent)
 		return;
 	}
 
-	// Set up a filesystem watcher on the enabled applications dir (if it exists).
 	connect(&m_invokeOnceTimer, &QTimer::timeout, this, &GuiPluginLoader::initPlugins);
-	const QString appsDir = enabledAppsDir();
-	if (!appsDir.isEmpty()) {
-		m_enabledAppsDirWatcher = new QFileSystemWatcher(QStringList { appsDir }, this);
-		connect(m_enabledAppsDirWatcher, &QFileSystemWatcher::directoryChanged,
-			this, &GuiPluginLoader::watchPluginDirs);
-	}
+#if defined(VENUS_GX_BUILD)
+	// Load only the plugins of the apps that venus-app-manager has enabled.
+	m_gxAppsTimer.setSingleShot(true);
+	m_gxAppsTimer.setInterval(100);
+	connect(&m_gxAppsTimer, &QTimer::timeout, this, &GuiPluginLoader::updateEnabledGxApps);
+	watchGxApps();
+#endif
 
 	// Set up filesystem watchers on all of the plugin dirs (if they exist),
 	// and read in plugin data from those plugin dirs.
-	watchPluginDirs(appsDir);
+	watchPluginDirs();
 
 	// Now force initialisation of plugins immediately rather than waiting
 	// for the invoke-once timer to complete.
 	m_invokeOnceTimer.stop();
 	initPlugins();
+
+	// Apply the custom branding selected in /CustomBranding, and follow it.
+	connect(&m_customBrandingTimer, &QTimer::timeout, this, &GuiPluginLoader::loadCustomBrandingFile);
+	watchSelectedCustomBranding();
+	loadCustomBrandingFile();
 }
 
 GuiPluginLoader::~GuiPluginLoader()
@@ -682,7 +699,69 @@ void GuiPluginMqttFetcher::checkFinished()
 	Q_EMIT succeeded();
 }
 
-void GuiPluginLoader::watchPluginDirs(const QString &appsDir)
+void GuiPluginLoader::watchGxApps()
+{
+	// Only com.victronenergy.appmanager's /GxApps/<name>/Enable is followed, so no app's
+	// plugin is loaded while venus-app-manager isn't running.
+	BackendConnection *backend = BackendConnection::create();
+	if (backend->type() == BackendConnection::UnknownSource) {
+		return;
+	}
+	m_gxAppsItem = VeQItems::getRoot()->itemGetOrCreate(
+			backend->serviceUidForType(QStringLiteral("appmanager")) + QStringLiteral("/GxApps"));
+	connect(m_gxAppsItem.data(), &VeQItem::childAdded, this, &GuiPluginLoader::watchGxApp);
+	connect(m_gxAppsItem.data(), &VeQItem::childAboutToBeRemoved, &m_gxAppsTimer, qOverload<>(&QTimer::start));
+	for (VeQItem *appItem : m_gxAppsItem->itemChildren()) {
+		watchGxApp(appItem);
+	}
+	m_enabledGxApps = enabledGxApps();
+}
+
+void GuiPluginLoader::watchGxApp(VeQItem *appItem)
+{
+	for (const QString &child : { QStringLiteral("Enable"), QStringLiteral("Name") }) {
+		VeQItem *item = appItem->itemGetOrCreate(child);
+		connect(item, &VeQItem::valueChanged, &m_gxAppsTimer, qOverload<>(&QTimer::start), Qt::UniqueConnection);
+		connect(item, &VeQItem::stateChanged, &m_gxAppsTimer, qOverload<>(&QTimer::start), Qt::UniqueConnection);
+	}
+	m_gxAppsTimer.start();
+}
+
+QStringList GuiPluginLoader::enabledGxApps() const
+{
+	QStringList apps;
+	if (!m_gxAppsItem) {
+		return apps;
+	}
+	for (VeQItem *appItem : m_gxAppsItem->itemChildren()) {
+		VeQItem *enableItem = appItem->itemGet(QStringLiteral("Enable"));
+		VeQItem *nameItem = appItem->itemGet(QStringLiteral("Name"));
+		if (!enableItem || enableItem->getValue().toInt() != 1 || !nameItem || !nameItem->getValue().isValid()) {
+			continue;
+		}
+		// The path's <name> is not always the app's name: /GxApps/<name>/Name is.
+		const QString name = nameItem->getValue().toString();
+		if (gxAppPath(name).isEmpty()) {
+			qCWarning(venusGui) << "Ignoring the enabled app" << appItem->id() << ": its name" << name << "is not valid";
+			continue;
+		}
+		apps.append(name);
+	}
+	apps.sort();
+	return apps;
+}
+
+void GuiPluginLoader::updateEnabledGxApps()
+{
+	const QStringList apps = enabledGxApps();
+	if (apps != m_enabledGxApps) {
+		qCInfo(venusGui) << "Enabled GX apps:" << apps;
+		m_enabledGxApps = apps;
+		watchPluginDirs();
+	}
+}
+
+void GuiPluginLoader::watchPluginDirs()
 {
 	// first, clear the previously read plugin data.
 	m_pluginDirData.clear();
@@ -694,7 +773,7 @@ void GuiPluginLoader::watchPluginDirs(const QString &appsDir)
 	}
 
 	// third, construct the watcher if required.
-	const QStringList pluginDirs = guiPluginDirs(appsDir);
+	const QStringList pluginDirs = guiPluginDirs(m_enabledGxApps);
 	if (!pluginDirs.isEmpty()) {
 		m_guiPluginDirsWatcher = new QFileSystemWatcher(pluginDirs, this);
 		connect(m_guiPluginDirsWatcher, &QFileSystemWatcher::directoryChanged,
@@ -800,8 +879,6 @@ QVector<GuiPluginIntegration> GuiPluginLoader::parseIntegrations(const QJsonObje
 	const QJsonArray pluginIntegrations = plugin.value(QStringLiteral("integrations")).toArray();
 	const QString guiPluginsVersionProblem
 			= checkRequiredGuiPluginsVersion(plugin.value(QStringLiteral("requiredGuiPluginsVersion")));
-	const QString brandingVersionProblem
-			= checkRequiredBrandingVersion(plugin.value(QStringLiteral("requiredBrandingVersion")));
 	for (qsizetype j = 0; j < pluginIntegrations.size(); ++j) {
 		const QJsonValue iv = pluginIntegrations[j];
 		if (!iv.isObject()) {
@@ -836,10 +913,7 @@ QVector<GuiPluginIntegration> GuiPluginLoader::parseIntegrations(const QJsonObje
 		//     cardType: 1/2/ ... 1 = controls card, 2 = switches card, ...
 		//     url: "qrc:/AppName/CustomCard.qml"
 		// },
-		// {
-		//     type: 6, // custom branding
-		//     url: "qrc:/AppName/Branding.qml"
-		// }
+		// Type 6 (branding) is accepted only in a custom branding file. See parseCustomBranding().
 
 		const QJsonObject integration = iv.toObject();
 		const int integrationType = integration.value(QStringLiteral("type")).toInt(0);
@@ -890,9 +964,9 @@ QVector<GuiPluginIntegration> GuiPluginLoader::parseIntegrations(const QJsonObje
 			continue;
 		}
 
-		if (integrationType == GuiPluginLoader::Branding && !brandingVersionProblem.isEmpty()) {
+		if (integrationType == GuiPluginLoader::Branding) {
 			qCWarning(venusGui).noquote() << "Ignoring the branding integration in plugin" << pluginName
-				<< "-" << brandingVersionProblem;
+				<< "- a branding is applied only from the selected custom branding";
 			continue;
 		}
 
@@ -938,7 +1012,6 @@ QVector<GuiPlugin> GuiPluginLoader::pluginsFromJson(const QString &pluginsJson)
 	//   minRequiredVersion: "version",
 	//   maxRequiredVersion: "version,
 	//   requiredGuiPluginsVersion: "major.minor", // optional, only if the plugin uses Victron.GuiPlugins
-	//   requiredBrandingVersion: "major.minor", // optional, only for custom branding plugins
 	//   resource: "base64-encoded-rcc-file",
 	//   translations: [ "qrc:/AppName/translations_en.qm", ... ]
 	//   integrations: [ ... ]
@@ -1057,13 +1130,13 @@ void GuiPluginLoader::populatePlugins()
 		}
 	}
 
-	// Branding objects can only be created, and cards compiled, once the QML engine is known.
+	// Cards can only be compiled once the QML engine is known.
 	if (m_qmlEngine) {
-		loadBrandingAndCards(&data);
+		loadCards(&data);
 	} else {
-		m_brandingAndCardsPending = std::any_of(data.cbegin(), data.cend(), [](const GuiPlugin &p) {
+		m_cardsPending = std::any_of(data.cbegin(), data.cend(), [](const GuiPlugin &p) {
 			return std::any_of(p.m_integrations.cbegin(), p.m_integrations.cend(), [](const GuiPluginIntegration &i) {
-				return i.type() == GuiPluginLoader::Branding || i.type() == GuiPluginLoader::QuickAccessPaneCard;
+				return i.type() == GuiPluginLoader::QuickAccessPaneCard;
 			});
 		});
 	}
@@ -1073,8 +1146,6 @@ void GuiPluginLoader::populatePlugins()
 		Q_EMIT pluginsChanged();
 	}
 
-	applyBranding();
-
 	m_busy = false;
 	Q_EMIT busyChanged();
 }
@@ -1082,33 +1153,10 @@ void GuiPluginLoader::populatePlugins()
 bool GuiPluginLoader::loadPluginData(const GuiPlugin &plugin)
 {
 	// Check that the running GUIv2 version satisfies the plugin's declared requirements.
-	// Both boundaries are inclusive: minRequiredVersion <= guiv2 <= maxRequiredVersion.
-	static const QVersionNumber guiv2Version(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
-
-	auto parseVersion = [](const QString &raw) -> QVersionNumber {
-		// Strip optional leading 'v'/'V' prefix (e.g. "v1.3.6" -> "1.3.6").
-		const QString s = (raw.startsWith('v') || raw.startsWith('V')) ? raw.mid(1) : raw;
-		return QVersionNumber::fromString(s);
-	};
-
-	if (!plugin.m_minRequiredVersion.isEmpty()) {
-		const QVersionNumber minVer = parseVersion(plugin.m_minRequiredVersion);
-		if (!minVer.isNull() && guiv2Version < minVer) {
-			qCWarning(venusGui) << "Plugin" << plugin.name()
-				<< "requires GUIv2 >=" << plugin.m_minRequiredVersion
-				<< "but running" << guiv2Version.toString();
-			return false;
-		}
-	}
-
-	if (!plugin.m_maxRequiredVersion.isEmpty()) {
-		const QVersionNumber maxVer = parseVersion(plugin.m_maxRequiredVersion);
-		if (!maxVer.isNull() && guiv2Version > maxVer) {
-			qCWarning(venusGui) << "Plugin" << plugin.name()
-				<< "requires GUIv2 <=" << plugin.m_maxRequiredVersion
-				<< "but running" << guiv2Version.toString();
-			return false;
-		}
+	const QString versionProblem = checkRequiredGuiVersion(plugin.m_minRequiredVersion, plugin.m_maxRequiredVersion);
+	if (!versionProblem.isEmpty()) {
+		qCWarning(venusGui).noquote() << "Plugin" << plugin.name() << versionProblem;
+		return false;
 	}
 
 	// load the resource data.
@@ -1144,13 +1192,6 @@ void GuiPluginLoader::unloadPluginData(bool clearCache)
 	m_currentTranslators.clear();
 	m_pluginTranslators.clear();
 
-	// Without this, every reload would leak a font registration.
-	for (int fontId : std::as_const(m_brandingFontIds)) {
-		QFontDatabase::removeApplicationFont(fontId);
-	}
-	m_brandingFontIds.clear();
-	m_branding.clear();
-
 	if (clearCache) {
 		// On a reload the QML engine caches the old compiled component bytecode under
 		// the same qrc:// URLs. Clear it so that delegates recreated after
@@ -1177,105 +1218,193 @@ void GuiPluginLoader::unloadSinglePluginData(const GuiPlugin &plugin)
 	m_currentTranslators.remove(plugin.name());
 }
 
-QVector<GuiPlugin> GuiPluginLoader::enableFirstBrandingPlugin(
-		QQmlEngine *engine,
-		QVector<GuiPlugin> *plugins,
-		QList<Victron::BrandingData> *branding,
-		QList<int> *fontIds)
+QString GuiPluginLoader::customBrandingFilePath(const QString &brandingName)
 {
-	QVector<GuiPlugin> removed;
-	if (!plugins || !branding || !fontIds) {
-		return removed;
-	}
-	branding->clear();
-
-	bool brandingEnabled = false;
-	for (auto it = plugins->begin(); it != plugins->end();) {
-		const bool hasBranding = std::any_of(it->m_integrations.cbegin(), it->m_integrations.cend(),
-				[](const GuiPluginIntegration &integration) {
-			return integration.type() == Branding;
-		});
-		if (brandingEnabled && hasBranding) {
-			qCWarning(venusGui).noquote() << QStringLiteral(
-					"Refusing to enable branding plugin %1 as a prior branding plugin is already enabled")
-					.arg(it->name());
-			removed.append(*it);
-			it = plugins->erase(it);
-			continue;
-		}
-
-		QVector<GuiPluginIntegration> integrations;
-		bool acceptedBranding = false;
-		for (const GuiPluginIntegration &integration : std::as_const(it->m_integrations)) {
-			if (integration.type() != Branding) {
-				integrations.append(integration);
-				continue;
-			}
-			if (acceptedBranding) {
-				qCWarning(venusGui).noquote() << QStringLiteral(
-						"Ignoring extra branding integration in plugin %1; only the first branding integration is used")
-						.arg(it->name());
-				continue;
-			}
-			const std::optional<Victron::BrandingData> snapshot = createBrandingSnapshot(
-					engine, integration.url(), it->name(), fontIds);
-			if (snapshot.has_value()) {
-				branding->append(*snapshot);
-				integrations.append(integration);
-				acceptedBranding = true;
-				brandingEnabled = true;
-			} else {
-				qCWarning(venusGui) << "Ignoring invalid branding integration in plugin" << it->name();
-			}
-		}
-
-		if (integrations.isEmpty()) {
-			qCWarning(venusGui) << "Ignoring plugin without valid integrations:" << it->name();
-			removed.append(*it);
-			it = plugins->erase(it);
-		} else {
-			it->m_integrations = integrations;
-			++it;
-		}
-	}
-	return removed;
+	const QString appPath = gxAppPath(brandingName);
+	return appPath.isEmpty() ? QString() : QStringLiteral("%1/custom-branding/%2.json").arg(appPath, brandingName);
 }
 
-void GuiPluginLoader::loadBrandingAndCards(QVector<GuiPlugin> *plugins)
+QString GuiPluginLoader::parseCustomBranding(const QJsonObject &customBranding, const QString &selectedBranding,
+		QUrl *brandingUrl, QByteArray *resource)
 {
-	// loadPluginData() has already registered these plugins. Unload any that are not enabled,
-	// or that are left without integrations.
-	QVector<GuiPlugin> removed = enableFirstBrandingPlugin(
-			m_qmlEngine, plugins, &m_branding, &m_brandingFontIds);
-	removed += removeCardsThatCannotBeCompiled(m_qmlEngine, plugins);
-	for (const GuiPlugin &plugin : std::as_const(removed)) {
+	// A custom branding file looks like:
+	// {
+	//   name: "AppName",
+	//   version: "version",
+	//   minRequiredVersion: "version",
+	//   maxRequiredVersion: "version",
+	//   requiredBrandingVersion: "major.minor",
+	//   integrations: [ { type: 6, url: "qrc:/AppName/custom-branding/Branding.qml" } ],
+	//   resource: "base64-encoded-rcc-file"
+	// }
+	const QString name = customBranding.value(QStringLiteral("name")).toString();
+	if (name != selectedBranding) {
+		return QStringLiteral("its name is \"%1\", not the selected custom branding \"%2\"").arg(name, selectedBranding);
+	}
+	const QString versionProblem = checkRequiredGuiVersion(
+			customBranding.value(QStringLiteral("minRequiredVersion")).toString(),
+			customBranding.value(QStringLiteral("maxRequiredVersion")).toString());
+	if (!versionProblem.isEmpty()) {
+		return versionProblem;
+	}
+	const QString brandingVersionProblem
+			= checkRequiredBrandingVersion(customBranding.value(QStringLiteral("requiredBrandingVersion")));
+	if (!brandingVersionProblem.isEmpty()) {
+		return brandingVersionProblem;
+	}
+	const QJsonArray integrations = customBranding.value(QStringLiteral("integrations")).toArray();
+	const QJsonObject integration = integrations.size() == 1 ? integrations.first().toObject() : QJsonObject();
+	const QUrl url(integration.value(QStringLiteral("url")).toString());
+	if (integration.value(QStringLiteral("type")).toInt() != GuiPluginLoader::Branding
+			|| url.scheme() != QLatin1String("qrc") || url.path().isEmpty()) {
+		return QStringLiteral("it must have one integration, a branding with a qrc url");
+	}
+	const QByteArray decoded = QByteArray::fromBase64(customBranding.value(QStringLiteral("resource")).toString().toUtf8());
+	if (decoded.isEmpty()) {
+		return QStringLiteral("its resource is missing");
+	}
+	*brandingUrl = url;
+	*resource = decoded;
+	return QString();
+}
+
+void GuiPluginLoader::watchSelectedCustomBranding()
+{
+	BackendConnection *backend = BackendConnection::create();
+	if (backend->type() == BackendConnection::UnknownSource) {
+		return;
+	}
+	// com.victronenergy.appmanager /CustomBranding: the name of the selected custom branding, empty for none.
+	m_selectedCustomBrandingItem = VeQItems::getRoot()->itemGetOrCreate(
+			backend->serviceUidForType(QStringLiteral("appmanager")) + QStringLiteral("/CustomBranding"));
+	if (m_selectedCustomBrandingItem) {
+		connect(m_selectedCustomBrandingItem.data(), &VeQItem::valueChanged, &m_customBrandingTimer, qOverload<>(&QTimer::start));
+		m_selectedCustomBrandingItem->getValue(); // requests it, once the service is there.
+	}
+}
+
+void GuiPluginLoader::loadCustomBrandingFile()
+{
+	const QString selectedBranding = m_selectedCustomBrandingItem ? m_selectedCustomBrandingItem->getValue().toString() : QString();
+	const QString path = customBrandingFilePath(selectedBranding);
+
+	// Follow the selected custom branding's file, and the apps folder, where an upgrade replaces its folder.
+	delete m_customBrandingWatcher;
+	m_customBrandingWatcher = nullptr;
+	if (!path.isEmpty()) {
+		QStringList watched;
+		for (const QString &dir : { gxAppsDir, QFileInfo(path).absolutePath() }) {
+			if (QFileInfo(dir).isDir()) {
+				watched.append(dir);
+			}
+		}
+		if (QFileInfo(path).isFile()) {
+			watched.append(path);
+		}
+		if (!watched.isEmpty()) {
+			m_customBrandingWatcher = new QFileSystemWatcher(watched, this);
+			connect(m_customBrandingWatcher, &QFileSystemWatcher::directoryChanged, &m_customBrandingTimer, qOverload<>(&QTimer::start));
+			connect(m_customBrandingWatcher, &QFileSystemWatcher::fileChanged, &m_customBrandingTimer, qOverload<>(&QTimer::start));
+		}
+	} else if (!selectedBranding.isEmpty()) {
+		qCWarning(venusGui) << "Ignoring the selected custom branding" << selectedBranding << ": it is not a valid name";
+	}
+
+	QByteArray json;
+	if (!path.isEmpty()) {
+		QFile file(path);
+		if (file.open(QIODevice::ReadOnly)) {
+			json = file.readAll();
+		} else {
+			qCWarning(venusGui) << "Cannot read the selected custom branding" << selectedBranding << "from" << path;
+		}
+	}
+	applyCustomBranding(json, json.isEmpty() ? QString() : selectedBranding);
+}
+
+void GuiPluginLoader::loadCards(QVector<GuiPlugin> *plugins)
+{
+	// loadPluginData() has already registered these plugins. Unload any that are left without integrations.
+	const QVector<GuiPlugin> removed = removeCardsThatCannotBeCompiled(m_qmlEngine, plugins);
+	for (const GuiPlugin &plugin : removed) {
 		unloadSinglePluginData(plugin);
 	}
 }
 
-void GuiPluginLoader::loadPendingBrandingAndCards()
+void GuiPluginLoader::loadPendingCards()
 {
-	if (!m_brandingAndCardsPending || !m_qmlEngine) {
+	if (!m_cardsPending || !m_qmlEngine) {
 		return;
 	}
-	m_brandingAndCardsPending = false;
+	m_cardsPending = false;
 	QVector<GuiPlugin> plugins = m_plugins;
-	loadBrandingAndCards(&plugins);
+	loadCards(&plugins);
 	m_plugins = plugins;
 	Q_EMIT pluginsChanged();
-	applyBranding();
 }
 
-void GuiPluginLoader::applyBranding()
+void GuiPluginLoader::applyCustomBranding(const QByteArray &json, const QString &selectedBranding)
 {
-	// The Branding files are read once the QML engine is known.
-	if (m_brandingAndCardsPending) {
+	// Branding objects can only be created once the QML engine is known.
+	if (!m_qmlEngine) {
+		m_customBrandingPending = true;
+		m_pendingCustomBrandingJson = json;
+		m_pendingCustomBrandingName = selectedBranding;
 		return;
 	}
+	m_customBrandingPending = false;
+	m_pendingCustomBrandingJson.clear();
+	m_pendingCustomBrandingName.clear();
 
+	QList<Victron::BrandingData> branding;
+	QList<int> fontIds;
+	QByteArray resource;
+	QString mapRoot;
+	if (!selectedBranding.isEmpty()) {
+		QUrl brandingUrl;
+		const QString problem = parseCustomBranding(QJsonDocument::fromJson(json).object(), selectedBranding, &brandingUrl, &resource);
+		if (!problem.isEmpty()) {
+			qCWarning(venusGui).noquote() << "Ignoring the selected custom branding" << selectedBranding << "-" << problem;
+			resource.clear();
+		} else {
+			// Each load is mapped under its own root, so the engine never reuses a Branding.qml
+			// compiled from an earlier version of the file.
+			mapRoot = QStringLiteral("/selected-custom-branding/%1").arg(++m_customBrandingLoadCount);
+			if (!QResource::registerResource(reinterpret_cast<const uchar*>(resource.constData()), mapRoot)) {
+				qCWarning(venusGui) << "Unable to load resource data for custom branding" << selectedBranding;
+				resource.clear();
+			} else {
+				QUrl url(brandingUrl);
+				url.setPath(mapRoot + brandingUrl.path());
+				std::optional<Victron::BrandingData> snapshot
+						= createBrandingSnapshot(m_qmlEngine, url, selectedBranding, &fontIds);
+				if (snapshot.has_value()) {
+					branding.append(*snapshot);
+				} else {
+					qCWarning(venusGui) << "Ignoring invalid branding in custom branding" << selectedBranding;
+				}
+			}
+		}
+	}
+
+	// Apply the new branding before the old custom branding's files and fonts go, as the theme refers to them.
 	ThemeSingleton *theme = ThemeSingleton::create();
-	if (!m_branding.isEmpty() || !theme->pluginBranding().isEmpty()) {
-		theme->setPluginBranding(m_branding);
+	if (!branding.isEmpty() || !theme->pluginBranding().isEmpty()) {
+		theme->setPluginBranding(branding);
+	}
+
+	for (int fontId : std::as_const(m_brandingFontIds)) {
+		QFontDatabase::removeApplicationFont(fontId);
+	}
+	if (!m_customBrandingResource.isEmpty()) {
+		QResource::unregisterResource(reinterpret_cast<const uchar*>(m_customBrandingResource.constData()), m_customBrandingMapRoot);
+	}
+	m_branding = branding;
+	m_brandingFontIds = fontIds;
+	m_customBrandingResource = resource;
+	m_customBrandingMapRoot = mapRoot;
+	if (!selectedBranding.isEmpty() && !m_branding.isEmpty()) {
+		qCInfo(venusGui) << "Applied custom branding" << selectedBranding;
 	}
 }
 

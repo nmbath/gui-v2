@@ -79,15 +79,19 @@ The tool provides a side-by-side visual interface showing differences, with pass
 
 ### Capturing with a custom branding plugin
 
-To check how a custom branding plugin (see [Custom branding plugins](branding-plugins.md)) changes the UI,
-capture the same pages with and without the plugin, and compare them.
+To check how a custom branding (see [Custom branding plugins](branding-plugins.md)) changes the UI,
+capture the same pages with and without it, and compare them.
 
-Desktop builds load plugins from the `plugins/` directory next to the executable; there is no
-option to load them from somewhere else. So:
+Desktop builds read the custom branding named in `com.victronenergy.appmanager` `/CustomBranding` from
+`/run/gx-apps/apps/<name>/custom-branding/<name>.json`, as the GX display does; there is no
+option to read it from somewhere else. The mock backend has no app manager, so:
 
-1. Compile the plugin, and copy its `<Name>-custom-branding.json` into `<executable directory>/plugins/`.
-2. Run the captures.
-3. Remove the `.json` again, so that later captures show the Victron colors.
+1. Compile the custom branding, and copy its `<name>-custom-branding.json` to
+   `/run/gx-apps/apps/<name>/custom-branding/<name>.json`.
+2. Add `"com.victronenergy.appmanager": { "/CustomBranding": "<name>" }` to the `setup` of the mock
+   configuration you capture with (see `data/mock/conf/`), and rebuild.
+3. Run the captures.
+4. Remove that entry again, so that later captures show the Victron colors.
 
 Capture both color schemes (`--colorScheme dark` and `--colorScheme light`), at 800x480 and at
 480x800 (`--resolution`). These pages between them show most of the colors that custom branding
