@@ -12,6 +12,7 @@ deploy instructions.
 | 2    | **DeviceListSettingsPage** | Device list settings for a specific product ID       | `DeviceListExample/`                 |
 | 3    | **NavigationPage**         | Main navigation bar, at a named location (default: before Levels). The location name is the last compiler argument; an integer is an error. | `NavigationExample/`                 |
 | 4    | **QuickAccessPane**        | Status bar icon that opens a full pane overlay       | `QuickAccessExample/`                |
+| 5    | **QuickAccessPaneCard**    | Card injected into the Controls or Switches pane     | `CardExample/`                       |
 
 Types not listed in the table above are not part of this change.
 
@@ -79,3 +80,9 @@ tanks: a `PluginDataItem` cannot enumerate them.
 Adds a brick icon to the status bar. Clicking it opens a full-screen
 overlay pane (like the built-in Controls and Switches panes) showing
 battery, solar, water, and a water pump toggle.
+
+### CardExample (Type 5)
+
+Injects a compact dashboard card into the Controls pane showing
+battery, solar, water, and a toggleable water pump button alongside
+the built-in ESS, EVCS, and inverter cards.

@@ -39,10 +39,13 @@ endfunction()
 set(probe_jsons "")
 add_probe_plugin(ProbeQuick ProbeQuick_Pane.qml
 	--quickaccess ProbeQuick_Pane.qml icon_brick.svg icon_brick.svg)
+add_probe_plugin(ProbeCard ProbeCard_Card.qml
+	--card ProbeCard_Card.qml 1)
 
 add_custom_target(probe_plugins DEPENDS ${probe_jsons})
 add_custom_command(TARGET probe_plugins POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E rm -f
 		"${CMAKE_BINARY_DIR}/bin/plugins/ProbeQuick.json"
+		"${CMAKE_BINARY_DIR}/bin/plugins/ProbeCard.json"
 	VERBATIM
 )

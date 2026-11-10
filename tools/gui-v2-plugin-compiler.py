@@ -1047,7 +1047,7 @@ if __name__ == '__main__':
                              'location name follows it. Omitted location defaults to BeforeLevels. '
                              'The page file name must be unique and must not match a built-in page.')
     parser.add_argument('-q', '--quickaccess', required=False, nargs='+', action='append', help='2-3 args: page.qml icon.svg [icon_active.svg]')
-    parser.add_argument('-c', '--card', default='')
+    parser.add_argument('-c', '--card', required=False, nargs='+', action='append', help='Pair of page .qml and card type (1=controls, 2=switches)')
     parser.add_argument('-b', '--branding', default='',     help='The Branding .qml file of a custom branding plugin')
     parser.add_argument('--qml-import-path', default=os.path.dirname(os.path.abspath(__file__)),
                         help='The directory containing Victron/Branding/qmldir, used by qmllint '
@@ -1252,8 +1252,33 @@ if __name__ == '__main__':
                     sys.exit(1)
                 qaIntegration["iconActive"] = "qrc:/" + args.name + "/" + iconActiveFile
             integrations.append(qaIntegration)
-    if len(args.card) > 0:
-        print("TODO: card...")
+    if args.card:
+        for integration in args.card:
+            if len(integration) != 2:
+                print("\n\nERROR: --card requires 2 args: page.qml cardType (1=controls, 2=switches)")
+                sys.exit(1)
+            pageQml = integration[0]
+            try:
+                cardType = int(integration[1])
+            except ValueError:
+                print("\n\nERROR: Card type must be an integer (1=controls, 2=switches)")
+                sys.exit(1)
+            if cardType not in (1, 2):
+                print("\n\nERROR: Card type must be 1 (controls) or 2 (switches)")
+                sys.exit(1)
+            if not pageQml.endswith('.qml'):
+                print("\n\nERROR: Card page must be a .qml file")
+                sys.exit(1)
+            if not os.path.exists(pageQml):
+                print(f"\n\nERROR: Card page \"{pageQml}\" not found in current directory")
+                sys.exit(1)
+            cardIntegration = {
+                "type": 5,
+                "url": "qrc:/" + args.name + "/" + pageQml,
+                "cardType": cardType
+            }
+            integrations.append(cardIntegration)
+
     if len(args.branding) > 0:
         brandingIntegration = {
             "type": BRANDING_INTEGRATION_TYPE,
