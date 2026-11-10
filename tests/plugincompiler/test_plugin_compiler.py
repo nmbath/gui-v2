@@ -4,8 +4,10 @@
 #
 # Tests for tools/gui-v2-plugin-compiler.py: the requiredGuiPluginsVersion that it writes,
 # the warning it prints for a deprecated type or member, the Branding import and name checks,
-# the image and font files it packs, and the requiredBrandingVersion that it writes.
+# the image and font files it packs, the requiredBrandingVersion that it writes, and the separate
+# plugin and custom branding files that it writes.
 
+import base64
 import contextlib
 import copy
 import importlib.util
@@ -14,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 from unittest.mock import mock_open, patch
@@ -311,6 +314,86 @@ class GxInstallCommandTest(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs['input'], payload)
         self.assertEqual(run.call_args.args[0][0], 'ssh')
         self.assertIn('root@gx.local', run.call_args.args[0])
+
+
+@unittest.skipIf(sys.platform == 'win32', 'uses shell scripts in place of lupdate and lrelease')
+class CompiledFilesTest(unittest.TestCase):
+    """Runs the compiler on a plugin directory and checks which files it writes.
+
+    lupdate and lrelease are replaced with scripts that do nothing, and --rcc skips rcc: each
+    resource is read from an .rcc file written beforehand, so the test can tell them apart."""
+
+    SETTINGS = 'import Victron.GuiPlugins\nPluginPage {}\n'
+    BRANDING = 'import Victron.Branding\nBranding {\n\tcolor_brand: "#F28C28"\n}\n'
+
+    def compile(self, files, args):
+        tmpDir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpDir.cleanup)
+        tmp = tmpDir.name
+        tools = os.path.join(tmp, 'bin')
+        os.mkdir(tools)
+        for tool in ('lupdate', 'lrelease'):
+            path = os.path.join(tools, tool)
+            with open(path, 'w') as script:
+                script.write('#!/bin/sh\nexit 0\n')
+            os.chmod(path, 0o755)
+        work = os.path.join(tmp, 'OemName')
+        os.mkdir(work)
+        for name, contents in files.items():
+            with open(os.path.join(work, name), 'w' if isinstance(contents, str) else 'wb') as file:
+                file.write(contents)
+        env = dict(os.environ, PATH=tools + os.pathsep + os.environ.get('PATH', ''))
+        result = subprocess.run([sys.executable, '-B', os.path.join(TOOLS_DIR, 'gui-v2-plugin-compiler.py'),
+                                 '--rcc', 'skip', '--qml-import-path', tmp] + args,
+                                cwd=work, env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        written = sorted(name for name in os.listdir(work) if name.endswith('.json'))
+        return work, written
+
+    def read(self, work, name):
+        with open(os.path.join(work, name), encoding='utf-8') as file:
+            return json.load(file)
+
+    def test_plugin_only(self):
+        work, written = self.compile({'Settings.qml': self.SETTINGS, 'OemName.rcc': b'plugin'},
+                                     ['--settings', 'Settings.qml'])
+        self.assertEqual(written, ['OemName-gui-v2.json'])
+        plugin = self.read(work, 'OemName-gui-v2.json')
+        self.assertEqual(plugin['name'], 'OemName')
+        self.assertEqual([i['type'] for i in plugin['integrations']], [1])
+        self.assertNotIn('requiredBrandingVersion', plugin)
+
+    def test_branding_only(self):
+        work, written = self.compile({'Branding.qml': self.BRANDING, 'logo.svg': '<svg/>',
+                                      'OemName-custom-branding.rcc': b'branding'},
+                                     ['--branding', 'Branding.qml'])
+        self.assertEqual(written, ['OemName-custom-branding.json'])
+        branding = self.read(work, 'OemName-custom-branding.json')
+        self.assertEqual(branding['name'], 'OemName')
+        self.assertEqual(branding['integrations'],
+                         [{'type': 6, 'url': 'qrc:/OemName/custom-branding/Branding.qml'}])
+        self.assertEqual(branding['requiredBrandingVersion'], '1.0')
+        self.assertEqual(base64.b64decode(branding['resource']), b'branding')
+        with open(os.path.join(work, 'OemName-custom-branding.qrc'), encoding='utf-8') as qrc:
+            contents = qrc.read()
+        self.assertIn('prefix="/OemName/custom-branding"', contents)
+        self.assertIn('<file>Branding.qml</file>', contents)
+        self.assertIn('<file>logo.svg</file>', contents)
+
+    def test_plugin_and_branding_are_separate_files(self):
+        work, written = self.compile({'Settings.qml': self.SETTINGS, 'Branding.qml': self.BRANDING,
+                                      'OemName.rcc': b'plugin', 'OemName-custom-branding.rcc': b'branding'},
+                                     ['--settings', 'Settings.qml', '--branding', 'Branding.qml'])
+        self.assertEqual(written, ['OemName-custom-branding.json', 'OemName-gui-v2.json'])
+        plugin = self.read(work, 'OemName-gui-v2.json')
+        self.assertEqual([i['type'] for i in plugin['integrations']], [1])
+        self.assertNotIn('requiredBrandingVersion', plugin)
+        self.assertEqual(base64.b64decode(plugin['resource']), b'plugin')
+        with open(os.path.join(work, 'OemName.qrc'), encoding='utf-8') as qrc:
+            self.assertNotIn('Branding.qml', qrc.read())
+        branding = self.read(work, 'OemName-custom-branding.json')
+        self.assertEqual([i['type'] for i in branding['integrations']], [6])
+        self.assertEqual(base64.b64decode(branding['resource']), b'branding')
 
 
 with open(os.path.join(TOOLS_DIR, 'branding-properties.json'), encoding='utf-8') as propertiesFile:

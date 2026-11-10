@@ -12,14 +12,14 @@ overlay pane (like the built-in Controls and Switches panes) showing a
   python3 ../../tools/gui-v2-plugin-compiler.py \
     --quickaccess QuickAccessExample_Pane.qml icon_brick_off.svg icon_brick_on.svg
 
-This produces QuickAccessExample.json.
+This produces QuickAccessExample-gui-v2.json.
 
 2) Deploy to device
 
-  scp QuickAccessExample.json root@venus.local:/tmp/
+  scp QuickAccessExample-gui-v2.json root@venus.local:/tmp/
   ssh root@venus.local
   mkdir -p /data/apps/available/QuickAccessExample/gui-v2/
-  cp /tmp/QuickAccessExample.json /data/apps/available/QuickAccessExample/gui-v2/
+  cp /tmp/QuickAccessExample-gui-v2.json /data/apps/available/QuickAccessExample/gui-v2/QuickAccessExample.json
   ln -sf /data/apps/available/QuickAccessExample /data/apps/enabled/QuickAccessExample
   svc -t /service/start-gui
 

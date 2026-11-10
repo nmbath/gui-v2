@@ -16,6 +16,9 @@ import xml.etree.ElementTree as ET
 BRANDING_PROPERTIES_FILE = 'branding-properties.json'
 BRANDING_IMPORTS = ('Victron.Branding', 'QtQml', 'QtQuick')
 BRANDING_INTEGRATION_TYPE = 6
+# The directory, under the plugin's resource prefix, that holds the custom branding's files:
+# qrc:/<name>/custom-branding/.
+CUSTOM_BRANDING_RESOURCE_DIRECTORY = 'custom-branding'
 # Image, animation and font files packed from the plugin directory. Paths in Branding.qml are not read.
 BRANDING_ASSET_EXTENSIONS = ('.svg', '.png', '.gif', '.ttf', '.otf')
 # A text search, not a complete ban. See .github/branding-plugins.md.
@@ -849,10 +852,11 @@ def run_lrelease(tsFiles, name):
             print(f"    lrelease returncode: {e.returncode}")
             print("    lrelease error:", e.stderr, file=sys.stderr)
 
-def write_qrc(qmlFiles, qmFiles, imageFiles, name):
-    # Keep the order, but list each file once (Branding files may also be collected as top-level files).
+def write_qrc(qmlFiles, qmFiles, imageFiles, name, prefix=None):
+    """Writes <name>.qrc, with the files under prefix (default "/<name>")."""
+    # Keep the order, but list each file once.
     allFiles = list(dict.fromkeys(qmlFiles + qmFiles + imageFiles))
-    contents = "<RCC>\n<qresource prefix=\"/" + name + "\">\n"
+    contents = "<RCC>\n<qresource prefix=\"" + (prefix or "/" + name) + "\">\n"
     for filename in allFiles:
         contents += "<file>" + filename + "</file>\n"
     contents += "</qresource>\n</RCC>\n"
@@ -901,8 +905,32 @@ def b64_encode_rcc(name):
         print("    cannot open " + rccFile + " for reading!")
     return base64Str
 
-def write_compiled_json(name, version, minRequiredVersion, maxRequiredVersion, translations, integrations, resource,
-                        requiredGuiPluginsVersion='', requiredBrandingVersion=''):
+def plugin_file_name(name):
+    """The file that holds the plugin's pages and other integrations. It never holds custom branding."""
+    return name + '-gui-v2.json'
+
+def custom_branding_file_name(name):
+    """The file that holds only the custom branding, written with --branding."""
+    return name + '-custom-branding.json'
+
+def pack_resource(rccName, files, prefix, skipRcc):
+    """Packs files into <rccName>.rcc, under prefix, and returns it base64-encoded."""
+    print("--- writing " + rccName + ".qrc")
+    write_qrc([], [], files, rccName, prefix)
+
+    print("--- running rcc")
+    if not skipRcc:
+        run_rcc(rccName)
+
+    print("--- base64 encoding rcc data")
+    resource = b64_encode_rcc(rccName)
+    if not resource:
+        print("\n\nERROR: no rcc data to pack, so no json was written")
+        sys.exit(1)
+    return resource
+
+def write_compiled_json(fileName, name, version, minRequiredVersion, maxRequiredVersion, translations, integrations,
+                        resource, requiredGuiPluginsVersion='', requiredBrandingVersion=''):
     dataDict = {
         "name": name,
         "version": version,
@@ -918,7 +946,7 @@ def write_compiled_json(name, version, minRequiredVersion, maxRequiredVersion, t
         "integrations": integrations,
         "resource": resource
     })
-    with open(name+'.json', 'w', encoding='utf-8') as file:
+    with open(fileName, 'w', encoding='utf-8') as file:
         json.dump(dataDict, file, indent=4)
         file.write('\n')
 
@@ -1028,7 +1056,9 @@ def install_on_gx(name, host, key_path, json_path=''):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='gui-v2-plugin-compiler',
-        description='Compiles plugins for gui-v2 into json files')
+        description='Compiles plugins for gui-v2 into json files: <name>-gui-v2.json for the plugin, and with '
+                    '--branding, <name>-custom-branding.json for its custom branding. With only --branding, '
+                    'only the custom branding is written.')
 
     parser.add_argument('--rcc', nargs='?', default='') # debugging only...
     parser.add_argument('-n', '--name', default=os.path.basename(os.getcwd()),
@@ -1048,7 +1078,9 @@ if __name__ == '__main__':
                              'The page file name must be unique and must not match a built-in page.')
     parser.add_argument('-q', '--quickaccess', required=False, nargs='+', action='append', help='2-3 args: page.qml icon.svg [icon_active.svg]')
     parser.add_argument('-c', '--card', required=False, nargs='+', action='append', help='Pair of page .qml and card type (1=controls, 2=switches)')
-    parser.add_argument('-b', '--branding', default='',     help='The Branding .qml file of a custom branding plugin')
+    parser.add_argument('-b', '--branding', default='',
+                        help='The Branding .qml file of a custom branding. It is written to '
+                             '<name>-custom-branding.json, not to the plugin')
     parser.add_argument('--qml-import-path', default=os.path.dirname(os.path.abspath(__file__)),
                         help='The directory containing Victron/Branding/qmldir, used by qmllint '
                              '(default: the directory of this script)')
@@ -1072,46 +1104,53 @@ if __name__ == '__main__':
         print("\n\nERROR: plugin name does not match working directory name!")
         sys.exit(1)
 
+    # With only --branding, there is no plugin, and only the custom branding is written.
+    hasPlugin = not args.branding or bool(args.settings or args.devicelist or args.navigation
+                                          or args.quickaccess or args.card)
+
     # The custom branding check runs first, so that a rejected Branding file never produces an RCC.
     brandingFiles = []
+    brandingPath = ''
     requiredBrandingVersion = ''
     if len(args.branding) > 0:
         print("--- checking custom branding")
         brandingFiles, requiredBrandingVersion = check_branding(args.branding, args.qml_import_path)
-        brandingFiles.append(os.path.normpath(args.branding).replace('\\', '/'))
+        brandingPath = os.path.normpath(args.branding).replace('\\', '/')
+        brandingFiles.append(brandingPath)
 
+    # Image and font files at the top of the directory are packed into the plugin, as its pages may
+    # use them, even when they are also the custom branding's files.
     imageFiles = collect_filenames('.', '.svg')
     imageFiles += collect_filenames('.', '.png')
     fontFiles = collect_filenames('.', '.ttf')
     fontFiles += collect_filenames('.', '.otf')
-    qmlFiles = collect_filenames('.', '.qml')
+    qmlFiles = [f for f in collect_filenames('.', '.qml') if f != brandingPath]
     tsFiles = collect_filenames('.', '.ts')
+    qmFiles = []
+    requiredGuiPluginsVersion = ''
+    resource = ''
 
-    print("--- checking the Victron.GuiPlugins version")
-    requiredGuiPluginsVersion = check_guiplugins_version(qmlFiles)
+    if hasPlugin:
+        print("--- checking the Victron.GuiPlugins version")
+        requiredGuiPluginsVersion = check_guiplugins_version(qmlFiles)
 
-    print("--- running lupdate")
-    run_lupdate(qmlFiles, tsFiles, args.name)
+        print("--- running lupdate")
+        run_lupdate(qmlFiles, tsFiles, args.name)
 
-    if args.filter_empty_sources and tsFiles:
-        strip_empty_sources(tsFiles)
+        if args.filter_empty_sources and tsFiles:
+            strip_empty_sources(tsFiles)
 
-    print("--- running lrelease")
-    run_lrelease(tsFiles, args.name)
-    qmFiles = collect_filenames('.', '.qm')
+        print("--- running lrelease")
+        run_lrelease(tsFiles, args.name)
+        qmFiles = collect_filenames('.', '.qm')
 
-    print("--- writing .qrc")
-    write_qrc(qmlFiles, qmFiles, imageFiles + fontFiles + brandingFiles, args.name)
+        resource = pack_resource(args.name, qmlFiles + qmFiles + imageFiles + fontFiles, None, len(args.rcc) > 0)
 
-    print("--- running rcc")
-    if len(args.rcc) == 0:
-        run_rcc(args.name)
-
-    print("--- base64 encoding rcc data")
-    resource = b64_encode_rcc(args.name)
-    if not resource:
-        print("\n\nERROR: no rcc data to pack, so the plugin json was not written")
-        sys.exit(1)
+    brandingResource = ''
+    if brandingPath:
+        brandingResource = pack_resource(args.name + '-custom-branding', brandingFiles,
+                                         '/' + args.name + '/' + CUSTOM_BRANDING_RESOURCE_DIRECTORY,
+                                         len(args.rcc) > 0)
 
     print("--- building translations array")
     translations = []
@@ -1279,19 +1318,29 @@ if __name__ == '__main__':
             }
             integrations.append(cardIntegration)
 
-    if len(args.branding) > 0:
+    pluginFile = ''
+    if hasPlugin:
+        pluginFile = plugin_file_name(args.name)
+        print("--- writing " + pluginFile)
+        write_compiled_json(pluginFile, args.name, args.version, args.min_required_version, args.max_required_version,
+                            translations, integrations, resource, requiredGuiPluginsVersion)
+
+    customBrandingFile = ''
+    if brandingPath:
+        customBrandingFile = custom_branding_file_name(args.name)
+        print("--- writing " + customBrandingFile)
         brandingIntegration = {
             "type": BRANDING_INTEGRATION_TYPE,
-            "url": "qrc:/" + args.name + "/" + brandingFiles[-1]
+            "url": "qrc:/" + args.name + "/" + CUSTOM_BRANDING_RESOURCE_DIRECTORY + "/" + brandingPath
         }
-        integrations.append(brandingIntegration)
-
-    print("--- writing compiled json")
-    write_compiled_json(args.name, args.version, args.min_required_version, args.max_required_version, translations,
-                        integrations, resource, requiredGuiPluginsVersion, requiredBrandingVersion)
+        write_compiled_json(customBrandingFile, args.name, args.version, args.min_required_version,
+                            args.max_required_version, [], [brandingIntegration], brandingResource,
+                            requiredBrandingVersion=requiredBrandingVersion)
 
     if args.install:
-        install_on_gx(args.name, args.install, args.ssh_key)
+        install_on_gx(args.name, args.install, args.ssh_key, pluginFile or customBrandingFile)
+        if pluginFile and customBrandingFile:
+            print("    " + customBrandingFile + " was not installed: only one file can be installed with --install")
 
     print("--- done!")
     sys.exit(0)

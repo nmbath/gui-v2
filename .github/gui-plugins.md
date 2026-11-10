@@ -35,8 +35,8 @@ Five example plugins show the rules in practice:
    For a navigation page, give the page, the icon and the bar title: `--navigation PluginNamePage.qml icon.svg "Title"`. The bar title is shown as written; it is not translated. The location, if given, must be the last argument and one of `BeforeBoat`, `BeforeBrief`, `BeforeOverview`, `BeforeLevels`, `BeforeNotifications`, `BeforeSettings` or `AfterSettings`. An integer is an error. If you omit the location, the page is inserted before Levels. The page file name must be unique and must not match a built-in page.
 
    Alternatively, compile it on a GX device if a Large image is installed, using `/opt/victronenergy/gui-v2/gui-v2-plugin-compiler.py`.
-4. The compiler packs every `.qml` file in the directory, so subpages need no option of their own. It writes `PluginName.json`.
-5. To try it on a GX device, add `--install <gx-host> --ssh-key <private-key>` to the compile command. This is for testing only. The compiler connects as root with that key, copies `PluginName.json` to `/data/apps/available/PluginName/gui-v2/`, and symlinks that app directory to `/data/apps/enabled/PluginName`. A repeat install replaces that symlink. It will not replace a real directory. You can do the same copy and symlink by hand. On a desktop build of gui-v2, copy `PluginName.json` into the `plugins` directory next to the `venus-gui-v2` executable.
+4. The compiler packs every `.qml` file in the directory, so subpages need no option of their own. It writes `PluginName-gui-v2.json`.
+5. To try it on a GX device, add `--install <gx-host> --ssh-key <private-key>` to the compile command. This is for testing only. The compiler connects as root with that key, copies `PluginName-gui-v2.json`, as `PluginName.json`, to `/data/apps/available/PluginName/gui-v2/`, and symlinks that app directory to `/data/apps/enabled/PluginName`. A repeat install replaces that symlink. It will not replace a real directory. You can do the same copy and symlink by hand. On a desktop build of gui-v2, copy `PluginName-gui-v2.json` into the `plugins` directory next to the `venus-gui-v2` executable.
 
 ## Rules for plugin pages
 

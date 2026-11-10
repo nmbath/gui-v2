@@ -21,7 +21,7 @@ as written, and it is not translated. The page title is translated.
     --min-required-version v1.4.1 \
     --navigation NavigationExample_Page.qml icon_brick.svg "Example"
 
-This writes NavigationExample.json. The command omits the location, so
+This writes NavigationExample-gui-v2.json. The command omits the location, so
 the page is inserted before Levels. The location, if given, must be the
 last argument and one of: BeforeBoat, BeforeBrief, BeforeOverview,
 BeforeLevels, BeforeNotifications, BeforeSettings or AfterSettings. An
@@ -38,10 +38,10 @@ running gui-v2.
 
 2) Deploy to a GX device
 
-  scp NavigationExample.json root@venus.local:/tmp/
+  scp NavigationExample-gui-v2.json root@venus.local:/tmp/
   ssh root@venus.local
   mkdir -p /data/apps/available/NavigationExample/gui-v2/
-  cp /tmp/NavigationExample.json /data/apps/available/NavigationExample/gui-v2/
+  cp /tmp/NavigationExample-gui-v2.json /data/apps/available/NavigationExample/gui-v2/NavigationExample.json
   ln -sf /data/apps/available/NavigationExample /data/apps/enabled/NavigationExample
   svc -t /service/start-gui
 

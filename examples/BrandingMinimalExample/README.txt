@@ -33,7 +33,7 @@ again.
 `--install gx.device.ip.address --ssh-key <private-key>` to the compile command
 in step 1, which connects as root, copies the plugin to the device and enables
 it, or do that by hand:
-- Copy the output file `BrandingMinimalExample.json` to /data/apps/available/BrandingMinimalExample/gui-v2/BrandingMinimalExample.json on device: `mkdir -p /data/apps/available/BrandingMinimalExample/gui-v2/ && cp BrandingMinimalExample.json /data/apps/available/BrandingMinimalExample/gui-v2/BrandingMinimalExample.json`
+- Copy the output file `BrandingMinimalExample-custom-branding.json` to /data/apps/available/BrandingMinimalExample/gui-v2/BrandingMinimalExample.json on device: `mkdir -p /data/apps/available/BrandingMinimalExample/gui-v2/ && cp BrandingMinimalExample-custom-branding.json /data/apps/available/BrandingMinimalExample/gui-v2/BrandingMinimalExample.json`
 - Symlink the `BrandingMinimalExample` directory as follows: `ln -s /data/apps/available/BrandingMinimalExample /data/apps/enabled/BrandingMinimalExample` on device
 
 3) The GUI reloads its plugins when /data/apps/enabled/ changes, so the colors

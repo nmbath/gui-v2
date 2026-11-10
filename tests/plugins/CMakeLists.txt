@@ -24,7 +24,7 @@ function(add_probe_plugin DIR QML)
 	add_custom_command(
 		OUTPUT "${json}"
 		COMMAND ${Python3_EXECUTABLE} "${PLUGIN_COMPILER}" ${ARGN}
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${work}/${DIR}.json" "${json}"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${work}/${DIR}-gui-v2.json" "${json}"
 		WORKING_DIRECTORY "${work}"
 		DEPENDS
 			"${prepared}"
