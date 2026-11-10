@@ -70,7 +70,7 @@ PluginPage {
 		return "The access level is not known yet."
 	}
 
-	PluginGradientListView {
+	PluginItemListView {
 		PluginPrimaryListLabel {
 			text: root.shownHint
 		}

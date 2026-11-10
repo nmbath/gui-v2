@@ -28,7 +28,7 @@ PluginPage {
 		path: "/Settings/FullApiExample/Level"
 	}
 
-	PluginGradientListView {
+	PluginItemListView {
 		PluginSettingsListHeader {
 			text: "Theme colors"
 		}

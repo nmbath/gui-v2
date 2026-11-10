@@ -8,11 +8,12 @@ import QtQml.Models
 import Victron.VenusOS
 
 /*
-	A scrolling list of items, which fills its parent.
+	A scrolling list of the items declared inside it, which fills its parent. For a list with one
+	item for each row of a model, use PluginModelListView.
 
 	Declare the items as direct children of it, for example:
 
-		PluginGradientListView {
+		PluginItemListView {
 			PluginListSwitch { text: "Enabled" }
 			PluginListNavigation { text: "Advanced"; pageUrl: Qt.resolvedUrl("AdvancedPage.qml") }
 		}

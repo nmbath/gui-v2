@@ -20,19 +20,12 @@ PluginPage {
 		uid: root.pathUid
 	}
 
-	PluginPrimaryListLabel {
-		id: intro
-
-		width: parent.width
-		text: root.pathUid + " has " + paths.count + " paths below it."
-	}
-
-	ListView {
-		anchors.top: intro.bottom
-		anchors.bottom: parent.bottom
-		width: parent.width
-		clip: true
+	PluginModelListView {
 		model: paths
+
+		header: PluginPrimaryListLabel {
+			text: root.pathUid + " has " + paths.count + " paths below it."
+		}
 
 		delegate: PluginListNavigation {
 			id: pathRow
@@ -50,7 +43,6 @@ PluginPage {
 				uid: pathRow.hasPathsBelow ? "" : pathRow.uid
 			}
 
-			width: ListView.view.width
 			text: pathRow.name
 			secondaryText: pathRow.hasPathsBelow ? ""
 				: pathRow.pathValue.valid ? String(pathRow.pathValue.value)
