@@ -1053,6 +1053,59 @@ def install_on_gx(name, host, key_path, json_path=''):
     if result.stderr:
         print("    ssh stderr:", result.stderr.decode('utf-8', 'replace'))
 
+# Options that a --config file cannot set.
+_NOT_IN_CONFIG = ('help', 'config', 'rcc')
+
+
+def read_config(path, parser):
+    """Reads compiler options from the JSON object in path, keyed by their long names without "--".
+
+    An option that takes one value is a string, a flag is true or false, and an option that can be
+    given more than once is a list with one list of arguments for each time, as on the command line.
+    Returns the values by argparse dest. Stops the compiler if the file or a value is invalid."""
+    try:
+        with open(path, encoding='utf-8') as file:
+            config = json.load(file)
+    except (OSError, ValueError) as e:
+        print("\n\nERROR: cannot read --config %s: %s" % (path, e))
+        sys.exit(1)
+    if not isinstance(config, dict):
+        print("\n\nERROR: --config %s must hold a JSON object" % path)
+        sys.exit(1)
+
+    actions = {}
+    for action in parser._actions:
+        longNames = [o[2:] for o in action.option_strings if o.startswith('--')]
+        if longNames and longNames[0] not in _NOT_IN_CONFIG:
+            actions[longNames[0]] = action
+
+    values = {}
+    for key, value in config.items():
+        action = actions.get(key)
+        if action is None:
+            print("\n\nERROR: --config %s: unknown option %r. Valid options: %s"
+                  % (path, key, ", ".join(sorted(actions))))
+            sys.exit(1)
+        if action.nargs == 0:
+            valid = isinstance(value, bool)
+            expected = 'true or false'
+        elif isinstance(action, argparse._AppendAction):
+            valid = (isinstance(value, list) and all(isinstance(args, list) and args for args in value)
+                     and all(isinstance(arg, (str, int)) and not isinstance(arg, bool)
+                             for args in value for arg in args))
+            expected = 'a list of argument lists, such as [["a", "b"]]'
+            if valid:
+                value = [[str(arg) for arg in args] for args in value]
+        else:
+            valid = isinstance(value, str)
+            expected = 'a string'
+        if not valid:
+            print("\n\nERROR: --config %s: %r must be %s" % (path, key, expected))
+            sys.exit(1)
+        values[action.dest] = value
+    return values
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='gui-v2-plugin-compiler',
@@ -1090,8 +1143,16 @@ if __name__ == '__main__':
                              'HOST is the device address, or root@HOST')
     parser.add_argument('--ssh-key', metavar='FILE', default='',
                         help='Private key for --install. Required with --install')
+    parser.add_argument('--config', metavar='FILE', default='',
+                        help='A JSON file of options, keyed by their long names without "--", for example '
+                             '{"settings": "Page.qml", "devicelist": [["0x106", "Device.qml", "Title"]]}. '
+                             'An option given on the command line replaces the one in the file')
 
     args = parser.parse_args()
+    if args.config:
+        for dest, value in read_config(args.config, parser).items():
+            if getattr(args, dest) == parser.get_default(dest):
+                setattr(args, dest, value)
     if bool(args.install) != bool(args.ssh_key):
         print("\n\nERROR: --install and --ssh-key must be given together")
         sys.exit(1)

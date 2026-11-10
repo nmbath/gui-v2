@@ -326,7 +326,15 @@ class CompiledFilesTest(unittest.TestCase):
     SETTINGS = 'import Victron.GuiPlugins\nPluginPage {}\n'
     BRANDING = 'import Victron.Branding\nBranding {\n\tcolor_brand: "#F28C28"\n}\n'
 
-    def compile(self, files, args):
+    def compile(self, files, args, config=None):
+        result, work = self.run_compiler(files, args, config)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        written = sorted(name for name in os.listdir(work) if name.endswith('.json'))
+        return work, written
+
+    def run_compiler(self, files, args, config=None):
+        """Runs the compiler in a plugin directory holding files. config, if given, is written to a
+        --config file outside that directory."""
         tmpDir = tempfile.TemporaryDirectory()
         self.addCleanup(tmpDir.cleanup)
         tmp = tmpDir.name
@@ -342,13 +350,55 @@ class CompiledFilesTest(unittest.TestCase):
         for name, contents in files.items():
             with open(os.path.join(work, name), 'w' if isinstance(contents, str) else 'wb') as file:
                 file.write(contents)
+        if config is not None:
+            configPath = os.path.join(tmp, 'config.json')
+            with open(configPath, 'w', encoding='utf-8') as file:
+                file.write(config if isinstance(config, str) else json.dumps(config))
+            args = args + ['--config', configPath]
         env = dict(os.environ, PATH=tools + os.pathsep + os.environ.get('PATH', ''))
         result = subprocess.run([sys.executable, '-B', os.path.join(TOOLS_DIR, 'gui-v2-plugin-compiler.py'),
                                  '--rcc', 'skip', '--qml-import-path', tmp] + args,
                                 cwd=work, env=env, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        written = sorted(name for name in os.listdir(work) if name.endswith('.json'))
-        return work, written
+        return result, work
+
+    def test_options_from_a_config_file(self):
+        work, written = self.compile(
+            {'Settings.qml': self.SETTINGS, 'Device.qml': self.SETTINGS, 'Branding.qml': self.BRANDING,
+             'OemName.rcc': b'plugin', 'OemName-custom-branding.rcc': b'branding'},
+            [], {'version': '2.1', 'settings': 'Settings.qml', 'devicelist': [['0x106', 'Device.qml', 'Cells']],
+                 'branding': 'Branding.qml', 'filter-empty-sources': True})
+        self.assertEqual(written, ['OemName-custom-branding.json', 'OemName-gui-v2.json'])
+        plugin = self.read(work, 'OemName-gui-v2.json')
+        self.assertEqual(plugin['version'], '2.1')
+        self.assertEqual([(i['type'], i.get('productId')) for i in plugin['integrations']],
+                         [(1, None), (2, '0x106')])
+        self.assertEqual(self.read(work, 'OemName-custom-branding.json')['version'], '2.1')
+
+    def test_command_line_replaces_the_config_file(self):
+        work, written = self.compile({'Settings.qml': self.SETTINGS, 'Other.qml': self.SETTINGS,
+                                      'OemName.rcc': b'plugin'},
+                                     ['--settings', 'Other.qml', '--version', '3.0'],
+                                     {'version': '2.1', 'settings': 'Settings.qml'})
+        plugin = self.read(work, 'OemName-gui-v2.json')
+        self.assertEqual(plugin['version'], '3.0')
+        self.assertEqual(plugin['integrations'], [{'type': 1, 'url': 'qrc:/OemName/Other.qml'}])
+
+    def test_config_file_errors(self):
+        for config, message in (
+                ('{"settings": ', 'cannot read --config'),
+                ('["settings"]', 'must hold a JSON object'),
+                ({'setings': 'Settings.qml'}, "unknown option 'setings'"),
+                ({'config': 'other.json'}, "unknown option 'config'"),
+                ({'settings': ['Settings.qml']}, "'settings' must be a string"),
+                ({'version': 2.1}, "'version' must be a string"),
+                ({'filter-empty-sources': 'yes'}, "'filter-empty-sources' must be true or false"),
+                ({'devicelist': ['0x106', 'Settings.qml', 'Cells']}, "'devicelist' must be a list of argument lists"),
+                ({'card': [['Card.qml', True]]}, "'card' must be a list of argument lists")):
+            with self.subTest(config=config):
+                result, work = self.run_compiler({'Settings.qml': self.SETTINGS}, [], config)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stdout)
+                self.assertEqual([name for name in os.listdir(work) if name.endswith('.json')], [])
 
     def read(self, work, name):
         with open(os.path.join(work, name), encoding='utf-8') as file:
