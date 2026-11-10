@@ -22,15 +22,17 @@ namespace GuiPlugins {
 	Set one of:
 	- serviceType and path, such as "settings" and "/Settings/Gui/DemoMode", for a service with
 	  one instance (settings, system, platform, or the plugin's own service). Leave deviceInstance
-	  unset. The uid is then BackendConnection::serviceUidForType(serviceType) + path.
+	  unset. The uid is then BackendConnection::serviceUidForType(serviceType) + "/" + path.
 	- serviceType, deviceInstance and path, for one device, such as "battery", 1 and
 	  "/Dc/0/Voltage". 0 is a real instance. The service uid cannot be built from the type and
 	  instance: on D-Bus and mock it has a suffix, and on MQTT the instance is part of the uid.
 	  AllDevicesModel already has the real service uid, so the data item watches that model and
-	  uses the matching device's serviceUid + path. uid stays empty until the device is there,
-	  and updates when that device appears, disappears or its service uid changes. If two devices
-	  have the same type and instance, the first one is used.
+	  uses the matching device's serviceUid + "/" + path. uid stays empty until the device is
+	  there, and updates when that device appears, disappears or its service uid changes. If two
+	  devices have the same type and instance, the first one is used.
 	- uid, the full uid, such as serviceUid + "/Dc/0/Voltage" on a PluginDevicePage.
+
+	The "/" at the start of path is optional.
 
 	min and max are the lowest and highest values that the system allows. Each is NaN when the
 	system does not give it, so a minimum of 0 can be told apart from no minimum.

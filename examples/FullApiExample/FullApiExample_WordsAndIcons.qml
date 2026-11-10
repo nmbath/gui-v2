@@ -11,7 +11,7 @@ import Victron.GuiPlugins
 PluginPage {
 	id: root
 
-	PluginGradientListView {
+	PluginItemListView {
 		PluginSettingsListHeader {
 			text: "Answers and actions"
 		}
@@ -110,7 +110,7 @@ PluginPage {
 
 		PluginListSetting {
 			text: "Tints"
-			// The tints are Text, SecondaryText, Warning, Critical, Success and Disabled.
+			// The tints are Text, SecondaryText, Warning, Critical, Success, Brand and Disabled.
 
 			Row {
 				spacing: 8
@@ -139,6 +139,11 @@ PluginPage {
 				PluginIconImage {
 					source: PluginIcons.checkmark
 					tint: PluginIconImage.Success
+				}
+
+				PluginIconImage {
+					source: PluginIcons.devices
+					tint: PluginIconImage.Brand
 				}
 
 				PluginIconImage {

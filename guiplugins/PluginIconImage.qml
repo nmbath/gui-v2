@@ -24,6 +24,7 @@ Item {
 		Warning,
 		Critical,
 		Success,
+		Brand,
 		Disabled
 	}
 
@@ -40,11 +41,12 @@ Item {
 		sourceSize.width: width
 		sourceSize.height: height
 		fillMode: Image.PreserveAspectFit
-		color: !root.enabled || root.tint === PluginIconImage.Disabled ? Theme.color_font_disabled
-			: root.tint === PluginIconImage.SecondaryText ? Theme.color_font_secondary
-			: root.tint === PluginIconImage.Warning ? Theme.color_warning
-			: root.tint === PluginIconImage.Critical ? Theme.color_critical
-			: root.tint === PluginIconImage.Success ? Theme.color_ok
-			: Theme.color_font_primary
+		color: !root.enabled || root.tint === PluginIconImage.Disabled ? PluginPalette.color_font_disabled
+			: root.tint === PluginIconImage.SecondaryText ? PluginPalette.color_font_secondary
+			: root.tint === PluginIconImage.Warning ? PluginPalette.color_warning
+			: root.tint === PluginIconImage.Critical ? PluginPalette.color_critical
+			: root.tint === PluginIconImage.Success ? PluginPalette.color_success
+			: root.tint === PluginIconImage.Brand ? PluginPalette.color_brand
+			: PluginPalette.color_font_primary
 	}
 }

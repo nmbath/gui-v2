@@ -1,19 +1,28 @@
 FullApiExample: a plugin that uses every type in Victron.GuiPlugins
 
-It adds a settings page with five subpages, and a page on the page of a
-Skylla-i charger (product id 0x106):
+It adds a settings page with seven subpages, and a page on the page of a
+Skylla-i charger (product id 0x106), with a subpage of its own:
 
 - FullApiExample_Main.qml: the settings page, with navigation list items.
 - FullApiExample_Readings.qml: text, quantities in each unit, and
   temperatures.
+- FullApiExample_Devices.qml: the devices of one service type, such as
+  every tank, and a value read from each device's service uid.
 - FullApiExample_Settings.qml: switches, text fields, numbers, options and
-  buttons, with and without data items.
-- FullApiExample_CustomItems.qml: list items with content of their own.
+  buttons, with and without data items, and a dialog that asks the user to
+  confirm a change.
+- FullApiExample_CustomItems.qml: list items with content of their own,
+  drawn with PluginPalette colors.
 - FullApiExample_AccessLevels.qml: list items shown, or changed, only from an
   access level.
 - FullApiExample_WordsAndIcons.qml: the common words, already translated,
   and the icons, drawn in the GUI's colors.
+- FullApiExample_Card.qml: a card with an icon, a title and a status, and
+  content of your own: a number and some text in the GUI's text sizes.
 - FullApiExample_Device.qml: the device page.
+- FullApiExample_Paths.qml: the paths of the device, with their values,
+  opened from the device page. A path with paths below it opens the page
+  again, for those paths.
 
 Together, the pages show every type in the API. A member that several types
 share, such as preferredVisible, showAccessLevel, writeAccessLevel, click()

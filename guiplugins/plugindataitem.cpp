@@ -293,13 +293,19 @@ void PluginDataItem::applyResolvedUid()
 		m_item->setUid(QString());
 		return;
 	}
+	QString serviceUid;
 	if (m_deviceInstance < 0) {
-		m_item->setUid(VenusOS::BackendConnection::create()->serviceUidForType(m_serviceType) + m_path);
+		serviceUid = VenusOS::BackendConnection::create()->serviceUidForType(m_serviceType);
+	} else {
+		const VenusOS::Device *device = m_watcher ? m_watcher->device() : nullptr;
+		serviceUid = device ? device->serviceUid() : QString();
+	}
+	if (serviceUid.isEmpty()) {
+		m_item->setUid(QString());
 		return;
 	}
-	const VenusOS::Device *device = m_watcher ? m_watcher->device() : nullptr;
-	const QString serviceUid = device ? device->serviceUid() : QString();
-	m_item->setUid(serviceUid.isEmpty() ? QString() : serviceUid + m_path);
+	const QString relativePath = m_path.startsWith(u'/') ? m_path.mid(1) : m_path;
+	m_item->setUid(relativePath.isEmpty() ? serviceUid : serviceUid + u'/' + relativePath);
 }
 
 QVariant PluginDataItem::value() const
