@@ -97,6 +97,9 @@ namespace {
 	// and its custom branding is custom-branding/<name>.json.
 	const QString gxAppsDir = QStringLiteral("/run/gx-apps/apps");
 
+	// Over MQTT, dbus-flashmq publishes the selected custom branding under this path.
+	const QString mqttCustomBrandingPath = QStringLiteral("GuiCustomizations/CustomBranding");
+
 	// The folder of the app named name, or an empty string if name cannot be a folder name.
 	QString gxAppPath(const QString &name) {
 		static const QRegularExpression nameExpression(QStringLiteral("^[A-Za-z0-9_.-]+$"));
@@ -287,6 +290,7 @@ GuiPluginLoader::GuiPluginLoader(QQmlEngine *engine, QObject *parent)
 		// Set up MQTT watchers on the gui plugins path,
 		// and read plugin data from those MQTT paths (if they exist).
 		connect(&m_invokeOnceTimer, &QTimer::timeout, this, &GuiPluginLoader::watchMqttPluginPaths);
+		connect(&m_customBrandingTimer, &QTimer::timeout, this, &GuiPluginLoader::fetchMqttCustomBranding);
 		BackendConnection *backend = BackendConnection::create();
 		connect(backend, &BackendConnection::stateChanged,
 				this, &GuiPluginLoader::triggerWatchMqttPluginPaths,
@@ -395,6 +399,8 @@ void GuiPluginLoader::watchMqttPluginPaths()
 		initPlugins();
 		return;
 	}
+
+	watchMqttCustomBranding();
 
 	VeQItem *guiCustomizations = backend->producer() && backend->producer()->services()
 			? backend->producer()->services()->itemChildren().value(QStringLiteral("GuiCustomizations"))
@@ -1282,6 +1288,61 @@ void GuiPluginLoader::loadCustomBrandingFile()
 		}
 	}
 	applyCustomBranding(json, json.isEmpty() ? QString() : selectedBranding);
+}
+
+void GuiPluginLoader::watchMqttCustomBranding()
+{
+	// dbus-flashmq publishes the custom branding selected in /CustomBranding as
+	// GuiCustomizations/CustomBranding/info, with its name, sha256 and chunks, like a plugin.
+	// Nothing, or an empty payload, means no custom branding.
+	BackendConnection *backend = BackendConnection::create();
+	if (m_mqttCustomBrandingInfoItem || !backend->producer() || !backend->producer()->services()) {
+		return;
+	}
+	m_mqttCustomBrandingInfoItem = backend->producer()->services()->itemGetOrCreate(
+			mqttCustomBrandingPath + QStringLiteral("/info"));
+	if (m_mqttCustomBrandingInfoItem) {
+		connect(m_mqttCustomBrandingInfoItem.data(), &VeQItem::valueChanged,
+				&m_customBrandingTimer, qOverload<>(&QTimer::start));
+		m_mqttCustomBrandingInfoItem->getValue(); // requests it, in case it was published before we subscribed.
+		m_customBrandingTimer.start();
+	}
+}
+
+void GuiPluginLoader::fetchMqttCustomBranding()
+{
+	const QVariantMap info = m_mqttCustomBrandingInfoItem
+			? m_mqttCustomBrandingInfoItem->getValue().toMap() : QVariantMap();
+	const QString name = info.value(QStringLiteral("name")).toString();
+	const QString sha256 = info.value(QStringLiteral("sha256")).toString();
+	if (name.isEmpty() || sha256.isEmpty()) {
+		delete m_customBrandingFetcher;
+		m_mqttCustomBrandingSha256.clear();
+		applyCustomBranding(QByteArray(), QString());
+		return;
+	}
+	if (sha256 == m_mqttCustomBrandingSha256
+			|| (m_customBrandingFetcher && m_customBrandingFetcher->sha256() == sha256)) {
+		return; // already applied, or being fetched.
+	}
+
+	delete m_customBrandingFetcher;
+	qCInfo(venusGui) << "Fetching custom branding" << name << "from MQTT";
+	GuiPluginMqttFetcher *fetcher = new GuiPluginMqttFetcher(name, sha256,
+			m_mqttCustomBrandingInfoItem->itemParent(), m_mqttCustomBrandingInfoItem, this);
+	m_customBrandingFetcher = fetcher;
+	connect(fetcher, &GuiPluginMqttFetcher::succeeded, this, [this, fetcher] {
+		m_mqttCustomBrandingSha256 = fetcher->sha256();
+		applyCustomBranding(fetcher->data(), fetcher->name());
+		fetcher->deleteLater();
+	});
+	connect(fetcher, &GuiPluginMqttFetcher::failed, this, [this, fetcher] {
+		qCWarning(venusGui) << "Failed to load custom branding" << fetcher->name() << "from MQTT";
+		m_mqttCustomBrandingSha256.clear();
+		applyCustomBranding(QByteArray(), QString());
+		fetcher->deleteLater();
+	});
+	fetcher->start();
 }
 
 void GuiPluginLoader::applyCustomBranding(const QByteArray &json, const QString &selectedBranding)

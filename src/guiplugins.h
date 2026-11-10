@@ -190,6 +190,8 @@ private:
 	void unloadSinglePluginData(const GuiPlugin &plugin);
 	void watchSelectedCustomBranding();
 	void loadCustomBrandingFile();
+	void watchMqttCustomBranding();
+	void fetchMqttCustomBranding();
 	void applyCustomBranding(const QByteArray &json, const QString &selectedBranding);
 	bool installPluginTranslatorForLanguage(const QString &pluginName, QLocale::Language language);
 	QString m_pluginsJson;
@@ -203,6 +205,11 @@ private:
 	QPointer<VeQItem> m_selectedCustomBrandingItem;
 	QFileSystemWatcher *m_customBrandingWatcher = nullptr;
 	QTimer m_customBrandingTimer;
+	// Over MQTT: GuiCustomizations/CustomBranding/info, the fetch in progress, and the sha256 of
+	// the custom branding applied.
+	QPointer<VeQItem> m_mqttCustomBrandingInfoItem;
+	QPointer<GuiPluginMqttFetcher> m_customBrandingFetcher;
+	QString m_mqttCustomBrandingSha256;
 	// The custom branding to apply once the QML engine is known.
 	QByteArray m_pendingCustomBrandingJson;
 	QString m_pendingCustomBrandingName;
