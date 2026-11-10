@@ -1046,7 +1046,7 @@ if __name__ == '__main__':
                              'An integer is an error. A title may be a location name only when a '
                              'location name follows it. Omitted location defaults to BeforeLevels. '
                              'The page file name must be unique and must not match a built-in page.')
-    parser.add_argument('-q', '--quickaccess', default='')
+    parser.add_argument('-q', '--quickaccess', required=False, nargs='+', action='append', help='2-3 args: page.qml icon.svg [icon_active.svg]')
     parser.add_argument('-c', '--card', default='')
     parser.add_argument('-b', '--branding', default='',     help='The Branding .qml file of a custom branding plugin')
     parser.add_argument('--qml-import-path', default=os.path.dirname(os.path.abspath(__file__)),
@@ -1218,8 +1218,40 @@ if __name__ == '__main__':
             if location is not None:
                 navIntegration["location"] = location
             integrations.append(navIntegration)
-    if len(args.quickaccess) > 0:
-        print("TODO: quick access...")
+    if args.quickaccess:
+        for integration in args.quickaccess:
+            if len(integration) < 2 or len(integration) > 3:
+                print("\n\nERROR: --quickaccess requires 2-3 args: page.qml icon.svg [icon_active.svg]")
+                sys.exit(1)
+            pageQml = integration[0]
+            iconFile = integration[1]
+            iconActiveFile = integration[2] if len(integration) == 3 else ''
+            if not pageQml.endswith('.qml'):
+                print("\n\nERROR: Quick access page must be a .qml file")
+                sys.exit(1)
+            if not os.path.exists(pageQml):
+                print(f"\n\nERROR: Quick access page \"{pageQml}\" not found in current directory")
+                sys.exit(1)
+            if not (iconFile.endswith('.svg') or iconFile.endswith('.png')):
+                print("\n\nERROR: Quick access icon must be a .svg or .png file")
+                sys.exit(1)
+            if not os.path.exists(iconFile):
+                print(f"\n\nERROR: Quick access icon \"{iconFile}\" not found in current directory")
+                sys.exit(1)
+            qaIntegration = {
+                "type": 4,
+                "url": "qrc:/" + args.name + "/" + pageQml,
+                "icon": "qrc:/" + args.name + "/" + iconFile
+            }
+            if len(iconActiveFile) > 0:
+                if not (iconActiveFile.endswith('.svg') or iconActiveFile.endswith('.png')):
+                    print("\n\nERROR: Quick access active icon must be a .svg or .png file")
+                    sys.exit(1)
+                if not os.path.exists(iconActiveFile):
+                    print(f"\n\nERROR: Quick access active icon \"{iconActiveFile}\" not found in current directory")
+                    sys.exit(1)
+                qaIntegration["iconActive"] = "qrc:/" + args.name + "/" + iconActiveFile
+            integrations.append(qaIntegration)
     if len(args.card) > 0:
         print("TODO: card...")
     if len(args.branding) > 0:

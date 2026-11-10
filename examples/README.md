@@ -11,6 +11,7 @@ deploy instructions.
 | 1    | **PluginSettingsPage**     | Settings > Integrations > UI Plugins > *your plugin* | `SimpleExample/`, `SimpleTrExample/` |
 | 2    | **DeviceListSettingsPage** | Device list settings for a specific product ID       | `DeviceListExample/`                 |
 | 3    | **NavigationPage**         | Main navigation bar, at a named location (default: before Levels). The location name is the last compiler argument; an integer is an error. | `NavigationExample/`                 |
+| 4    | **QuickAccessPane**        | Status bar icon that opens a full pane overlay       | `QuickAccessExample/`                |
 
 Types not listed in the table above are not part of this change.
 
@@ -72,3 +73,9 @@ Adds a page to the main nav bar with a brick icon. The page is a
 `PluginPage` and imports only `Victron.GuiPlugins`. It shows battery,
 DC PV and DC system values, plus a local switch. It does not list
 tanks: a `PluginDataItem` cannot enumerate them.
+
+### QuickAccessExample (Type 4)
+
+Adds a brick icon to the status bar. Clicking it opens a full-screen
+overlay pane (like the built-in Controls and Switches panes) showing
+battery, solar, water, and a water pump toggle.

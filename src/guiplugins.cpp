@@ -199,6 +199,10 @@ namespace {
 		}
 		return QStringList();
 #elif defined(VENUS_DESKTOP_BUILD)
+		const QByteArray overrideDir = qgetenv("VENUS_GUI_PLUGINS_DIR");
+		if (!overrideDir.isEmpty()) {
+			return QStringList { QString::fromLocal8Bit(overrideDir) };
+		}
 		// look in ~appdir/plugins/
 		const QString appDirPath = QCoreApplication::applicationDirPath();
 		QDir pluginDir = QDir(appDirPath);
