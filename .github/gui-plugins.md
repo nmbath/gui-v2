@@ -42,6 +42,16 @@ Seven example plugins show the rules in practice:
 
    For a card, give the card file and the pane, `1` for Controls or `2` for Switches: `--card PluginNameCard.qml 1`.
 
+   The options can also be kept in a JSON file and given with `--config <file>`. Each key is an option's long name without `--`. An option that takes one value is a string, a flag is `true` or `false`, and an option that can be given more than once is a list with one list of arguments for each time. An option given on the command line replaces the one in the file. For example:
+
+   ```json
+   {
+       "version": "1.2",
+       "settings": "PluginNameSettings.qml",
+       "devicelist": [["0x106", "PluginNameDevice.qml", "Cell Voltages"]]
+   }
+   ```
+
    Alternatively, compile it on a GX device if a Large image is installed, using `/opt/victronenergy/gui-v2/gui-v2-plugin-compiler.py`.
 4. The compiler packs every `.qml` file in the directory, so subpages need no option of their own. It writes `PluginName-gui-v2.json`.
 5. To try it on a GX device, add `--install <gx-host> --ssh-key <private-key>` to the compile command. This is for testing only. The compiler connects as root with that key, copies `PluginName-gui-v2.json`, as `PluginName.json`, to `/data/apps/available/PluginName/gui-v2/`, and symlinks that app directory to `/data/apps/enabled/PluginName`. A repeat install replaces that symlink. It will not replace a real directory. You can do the same copy and symlink by hand. On a desktop build of gui-v2, copy `PluginName-gui-v2.json` into the `plugins` directory next to the `venus-gui-v2` executable.
