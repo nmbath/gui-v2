@@ -40,6 +40,7 @@ class BackendConnection : public QObject
 	Q_PROPERTY(bool vrm READ isVrm WRITE setVrm NOTIFY vrmChanged FINAL)
 	Q_PROPERTY(bool ready READ isReady NOTIFY readyChanged FINAL)
 	Q_PROPERTY(bool readyLatched READ isReadyLatched NOTIFY readyLatchedChanged FINAL)
+	Q_PROPERTY(FileExchangeUploadStatus fileExchangeUploadStatus READ fileExchangeUploadStatus NOTIFY fileExchangeUploadStatusChanged FINAL)
 
 	friend class BackendConnectionTester;
 public:
@@ -80,6 +81,17 @@ public:
 		Full = 2
 	};
 	Q_ENUM(VrmPortalMode)
+
+	// The browser's upload of a file to com.victronenergy.appmanager's file exchange.
+	enum FileExchangeUploadStatus {
+		FileExchangeUploadIdle,
+		FileExchangeUploadSelected,
+		FileExchangeUploadSending,
+		FileExchangeUploadSent,
+		FileExchangeUploadFailed,
+		FileExchangeUploadCancelled
+	};
+	Q_ENUM(FileExchangeUploadStatus)
 
 	enum MqttClientError {
 		MqttClient_NoError = QMqttClient::NoError,
@@ -165,6 +177,10 @@ public:
 	Q_INVOKABLE void securityProtocolChanged();
 	Q_INVOKABLE void reloadPage();
 	Q_INVOKABLE void openUrl(const QString &url);
+	Q_INVOKABLE void chooseFileExchangeFile(const QString &accept = QString());
+	Q_INVOKABLE bool uploadFileExchangeFile(const QString &capabilityRef);
+	FileExchangeUploadStatus fileExchangeUploadStatus() const;
+	void setFileExchangeUploadStatus(FileExchangeUploadStatus status);
 
 #if defined(VENUS_WEBASSEMBLY_BUILD)
 	Q_INVOKABLE void hitWatchdog();
@@ -183,6 +199,7 @@ Q_SIGNALS:
 	void tokenChanged();
 	void idUserChanged();
 	void vrmChanged();
+	void fileExchangeUploadStatusChanged();
 	void nodeRedUrlChanged();
 	void signalKUrlChanged();
 	void producerChanged();
@@ -225,6 +242,7 @@ private:
 	bool m_vrm = false;
 	bool m_ready = false;
 	bool m_readyLatched = false;
+	FileExchangeUploadStatus m_fileExchangeUploadStatus = FileExchangeUploadIdle;
 
 	State m_state = BackendConnection::State::Idle;
 	HeartbeatState m_heartbeatState = BackendConnection::HeartbeatState::HeartbeatActive;

@@ -13,6 +13,7 @@ Item {
 
 	// Mock service implementations that configure various settings, mimic some system operations
 	// (in a limited manner) and animate data values to simulate a working system.
+	AppManagerImpl {}
 	BatteriesImpl {}
 	DevicesImpl {}
 	EvChargersImpl {}
