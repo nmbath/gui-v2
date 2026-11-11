@@ -70,6 +70,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/ColorButton.qml
     components/IconButton.qml
     components/InputPanel.qml
+    components/InstallerInformationAction.qml
     components/InverterAcOutSettings.qml
     components/IOChannelQuantityLabel.qml
     components/Led.qml
@@ -471,6 +472,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsHub4.qml
     pages/settings/PageSettingsHub4Feedin.qml
     pages/settings/PageSettingsHub4Peakshaving.qml
+    pages/settings/PageSettingsInstallerInformation.qml
+    pages/settings/PageSettingsInstallerInformationForm.qml
     pages/settings/PageSettingsIntegrations.qml
     pages/settings/PageSettingsLarge.qml
     pages/settings/PageSettingsLogger.qml
