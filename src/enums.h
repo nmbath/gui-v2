@@ -1153,6 +1153,29 @@ public:
 	};
 	Q_ENUM(ElectricalQuantity_Source)
 
+	// com.victronenergy.appmanager /FileExchange/Session/State
+	enum FileExchange_State {
+		FileExchange_State_Idle = 0,
+		FileExchange_State_Preparing = 1,
+		FileExchange_State_Waiting = 2,
+		FileExchange_State_Receiving = 3,
+		FileExchange_State_Review = 4,
+		FileExchange_State_Processing = 5,
+		FileExchange_State_Validating = 6,
+		FileExchange_State_Complete = 7,
+		FileExchange_State_Failed = 8,
+		FileExchange_State_Cancelled = 9
+	};
+	Q_ENUM(FileExchange_State)
+
+	// com.victronenergy.appmanager /GxApps/<name>/Components
+	enum GxApp_Component {
+		GxApp_Component_Gui = 0x1,
+		GxApp_Component_CustomBranding = 0x2,
+		GxApp_Component_Service = 0x4
+	};
+	Q_ENUM(GxApp_Component)
+
 	Q_INVOKABLE QString statusText_off() const;
 	Q_INVOKABLE QString statusText_unknown() const;
 

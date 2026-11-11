@@ -791,6 +791,86 @@
         }
     </script>
     <script type="text/javascript">
+        // The upload to com.victronenergy.appmanager's file exchange, started by
+        // BackendConnection::chooseFileExchangeFile() and uploadFileExchangeFile().
+        var fileExchangeUpload = null
+
+        function reportFileExchangeUpload(upload, status)
+        {
+            const mod = window._qtWasmModule
+            if (upload === fileExchangeUpload && mod && typeof mod.jsSetFileExchangeUploadStatus === 'function') {
+                mod.jsSetFileExchangeUploadStatus(status)
+            }
+        }
+
+        function chooseFileExchangeFile(accept)
+        {
+            const input = document.createElement("input")
+            input.type = "file"
+            input.accept = accept
+            const upload = { file: null, started: false }
+            fileExchangeUpload = upload
+            input.addEventListener("change", () => {
+                if (input.files && input.files.length > 0) {
+                    upload.file = input.files[0]
+                    reportFileExchangeUpload(upload, "selected")
+                } else {
+                    reportFileExchangeUpload(upload, "cancelled")
+                }
+            }, { once: true })
+            input.addEventListener("cancel", () => reportFileExchangeUpload(upload, "cancelled"), { once: true })
+            input.click()
+        }
+
+        // Asks for admission with the session's /FileExchange/Session/Transfer/CapabilityRef,
+        // then sends the file to the upload URL the admission gives.
+        function uploadFileExchangeFile(capabilityRef)
+        {
+            const upload = fileExchangeUpload
+            if (!upload || !upload.file || upload.started) {
+                return false
+            }
+            const uploadPathPattern = /^\/exchange\/upload\/[A-Za-z0-9_-]{32,128}$/
+            const fail = () => reportFileExchangeUpload(upload, "failed")
+            const filename = encodeURIComponent(upload.file.name)
+            upload.started = true
+            reportFileExchangeUpload(upload, "sending")
+            // Mock mode has no app manager; the mock service receives the file itself.
+            if (new URLSearchParams(location.search).has("mock")) {
+                setTimeout(() => reportFileExchangeUpload(upload, "sent"), 2000)
+                return true
+            }
+
+            const admission = new XMLHttpRequest()
+            admission.open("POST", "/exchange/" + capabilityRef + "/admit")
+            admission.setRequestHeader("X-Venus-Upload-Length", String(upload.file.size))
+            admission.setRequestHeader("X-Venus-Filename", filename)
+            admission.onerror = fail
+            admission.onload = () => {
+                let reply = {}
+                try {
+                    reply = JSON.parse(admission.responseText)
+                } catch (error) {
+                    fail()
+                    return
+                }
+                if (admission.status !== 201 || !uploadPathPattern.test(reply.uploadUrl || "")) {
+                    fail()
+                    return
+                }
+
+                const request = new XMLHttpRequest()
+                request.open("PUT", reply.uploadUrl)
+                request.setRequestHeader("X-Venus-Filename", filename)
+                request.onerror = fail
+                request.onload = () => reportFileExchangeUpload(upload, request.status === 201 ? "sent" : "failed")
+                request.send(upload.file)
+            }
+            admission.send()
+            return true
+        }
+    </script>
+    <script type="text/javascript">
         // ---- Touch input recovery guard ---------------------------------
         //
         // Workaround for a bug in the Qt WASM platform plugin: it removes a
