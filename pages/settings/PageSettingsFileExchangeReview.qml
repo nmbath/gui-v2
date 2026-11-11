@@ -4,6 +4,7 @@
 */
 
 import QtQuick
+import QtQuick.Layouts
 import Victron.VenusOS
 
 // What a file exchange session received, from /FileExchange/Session/Review, for the user to
@@ -14,6 +15,7 @@ Page {
 	required property FileExchangeAction fileExchangeAction
 	readonly property var review: FileExchange.review
 	readonly property bool isApp: FileExchange.action === "app-install" || FileExchange.action === "app-update"
+	readonly property bool isInstallerInformation: FileExchange.component === "installerInformation"
 	property string sessionId: FileExchange.sessionId
 	property bool confirming
 
@@ -101,12 +103,65 @@ Page {
 						: ""
 			}
 
+			ListSetting {
+				id: logoRow
+
+				//% "Logo"
+				text: qsTrId("fileexchange_review_logo")
+				preferredVisible: root.isInstallerInformation && !!root.review.logo
+				contentItem: RowLayout {
+					Label {
+						text: logoRow.text
+						font: logoRow.font
+						color: Theme.color_font_primary
+						Layout.fillWidth: true
+					}
+					Image {
+						source: root.isInstallerInformation ? root.review.logo || "" : ""
+						fillMode: Image.PreserveAspectFit
+						Layout.preferredHeight: Theme.geometry_installerInformation_logo_height
+						Layout.preferredWidth: Theme.geometry_installerInformation_logo_width
+					}
+				}
+			}
+
+			ReviewText {
+				//% "Company name"
+				text: qsTrId("fileexchange_review_company_name")
+				secondaryText: root.isInstallerInformation ? root.review.companyName || "" : ""
+			}
+
+			ReviewText {
+				//% "Company address"
+				text: qsTrId("fileexchange_review_company_address")
+				secondaryText: root.isInstallerInformation ? root.review.companyAddress || "" : ""
+			}
+
+			ReviewText {
+				//% "Telephone"
+				text: qsTrId("fileexchange_review_telephone")
+				secondaryText: root.isInstallerInformation ? root.review.telephone || "" : ""
+			}
+
+			ReviewText {
+				//% "Support email"
+				text: qsTrId("fileexchange_review_support_email")
+				secondaryText: root.isInstallerInformation ? root.review.supportEmail || "" : ""
+			}
+
 			ListButton {
 				text: root.fileExchangeAction.confirmText
 				secondaryText: root.fileExchangeAction.confirmButtonText
 				writeAccessLevel: VenusOS.User_AccessType_User
 				interactive: FileExchange.canConfirm
-				onClicked: Global.dialogLayer.open(confirmDialogComponent)
+				onClicked: {
+					if (root.fileExchangeAction.confirmTitle) {
+						Global.dialogLayer.open(confirmDialogComponent)
+					} else {
+						root.confirming = true
+						root.fileExchangeAction.confirm(root)
+					}
+				}
 			}
 
 			ListButton {

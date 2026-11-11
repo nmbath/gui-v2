@@ -822,6 +822,39 @@
             input.click()
         }
 
+        // Makes data the GUI has put together, such as a form's, the file to upload.
+        function setFileExchangeUploadData(filename, data)
+        {
+            fileExchangeUpload = {
+                file: new File([data], filename, { type: "application/json" }),
+                started: false
+            }
+        }
+
+        // Reads the chosen image as a data: URI, which is "" if it is larger than maximumSize.
+        function chooseFileExchangeImage(accept, maximumSize)
+        {
+            const input = document.createElement("input")
+            input.type = "file"
+            input.accept = accept
+            input.addEventListener("change", () => {
+                const mod = window._qtWasmModule
+                const file = input.files && input.files.length > 0 ? input.files[0] : null
+                if (!file || !mod || typeof mod.jsFileExchangeImageChosen !== 'function') {
+                    return
+                }
+                if (file.size > maximumSize) {
+                    mod.jsFileExchangeImageChosen(file.name, "")
+                    return
+                }
+                const reader = new FileReader()
+                reader.onload = () => mod.jsFileExchangeImageChosen(file.name, String(reader.result))
+                reader.onerror = () => mod.jsFileExchangeImageChosen(file.name, "")
+                reader.readAsDataURL(file)
+            }, { once: true })
+            input.click()
+        }
+
         // Asks for admission with the session's /FileExchange/Session/Transfer/CapabilityRef,
         // then sends the file to the upload URL the admission gives.
         function uploadFileExchangeFile(capabilityRef)

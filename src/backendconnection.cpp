@@ -296,6 +296,25 @@ bool BackendConnection::uploadFileExchangeFile(const QString &capabilityRef)
 	return !upload.isUndefined() && upload(capabilityRef.toStdString()).as<bool>();
 }
 
+void BackendConnection::setFileExchangeUploadData(const QString &filename, const QString &data)
+{
+	// The data becomes the file that uploadFileExchangeFile() sends.
+	setFileExchangeUploadStatus(FileExchangeUploadIdle);
+	const emscripten::val setData = emscripten::val::global("setFileExchangeUploadData");
+	if (!setData.isUndefined()) {
+		setData(filename.toStdString(), data.toStdString());
+	}
+}
+
+void BackendConnection::chooseFileExchangeImage(const QString &accept, int maximumSize)
+{
+	// 'chooseFileExchangeImage' is defined in index.html, and answers through jsFileExchangeImageChosen().
+	const emscripten::val choose = emscripten::val::global("chooseFileExchangeImage");
+	if (!choose.isUndefined()) {
+		choose(accept.toStdString(), maximumSize);
+	}
+}
+
 void BackendConnection::hitWatchdog()
 {
 	// 'watchdogHit' and 'guiv2initialized' are defined in index.html.
@@ -316,6 +335,8 @@ void BackendConnection::reloadPage() {}
 void BackendConnection::openUrl(const QString &) {}
 void BackendConnection::chooseFileExchangeFile(const QString &) {}
 bool BackendConnection::uploadFileExchangeFile(const QString &) { return false; }
+void BackendConnection::setFileExchangeUploadData(const QString &, const QString &) {}
+void BackendConnection::chooseFileExchangeImage(const QString &, int) {}
 
 #endif
 
@@ -865,8 +886,21 @@ void jsSetFileExchangeUploadStatus(const std::string &status)
 	}, Qt::QueuedConnection);
 }
 
+// Called from chooseFileExchangeImage() in index.html.
+void jsFileExchangeImageChosen(const std::string &filename, const std::string &dataUri)
+{
+	using Connection = Victron::VenusOS::BackendConnection;
+	Connection *connection = Connection::create();
+	const QString name = QString::fromStdString(filename);
+	const QString uri = QString::fromStdString(dataUri);
+	QMetaObject::invokeMethod(connection, [connection, name, uri]() {
+		emit connection->fileExchangeImageChosen(name, uri);
+	}, Qt::QueuedConnection);
+}
+
 EMSCRIPTEN_BINDINGS(backendconnection_bindings) {
 	emscripten::function("jsSetFileExchangeUploadStatus", &jsSetFileExchangeUploadStatus);
+	emscripten::function("jsFileExchangeImageChosen", &jsFileExchangeImageChosen);
 }
 
 #endif

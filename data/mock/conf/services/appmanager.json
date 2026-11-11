@@ -56,6 +56,23 @@
         "/FileExchange/Actions/app_update/Id": "app-update",
         "/FileExchange/Actions/app_update/Available": 1,
         "/FileExchange/Actions/app_update/UnavailableReason": 0,
-        "/FileExchange/Actions/app_update/MaxTransferSize": 8388608
+        "/FileExchange/Actions/app_update/MaxTransferSize": 8388608,
+        "/FileExchange/Actions/component_install/Id": "component-install",
+        "/FileExchange/Actions/component_install/Available": 1,
+        "/FileExchange/Actions/component_install/UnavailableReason": 0,
+        "/FileExchange/Actions/component_install/MaxTransferSize": 131072,
+        "/FileExchange/Actions/component_install/Components": "{\"installerInformation\": 131072}",
+        "/InstallerInformation/CompanyName": "",
+        "/InstallerInformation/CompanyAddress": "",
+        "/InstallerInformation/Telephone": "",
+        "/InstallerInformation/SupportEmail": "",
+        "/InstallerInformation/Logo": "",
+        "/InstallerInformation/Remove": 0
+    },
+    "com.victronenergy.settings": {
+        "/Settings/InstallerInformation/CompanyName": "",
+        "/Settings/InstallerInformation/CompanyAddress": "",
+        "/Settings/InstallerInformation/Telephone": "",
+        "/Settings/InstallerInformation/SupportEmail": ""
     }
 }
