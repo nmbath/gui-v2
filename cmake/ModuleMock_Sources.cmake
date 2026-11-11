@@ -1,4 +1,5 @@
 set(VictronMock_QML_MODULE_SOURCES
+    data/mock/AppManagerImpl.qml
     data/mock/BatteriesImpl.qml
     data/mock/DevicesImpl.qml
     data/mock/EvChargersImpl.qml
@@ -30,6 +31,7 @@ SET(VictronMock_QML_MODULE_RESOURCES
     data/mock/conf/split-phase.json
     data/mock/conf/switch-pane.json
     data/mock/conf/services/alternator.json
+    data/mock/conf/services/appmanager.json
     data/mock/conf/services/ble-sensors.json
     data/mock/conf/services/canbus-rvc.json
     data/mock/conf/services/cgwacs-energy-meters.json

@@ -2,6 +2,7 @@
     "files": [
         ":/data/mock/conf/setup-common.json",
         ":/data/mock/conf/services/alternator.json",
+        ":/data/mock/conf/services/appmanager.json",
         ":/data/mock/conf/services/ble-sensors.json",
         ":/data/mock/conf/services/canbus-rvc.json",
         ":/data/mock/conf/services/cgwacs-energy-meters.json",

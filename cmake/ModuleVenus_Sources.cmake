@@ -1,5 +1,6 @@
 set (VictronVenusOS_QML_MODULE_SINGLETON_SOURCES # All qml singletons have to be added here
     components/CommonWords.qml
+    components/FileExchange.qml
     components/FirmwareVersion.qml
     Global.qml
     data/Services.qml
@@ -53,6 +54,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/EnvironmentGaugePanel.qml
     components/EnvironmentGaugePanelBackground.qml
     components/ExpandedTanksView.qml
+    components/FileExchangeAction.qml
     components/FirmwareUpdate.qml
     components/FittedQuantityLabel.qml
     components/FixedWidthLabel.qml
@@ -185,6 +187,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     components/dialogs/VrmInstanceSwapDialog.qml
     components/dialogs/ESSMinimumSOCDialog.qml
     components/dialogs/EvcsChargerModeDialog.qml
+    components/dialogs/FileExchangeDialog.qml
     components/dialogs/GeneratorDialog.qml
     components/dialogs/GeneratorStartDialog.qml
     components/dialogs/GeneratorStopDialog.qml
@@ -449,6 +452,7 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsDynamicEss.qml
     pages/settings/PageSettingsEebus.qml
     pages/settings/PageSettingsEebusDevice.qml
+    pages/settings/PageSettingsFileExchangeReview.qml
     pages/settings/PageSettingsFirmware.qml
     pages/settings/PageSettingsFirmwareOffline.qml
     pages/settings/PageSettingsFirmwareOnline.qml
@@ -462,6 +466,8 @@ set (VictronVenusOS_QML_MODULE_SOURCES
     pages/settings/PageSettingsGeneral.qml
     pages/settings/PageSettingsGenerator.qml
     pages/settings/PageSettingsGsm.qml
+    pages/settings/PageSettingsGxApp.qml
+    pages/settings/PageSettingsGxApps.qml
     pages/settings/PageSettingsHub4.qml
     pages/settings/PageSettingsHub4Feedin.qml
     pages/settings/PageSettingsHub4Peakshaving.qml
