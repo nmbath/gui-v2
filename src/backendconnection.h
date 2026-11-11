@@ -179,6 +179,8 @@ public:
 	Q_INVOKABLE void openUrl(const QString &url);
 	Q_INVOKABLE void chooseFileExchangeFile(const QString &accept = QString());
 	Q_INVOKABLE bool uploadFileExchangeFile(const QString &capabilityRef);
+	Q_INVOKABLE void setFileExchangeUploadData(const QString &filename, const QString &data);
+	Q_INVOKABLE void chooseFileExchangeImage(const QString &accept, int maximumSize);
 	FileExchangeUploadStatus fileExchangeUploadStatus() const;
 	void setFileExchangeUploadStatus(FileExchangeUploadStatus status);
 
@@ -200,6 +202,8 @@ Q_SIGNALS:
 	void idUserChanged();
 	void vrmChanged();
 	void fileExchangeUploadStatusChanged();
+	// From chooseFileExchangeImage(): the image as a data: URI, or "" if it is over the size.
+	void fileExchangeImageChosen(const QString &filename, const QString &dataUri);
 	void nodeRedUrlChanged();
 	void signalKUrlChanged();
 	void producerChanged();
