@@ -207,6 +207,20 @@ Page {
 				}
 			}
 
+			ListNavigation {
+				//% "GX Applications"
+				text: qsTrId("pagesettingsintegrations_gx_applications")
+				// Only while venus-app-manager is running.
+				preferredVisible: appManagerCustomBranding.valid
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsGxApps.qml", {"title": text})
+
+				VeQuickItem {
+					id: appManagerCustomBranding
+
+					uid: BackendConnection.serviceUidForType("appmanager") + "/CustomBranding"
+				}
+			}
+
 			SettingsListHeader {
 				id: osLargeFeatures
 				readonly property bool largeEnabled: signalk.preferredVisible || nodeRed.preferredVisible
