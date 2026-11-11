@@ -16,6 +16,8 @@ Page {
 	readonly property bool isModified: fsModifiedStateItem.value === VenusOS.ModificationChecks_FsModifiedState_Modified
 		|| (systemHooksStateItem.valid && (systemHooksStateItem.value & VenusOS.ModificationChecks_SystemHooksState_HookLoadedAtStartup))
 	readonly property bool isRaspberry: modelItem.valid && modelItem.value.indexOf("Raspberry") !== -1
+	readonly property bool installerInformationSet: !!installerCompanyName.value || !!installerCompanyAddress.value
+			|| !!installerTelephone.value || !!installerSupportEmail.value
 
 	function supportStateText() {
 		let runningServices = []
@@ -127,9 +129,58 @@ Page {
 				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsAccessAndSecurity.qml", {"title": text})
 			}
 
+			ListNavigation {
+				//% "About"
+				text: qsTrId("pagesettingsgeneral_about")
+				// Only once the installer information is set in localsettings.
+				preferredVisible: root.installerInformationSet
+				onClicked: Global.pageManager.pushPage("/pages/settings/PageSettingsInstallerInformation.qml", {"title": text})
+
+				VeQuickItem {
+					id: installerCompanyName
+					uid: Services.settings.serviceUid + "/Settings/InstallerInformation/CompanyName"
+				}
+				VeQuickItem {
+					id: installerCompanyAddress
+					uid: Services.settings.serviceUid + "/Settings/InstallerInformation/CompanyAddress"
+				}
+				VeQuickItem {
+					id: installerTelephone
+					uid: Services.settings.serviceUid + "/Settings/InstallerInformation/Telephone"
+				}
+				VeQuickItem {
+					id: installerSupportEmail
+					uid: Services.settings.serviceUid + "/Settings/InstallerInformation/SupportEmail"
+				}
+			}
+
 			SettingsListHeader {
 				//% "Preferences"
 				text: qsTrId("pagesettingsgeneral_preferences")
+			}
+
+			ListNavigation {
+				//% "Add Installer Information"
+				text: qsTrId("pagesettingsgeneral_add_installer_information")
+				secondaryText: installerInformationAction.unavailableText
+				showAccessLevel: VenusOS.User_AccessType_SuperUser
+				// Until it is set, and only where com.victronenergy.appmanager can set it up.
+				preferredVisible: !root.installerInformationSet && FileExchange.valid
+				interactive: installerInformationAction.available
+				onClicked: {
+					if (Qt.platform.os === "wasm") {
+						Global.pageManager.pushPage("/pages/settings/PageSettingsInstallerInformationForm.qml",
+								{ title: installerInformationAction.title, fileExchangeAction: installerInformationAction })
+					} else {
+						installerInformationAction.start()
+					}
+				}
+
+				InstallerInformationAction {
+					id: installerInformationAction
+					page: root
+					returnPage: root
+				}
 			}
 
 			ListNavigation {
